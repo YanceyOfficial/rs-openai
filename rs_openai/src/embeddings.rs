@@ -2,7 +2,7 @@
 //!
 //! Related guide: [Embeddings](https://platform.openai.com/docs/guides/embeddings)
 
-use super::{OpenAI, Response};
+use super::{OpenAI, OpenAIResponse};
 use crate::error::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -59,7 +59,7 @@ impl<'a> Embeddings<'a> {
 
     /// Creates an embedding vector representing the input text.
     #[tokio::main]
-    pub async fn create(&self, req: &CreateEmbeddingRequest) -> Response<EmbeddingResponse> {
+    pub async fn create(&self, req: &CreateEmbeddingRequest) -> OpenAIResponse<EmbeddingResponse> {
         self.openai.post("/embeddings", req).await
     }
 }

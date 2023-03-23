@@ -1,6 +1,6 @@
 //! Given a chat conversation, the model will return a chat completion response.
 
-use super::{OpenAI, Response};
+use super::{OpenAI, OpenAIResponse};
 use crate::error::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -135,7 +135,7 @@ impl<'a> Chat<'a> {
 
     /// Creates a completion for the chat message.
     #[tokio::main]
-    pub async fn create(&self, req: &CreateChatRequest) -> Response<ChatResponse> {
+    pub async fn create(&self, req: &CreateChatRequest) -> OpenAIResponse<ChatResponse> {
         self.openai.post("/chat/completions", req).await
     }
 }

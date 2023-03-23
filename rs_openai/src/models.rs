@@ -1,7 +1,7 @@
 //! List and describe the various models available in the API.
 //! You can refer to the [Models](https://platform.openai.com/docs/models/overview) documentation to understand what models are available and the differences between them.
 
-use super::{OpenAI, Response};
+use super::{OpenAI, OpenAIResponse};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -53,14 +53,14 @@ impl<'a> Models<'a> {
     ///
     /// - `model` - The ID of the model to use for this request.
     #[tokio::main]
-    pub async fn retrieve(&self, model: &str) -> Response<ModelResponse> {
+    pub async fn retrieve(&self, model: &str) -> OpenAIResponse<ModelResponse> {
         self.openai.get(&format!("/models/{model}"), &()).await
     }
 
     /// Lists the currently available models, and provides basic information about each
     /// one such as the owner and availability.
     #[tokio::main]
-    pub async fn list(&self) -> Response<ModelListResponse> {
+    pub async fn list(&self) -> OpenAIResponse<ModelListResponse> {
         self.openai.get("/models", &()).await
     }
 }

@@ -35,7 +35,7 @@ mod r#macro;
 
 use error::{ApiErrorResponse, OpenAIError};
 
-type Response<T> = Result<T, error::OpenAIError>;
+type OpenAIResponse<T> = Result<T, error::OpenAIError>;
 
 /// Default v1 API base url
 pub const API_BASE: &str = "https://api.openai.com/v1";
@@ -71,7 +71,7 @@ impl<'a> OpenAI<'a> {
         method: reqwest::Method,
         route: &str,
         builder: F,
-    ) -> Response<T>
+    ) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
         F: FnOnce(RequestBuilder) -> RequestBuilder,
@@ -108,7 +108,7 @@ impl<'a> OpenAI<'a> {
         Ok(data)
     }
 
-    pub(crate) async fn get<T, F>(&self, route: &str, query: &F) -> Response<T>
+    pub(crate) async fn get<T, F>(&self, route: &str, query: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
         F: Serialize,
@@ -117,7 +117,7 @@ impl<'a> OpenAI<'a> {
             .await
     }
 
-    pub(crate) async fn post_form<T>(&self, route: &str, form_data: Form) -> Response<T>
+    pub(crate) async fn post_form<T>(&self, route: &str, form_data: Form) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
     {
@@ -127,7 +127,7 @@ impl<'a> OpenAI<'a> {
         .await
     }
 
-    pub(crate) async fn post<T, F>(&self, route: &str, json: &F) -> Response<T>
+    pub(crate) async fn post<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
         F: Serialize,
@@ -137,7 +137,7 @@ impl<'a> OpenAI<'a> {
     }
 
     #[allow(unused)]
-    pub(crate) async fn put<T, F>(&self, route: &str, json: &F) -> Response<T>
+    pub(crate) async fn put<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
         F: Serialize,
@@ -147,7 +147,7 @@ impl<'a> OpenAI<'a> {
     }
 
     #[allow(unused)]
-    pub(crate) async fn delete<T, F>(&self, route: &str, json: &F) -> Response<T>
+    pub(crate) async fn delete<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
         F: Serialize,

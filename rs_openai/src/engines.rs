@@ -6,7 +6,7 @@
 //!
 //! Please use their replacement, [Models](https://platform.openai.com/docs/api-reference/models), instead. [Learn more](https://help.openai.com/TODO).
 
-use super::{OpenAI, Response};
+use super::{OpenAI, OpenAIResponse};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -38,7 +38,7 @@ impl<'a> Engines<'a> {
         note = "The Engines endpoints are deprecated. Please use their replacement, Models, instead."
     )]
     #[tokio::main]
-    pub async fn list(&self) -> Response<EngineListResponse> {
+    pub async fn list(&self) -> OpenAIResponse<EngineListResponse> {
         self.openai.get("/engines", &()).await
     }
 
@@ -51,7 +51,7 @@ impl<'a> Engines<'a> {
         note = "The Engines endpoints are deprecated. Please use their replacement, Models, instead."
     )]
     #[tokio::main]
-    pub async fn retrieve(&self, engine_id: &str) -> Response<EngineResponse> {
+    pub async fn retrieve(&self, engine_id: &str) -> OpenAIResponse<EngineResponse> {
         self.openai.get(&format!("/engines/{engine_id}"), &()).await
     }
 }

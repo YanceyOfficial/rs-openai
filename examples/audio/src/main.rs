@@ -23,7 +23,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .file(FileMeta {
             file_content: buffer,
             filename: "xxxx".into(),
-            content_type: "".into(),
         })
         .model(AudioModel::Whisper1)
         .build()?;

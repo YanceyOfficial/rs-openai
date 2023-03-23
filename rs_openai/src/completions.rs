@@ -1,7 +1,7 @@
 //! Given a prompt, the model will return one or more predicted completions,
 //! and can also return the probabilities of alternative tokens at each position.
 
-use super::{OpenAI, Response};
+use super::{OpenAI, OpenAIResponse};
 use crate::chat::Stop;
 use crate::error::OpenAIError;
 use derive_builder::Builder;
@@ -168,7 +168,7 @@ impl<'a> Completions<'a> {
 
     /// Creates a completion for the provided prompt and parameters
     #[tokio::main]
-    pub async fn create(&self, req: &CreateCompletionRequest) -> Response<CompletionResponse> {
+    pub async fn create(&self, req: &CreateCompletionRequest) -> OpenAIResponse<CompletionResponse> {
         self.openai.post("/completions", req).await
     }
 }

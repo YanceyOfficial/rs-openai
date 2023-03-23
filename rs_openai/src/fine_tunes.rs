@@ -2,7 +2,7 @@
 //!
 //! Related guide: [Fine-tune models](https://platform.openai.com/docs/guides/fine-tuning)
 
-use super::{OpenAI, Response};
+use super::{OpenAI, OpenAIResponse};
 use crate::error::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -178,11 +178,11 @@ impl<'a> FineTunes<'a> {
 
     /// Creates a job that fine-tunes a specified model from a given dataset.
     ///
-    /// Response includes details of the enqueued job including job status and the name of the fine-tuned models once complete.
+    /// OpenAIResponse includes details of the enqueued job including job status and the name of the fine-tuned models once complete.
     ///
     /// [Learn more about Fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
     #[tokio::main]
-    pub async fn create(&self, req: &CreateFineTuneRequest) -> Response<FineTuneResponse> {
+    pub async fn create(&self, req: &CreateFineTuneRequest) -> OpenAIResponse<FineTuneResponse> {
         self.openai.post("/fine-tunes", req).await
     }
 
@@ -194,7 +194,7 @@ impl<'a> FineTunes<'a> {
     ///
     /// [Learn more about Fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
     #[tokio::main]
-    pub async fn retrieve(&self, fine_tune_id: &str) -> Response<FineTuneResponse> {
+    pub async fn retrieve(&self, fine_tune_id: &str) -> OpenAIResponse<FineTuneResponse> {
         self.openai
             .get(&format!("/fine-tunes/{fine_tune_id}"), &())
             .await
@@ -206,7 +206,7 @@ impl<'a> FineTunes<'a> {
     ///
     /// - `fine_tune_id` - The ID of the fine-tune job to cancel
     #[tokio::main]
-    pub async fn cancel(&self, fine_tune_id: &str) -> Response<FineTuneResponse> {
+    pub async fn cancel(&self, fine_tune_id: &str) -> OpenAIResponse<FineTuneResponse> {
         self.openai
             .post(&format!("/fine-tunes/{fine_tune_id}/cancel"), &())
             .await
@@ -214,7 +214,7 @@ impl<'a> FineTunes<'a> {
 
     /// List your organization's fine-tuning jobs
     #[tokio::main]
-    pub async fn list(&self) -> Response<FineTuneListResponse> {
+    pub async fn list(&self) -> OpenAIResponse<FineTuneListResponse> {
         self.openai.get("/fine-tunes", &()).await
     }
 
@@ -236,7 +236,7 @@ impl<'a> FineTunes<'a> {
         &self,
         fine_tune_id: &str,
         stream: Option<bool>,
-    ) -> Response<EventListResponse> {
+    ) -> OpenAIResponse<EventListResponse> {
         self.openai
             .get(&format!("/fine-tunes/{fine_tune_id}/events"), &stream)
             .await
@@ -248,7 +248,7 @@ impl<'a> FineTunes<'a> {
     ///
     /// - `model` - The model to delete
     #[tokio::main]
-    pub async fn delete_model(&self, model: &str) -> Response<DeleteFileResponse> {
+    pub async fn delete_model(&self, model: &str) -> OpenAIResponse<DeleteFileResponse> {
         self.openai.delete(&format!("/models/{model}"), &()).await
     }
 }

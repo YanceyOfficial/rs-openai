@@ -2,7 +2,7 @@
 //!
 //! Related guide: [Speech to text](https://platform.openai.com/docs/guides/speech-to-text)
 
-use super::{OpenAI, Response};
+use super::{OpenAI, OpenAIResponse};
 use crate::error::OpenAIError;
 use derive_builder::Builder;
 use reqwest::multipart::Form;
@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 pub struct FileMeta {
     pub file_content: Vec<u8>,
     pub filename: String,
-    pub content_type: String,
 }
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
@@ -33,121 +32,205 @@ pub enum ResponseFormat {
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
 pub enum Language {
-    #[strum(serialize = "afrikaans")]
-    Afrikaans,
-    #[strum(serialize = "arabic")]
-    Arabic,
-    #[strum(serialize = "armenian")]
-    Armenian,
-    #[strum(serialize = "azerbaijani")]
-    Azerbaijani,
-    #[strum(serialize = "belarusian")]
-    Belarusian,
-    #[strum(serialize = "bosnian")]
-    Bosnian,
-    #[strum(serialize = "bulgarian")]
-    Bulgarian,
-    #[strum(serialize = "catalan")]
-    Catalan,
-    #[strum(serialize = "chinese")]
-    Chinese,
-    #[strum(serialize = "croatian")]
-    Croatian,
-    #[strum(serialize = "czech")]
-    Czech,
-    #[strum(serialize = "danish")]
-    Danish,
-    #[strum(serialize = "dutch")]
-    Dutch,
     #[default]
-    #[strum(serialize = "english")]
+    #[strum(serialize = "en")]
     English,
-    #[strum(serialize = "estonian")]
-    Estonian,
-    #[strum(serialize = "finnish")]
-    Finnish,
-    #[strum(serialize = "french")]
-    French,
-    #[strum(serialize = "galician")]
-    Galician,
-    #[strum(serialize = "german")]
+    #[strum(serialize = "zh")]
+    Chinese,
+    #[strum(serialize = "de")]
     German,
-    #[strum(serialize = "greek")]
-    Greek,
-    #[strum(serialize = "hebrew")]
-    Hebrew,
-    #[strum(serialize = "hindi")]
-    Hindi,
-    #[strum(serialize = "hungarian")]
-    Hungarian,
-    #[strum(serialize = "icelandic")]
-    Icelandic,
-    #[strum(serialize = "indonesian")]
-    Indonesian,
-    #[strum(serialize = "italian")]
-    Italian,
-    #[strum(serialize = "japanese")]
-    Japanese,
-    #[strum(serialize = "kannada")]
-    Kannada,
-    #[strum(serialize = "kazakh")]
-    Kazakh,
-    #[strum(serialize = "korean")]
-    Korean,
-    #[strum(serialize = "latvian")]
-    Latvian,
-    #[strum(serialize = "lithuanian")]
-    Lithuanian,
-    #[strum(serialize = "macedonian")]
-    Macedonian,
-    #[strum(serialize = "malay")]
-    Malay,
-    #[strum(serialize = "marathi")]
-    Marathi,
-    #[strum(serialize = "maori")]
-    Maori,
-    #[strum(serialize = "nepali")]
-    Nepali,
-    #[strum(serialize = "norwegian")]
-    Norwegian,
-    #[strum(serialize = "persian")]
-    Persian,
-    #[strum(serialize = "polish")]
-    Polish,
-    #[strum(serialize = "portuguese")]
-    Portuguese,
-    #[strum(serialize = "romanian")]
-    Romanian,
-    #[strum(serialize = "russian")]
-    Russian,
-    #[strum(serialize = "serbian")]
-    Serbian,
-    #[strum(serialize = "slovak")]
-    Slovak,
-    #[strum(serialize = "slovenian")]
-    Slovenian,
-    #[strum(serialize = "spanish")]
+    #[strum(serialize = "es")]
     Spanish,
-    #[strum(serialize = "swahili")]
-    Swahili,
-    #[strum(serialize = "swedish")]
-    Swedish,
-    #[strum(serialize = "tagalog")]
-    Tagalog,
-    #[strum(serialize = "tamil")]
-    Tamil,
-    #[strum(serialize = "thai")]
-    Thai,
-    #[strum(serialize = "turkish")]
+    #[strum(serialize = "ru")]
+    Russian,
+    #[strum(serialize = "ko")]
+    Korean,
+    #[strum(serialize = "fr")]
+    French,
+    #[strum(serialize = "ja")]
+    Japanese,
+    #[strum(serialize = "pt")]
+    Portuguese,
+    #[strum(serialize = "tr")]
     Turkish,
-    #[strum(serialize = "ukrainian")]
-    Ukrainian,
-    #[strum(serialize = "urdu")]
-    Urdu,
-    #[strum(serialize = "vietnamese")]
+    #[strum(serialize = "pl")]
+    Polish,
+    #[strum(serialize = "ca")]
+    Catalan,
+    #[strum(serialize = "nl")]
+    Dutch,
+    #[strum(serialize = "ar")]
+    Arabic,
+    #[strum(serialize = "sv")]
+    Swedish,
+    #[strum(serialize = "it")]
+    Italian,
+    #[strum(serialize = "id")]
+    Indonesian,
+    #[strum(serialize = "hi")]
+    Hindi,
+    #[strum(serialize = "fi")]
+    Finnish,
+    #[strum(serialize = "vi")]
     Vietnamese,
-    #[strum(serialize = "welsh")]
+    #[strum(serialize = "he")]
+    Hebrew,
+    #[strum(serialize = "uk")]
+    Ukrainian,
+    #[strum(serialize = "el")]
+    Greek,
+    #[strum(serialize = "ms")]
+    Malay,
+    #[strum(serialize = "cs")]
+    Czech,
+    #[strum(serialize = "ro")]
+    Romanian,
+    #[strum(serialize = "da")]
+    Danish,
+    #[strum(serialize = "hu")]
+    Hungarian,
+    #[strum(serialize = "ta")]
+    Tamil,
+    #[strum(serialize = "no")]
+    Norwegian,
+    #[strum(serialize = "th")]
+    Thai,
+    #[strum(serialize = "ur")]
+    Urdu,
+    #[strum(serialize = "hr")]
+    Croatian,
+    #[strum(serialize = "bg")]
+    Bulgarian,
+    #[strum(serialize = "lt")]
+    Lithuanian,
+    #[strum(serialize = "la")]
+    Latin,
+    #[strum(serialize = "mi")]
+    Maori,
+    #[strum(serialize = "ml")]
+    Malayalam,
+    #[strum(serialize = "cy")]
     Welsh,
+    #[strum(serialize = "sk")]
+    Slovak,
+    #[strum(serialize = "te")]
+    Telugu,
+    #[strum(serialize = "fa")]
+    Persian,
+    #[strum(serialize = "lv")]
+    Latvian,
+    #[strum(serialize = "bn")]
+    Bengali,
+    #[strum(serialize = "sr")]
+    Serbian,
+    #[strum(serialize = "az")]
+    Azerbaijani,
+    #[strum(serialize = "sl")]
+    Slovenian,
+    #[strum(serialize = "kn")]
+    Kannada,
+    #[strum(serialize = "et")]
+    Estonian,
+    #[strum(serialize = "mk")]
+    Macedonian,
+    #[strum(serialize = "br")]
+    Breton,
+    #[strum(serialize = "eu")]
+    Basque,
+    #[strum(serialize = "is")]
+    Icelandic,
+    #[strum(serialize = "hy")]
+    Armenian,
+    #[strum(serialize = "ne")]
+    Nepali,
+    #[strum(serialize = "mn")]
+    Mongolian,
+    #[strum(serialize = "bs")]
+    Bosnian,
+    #[strum(serialize = "kk")]
+    Kazakh,
+    #[strum(serialize = "sq")]
+    Albanian,
+    #[strum(serialize = "sw")]
+    Swahili,
+    #[strum(serialize = "gl")]
+    Galician,
+    #[strum(serialize = "mr")]
+    Marathi,
+    #[strum(serialize = "pa")]
+    Punjabi,
+    #[strum(serialize = "si")]
+    Sinhala,
+    #[strum(serialize = "km")]
+    Khmer,
+    #[strum(serialize = "sn")]
+    Shona,
+    #[strum(serialize = "yo")]
+    Yoruba,
+    #[strum(serialize = "so")]
+    Somali,
+    #[strum(serialize = "af")]
+    Afrikaans,
+    #[strum(serialize = "oc")]
+    Occitan,
+    #[strum(serialize = "ka")]
+    Georgian,
+    #[strum(serialize = "be")]
+    Belarusian,
+    #[strum(serialize = "tg")]
+    Tajik,
+    #[strum(serialize = "sd")]
+    Sindhi,
+    #[strum(serialize = "gu")]
+    Gujarati,
+    #[strum(serialize = "am")]
+    Amharic,
+    #[strum(serialize = "yi")]
+    Yiddish,
+    #[strum(serialize = "lo")]
+    Lao,
+    #[strum(serialize = "uz")]
+    Uzbek,
+    #[strum(serialize = "fo")]
+    Faroese,
+    #[strum(serialize = "ht")]
+    HaitianCreole,
+    #[strum(serialize = "ps")]
+    Pashto,
+    #[strum(serialize = "tk")]
+    Turkmen,
+    #[strum(serialize = "nn")]
+    Nynorsk,
+    #[strum(serialize = "mt")]
+    Maltese,
+    #[strum(serialize = "sa")]
+    Sanskrit,
+    #[strum(serialize = "lb")]
+    Luxembourgish,
+    #[strum(serialize = "my")]
+    Myanmar,
+    #[strum(serialize = "bo")]
+    Tibetan,
+    #[strum(serialize = "tl")]
+    Tagalog,
+    #[strum(serialize = "mg")]
+    Malagasy,
+    #[strum(serialize = "as")]
+    Assamese,
+    #[strum(serialize = "tt")]
+    Tatar,
+    #[strum(serialize = "haw")]
+    Hawaiian,
+    #[strum(serialize = "ln")]
+    Lingala,
+    #[strum(serialize = "ha")]
+    Hausa,
+    #[strum(serialize = "ba")]
+    Bashkir,
+    #[strum(serialize = "jw")]
+    Javanese,
+    #[strum(serialize = "su")]
+    Sundanese,
 }
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
@@ -256,7 +339,10 @@ impl<'a> Audio<'a> {
 
     /// Transcribes audio into the input language.
     #[tokio::main]
-    pub async fn transcribe(&self, req: &CreateTranscriptionRequest) -> Response<AudioResponse> {
+    pub async fn transcribe(
+        &self,
+        req: &CreateTranscriptionRequest,
+    ) -> OpenAIResponse<AudioResponse> {
         let file_part = reqwest::multipart::Part::stream(req.file.file_content.clone())
             .file_name("file_name.mp4")
             .mime_str("application/octet-stream")
@@ -264,7 +350,7 @@ impl<'a> Audio<'a> {
 
         let mut form = Form::new()
             .part("file", file_part)
-            .text("model", "whisper-1");
+            .text("model", req.model.to_string());
 
         if let Some(language) = req.language.clone() {
             form = form.text("laguage", language.to_string());
@@ -289,7 +375,7 @@ impl<'a> Audio<'a> {
 
     /// Translates audio into English.
     #[tokio::main]
-    pub async fn translate(&self, req: &CreateTranslationRequest) -> Response<AudioResponse> {
+    pub async fn translate(&self, req: &CreateTranslationRequest) -> OpenAIResponse<AudioResponse> {
         let mut form = Form::new()
             .part(
                 req.file.filename.clone(),

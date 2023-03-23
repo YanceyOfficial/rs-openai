@@ -1,6 +1,6 @@
 //! Files are used to upload documents that can be used with features like [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tunes).
 
-use super::{OpenAI, Response};
+use super::{OpenAI, OpenAIResponse};
 use crate::error::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ impl<'a> Files<'a> {
     }
     /// Returns a list of files that belong to the user's organization.
     #[tokio::main]
-    pub async fn list(&self) -> Response<FileListResponse> {
+    pub async fn list(&self) -> OpenAIResponse<FileListResponse> {
         self.openai.get("/files", &()).await
     }
 
@@ -67,7 +67,7 @@ impl<'a> Files<'a> {
     ///
     /// - `file_id` - The ID of the file to use for this request
     #[tokio::main]
-    pub async fn delete(&self, file_id: &str) -> Response<DeleteFileResponse> {
+    pub async fn delete(&self, file_id: &str) -> OpenAIResponse<DeleteFileResponse> {
         self.openai.delete(&format!("/files/{file_id}"), &()).await
     }
 
@@ -75,7 +75,7 @@ impl<'a> Files<'a> {
     /// Currently, the size of all the files uploaded by one organization can be up to 1 GB.
     /// Please contact us if you need to increase the storage limit.
     #[tokio::main]
-    pub async fn upload(&self, req: &UploadFileRequest) -> Response<FileResponse> {
+    pub async fn upload(&self, req: &UploadFileRequest) -> OpenAIResponse<FileResponse> {
         self.openai.post("/files", req).await
     }
 
@@ -85,7 +85,7 @@ impl<'a> Files<'a> {
     ///
     /// - `file_id` - The ID of the file to use for this request
     #[tokio::main]
-    pub async fn retrieve(&self, file_id: &str) -> Response<FileResponse> {
+    pub async fn retrieve(&self, file_id: &str) -> OpenAIResponse<FileResponse> {
         self.openai.get(&format!("/files/{file_id}"), &()).await
     }
 
@@ -95,7 +95,7 @@ impl<'a> Files<'a> {
     ///
     /// - `file_id` - The ID of the file to use for this request
     #[tokio::main]
-    pub async fn retrieve_content(&self, file_id: &str) -> Response<String> {
+    pub async fn retrieve_content(&self, file_id: &str) -> OpenAIResponse<String> {
         self.openai
             .get(&format!("/files/{file_id}/content"), &())
             .await

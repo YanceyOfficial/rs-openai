@@ -2,7 +2,7 @@
 //!
 //! Related guide: [Image generation](https://platform.openai.com/docs/guides/images)
 
-use super::{OpenAI, Response};
+use super::{OpenAI, OpenAIResponse};
 use crate::error::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -121,13 +121,13 @@ impl<'a> Images<'a> {
 
     /// Creates an image given a prompt.
     #[tokio::main]
-    pub async fn create_image(&self, req: &CreateImageRequest) -> Response<ImageResponse> {
+    pub async fn create_image(&self, req: &CreateImageRequest) -> OpenAIResponse<ImageResponse> {
         self.openai.post("/images/generations", req).await
     }
 
     /// Creates an edited or extended image given an original image and a prompt.
     #[tokio::main]
-    pub async fn create_edit(&self, req: &CreateImageEditRequest) -> Response<ImageResponse> {
+    pub async fn create_edit(&self, req: &CreateImageEditRequest) -> OpenAIResponse<ImageResponse> {
         self.openai.post("/images/edits", req).await
     }
 
@@ -136,7 +136,7 @@ impl<'a> Images<'a> {
     pub async fn create_variations(
         &self,
         req: &CreateImageVariationRequest,
-    ) -> Response<ImageResponse> {
+    ) -> OpenAIResponse<ImageResponse> {
         self.openai.post("/images/variations", req).await
     }
 }

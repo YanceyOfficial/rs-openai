@@ -2,7 +2,7 @@
 //!
 //! Related guide: [Moderations](https://platform.openai.com/docs/guides/moderation)
 
-use super::{OpenAI, Response};
+use super::{OpenAI, OpenAIResponse};
 use crate::error::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -98,7 +98,7 @@ impl<'a> Moderations<'a> {
 
     /// Classifies if text violates OpenAI's Content Policy
     #[tokio::main]
-    pub async fn create(&self, req: &CreateModerationRequest) -> Response<ModerationResponse> {
+    pub async fn create(&self, req: &CreateModerationRequest) -> OpenAIResponse<ModerationResponse> {
         self.openai.post("/moderations", req).await
     }
 }

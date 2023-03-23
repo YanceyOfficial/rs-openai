@@ -1,6 +1,6 @@
 //! Given a prompt and an instruction, the model will return an edited version of the prompt.
 
-use super::{OpenAI, Response};
+use super::{OpenAI, OpenAIResponse};
 use crate::error::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -73,7 +73,7 @@ impl<'a> Edits<'a> {
     }
     /// Creates a new edit for the provided input, instruction, and parameters.
     #[tokio::main]
-    pub async fn create_edit(&self, req: &CreateEditRequest) -> Response<EditResponse> {
+    pub async fn create_edit(&self, req: &CreateEditRequest) -> OpenAIResponse<EditResponse> {
         self.openai.post("/edits", req).await
     }
 }
