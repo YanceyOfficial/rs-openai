@@ -1,0 +1,57 @@
+//! These endpoints describe and provide access to the various engines available in the API.
+//!
+//! # Warning
+//!
+//! The Engines endpoints are deprecated.
+//!
+//! Please use their replacement, [Models](https://platform.openai.com/docs/api-reference/models), instead. [Learn more](https://help.openai.com/TODO).
+
+use super::{OpenAI, Response};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct EngineResponse {
+    pub id: String,
+    pub object: String,
+    pub owner: String,
+    pub ready: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct EngineListResponse {
+    pub data: Vec<EngineResponse>,
+    pub object: String,
+}
+
+pub struct Engines<'a> {
+    openai: &'a OpenAI<'a>,
+}
+
+impl<'a> Engines<'a> {
+    pub fn new(openai: &'a OpenAI) -> Self {
+        Self { openai }
+    }
+
+    /// Lists the currently available (non-finetuned) models,
+    /// and provides basic information about each one such as the owner and availability.
+    #[deprecated(
+        note = "The Engines endpoints are deprecated. Please use their replacement, Models, instead."
+    )]
+    #[tokio::main]
+    pub async fn list(&self) -> Response<EngineListResponse> {
+        self.openai.get("/engines", &()).await
+    }
+
+    /// Retrieves a model instance, providing basic information about it such as the owner and availability.
+    ///
+    /// # Path parameters
+    ///
+    /// - `engine_id` - The ID of the engine to use for this request
+    #[deprecated(
+        note = "The Engines endpoints are deprecated. Please use their replacement, Models, instead."
+    )]
+    #[tokio::main]
+    pub async fn retrieve(&self, engine_id: &str) -> Response<EngineResponse> {
+        self.openai.get(&format!("/engines/{engine_id}"), &()).await
+    }
+}

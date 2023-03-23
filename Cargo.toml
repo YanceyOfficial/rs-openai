@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "rs_openai",
+    "examples/audio",
+    "examples/models",
+]
