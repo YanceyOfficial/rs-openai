@@ -11,10 +11,10 @@ use std::collections::HashMap;
 // Struct for the prompt parameter
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Prompt {
-    String(String),                       // Encoded as a string
-    ArrayOfString(Vec<String>),           // Encoded as an array of strings
-    ArrayOfTokens(Vec<String>),           // Encoded as an array of tokens
-    ArrayOfTokenArrays(Vec<Vec<String>>), // Encoded as an array of token arrays
+    String(String),
+    ArrayOfString(Vec<String>),
+    ArrayOfTokens(Vec<String>),
+    ArrayOfTokenArrays(Vec<Vec<String>>),
 }
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]

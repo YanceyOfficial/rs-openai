@@ -15,7 +15,7 @@ pub enum ModerationInput {
 }
 
 #[derive(Debug, Serialize, Default, Clone)]
-pub enum ModerationModel {
+pub enum Model {
     #[default]
     #[serde(rename = "text-moderation-latest")]
     Latest,
@@ -40,7 +40,7 @@ pub struct CreateModerationRequest {
     /// If you use `text-moderation-stable`, we will provide advanced notice before updating the model.
     /// Accuracy of `text-moderation-stable` may be slightly lower than for `text-moderation-latest`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub model: Option<ModerationModel>,
+    pub model: Option<Model>, // default: "text-moderation-latest"
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,7 +96,7 @@ impl<'a> Moderations<'a> {
         Self { openai }
     }
 
-    /// Classifies if text violates OpenAI's Content Policy
+    /// Classifies if text violates OpenAI's Content Policy.
     #[tokio::main]
     pub async fn create(&self, req: &CreateModerationRequest) -> OpenAIResponse<ModerationResponse> {
         self.openai.post("/moderations", req).await

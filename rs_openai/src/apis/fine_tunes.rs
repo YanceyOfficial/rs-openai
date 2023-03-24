@@ -232,7 +232,7 @@ impl<'a> FineTunes<'a> {
     /// The stream will terminate with a `data: [DONE]` message when the job is finished (succeeded, cancelled, or failed).
     ///     - If set to false, only events generated so far will be returned.
     #[tokio::main]
-    pub async fn list_event(
+    pub async fn retrieve_content(
         &self,
         fine_tune_id: &str,
         stream: Option<bool>,
