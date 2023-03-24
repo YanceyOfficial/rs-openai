@@ -1,7 +1,7 @@
 //! Files are used to upload documents that can be used with features like [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tunes).
 
 use super::{OpenAI, OpenAIResponse};
-use crate::error::OpenAIError;
+use crate::shared::errors::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 

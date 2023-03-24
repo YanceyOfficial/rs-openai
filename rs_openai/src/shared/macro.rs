@@ -50,14 +50,14 @@ impl_from!(String, ModerationInput);
 impl_from!(&String, ModerationInput);
 impl_from!(&str, ModerationInput);
 
-impl_from!(String, Stop);
-impl_from!(&String, Stop);
-impl_from!(&str, Stop);
+// impl_from!(String, Stop);
+// impl_from!(&String, Stop);
+// impl_from!(&str, Stop);
 
 impl_from!(String, Prompt);
 impl_from!(&String, Prompt);
 impl_from!(&str, Prompt);
 
 impl_default!(ModerationInput);
-impl_default!(Stop);
+// impl_default!(Stop);
 impl_default!(Prompt);

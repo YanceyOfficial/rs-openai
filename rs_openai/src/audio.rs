@@ -3,16 +3,11 @@
 //! Related guide: [Speech to text](https://platform.openai.com/docs/guides/speech-to-text)
 
 use super::{OpenAI, OpenAIResponse};
-use crate::error::OpenAIError;
+use crate::shared::errors::OpenAIError;
+use crate::shared::types::FileMeta;
 use derive_builder::Builder;
 use reqwest::multipart::Form;
 use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Default, Debug, Clone)]
-pub struct FileMeta {
-    pub file_content: Vec<u8>,
-    pub filename: String,
-}
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
 #[serde(rename_all = "snake_case")]
@@ -241,26 +236,6 @@ pub enum AudioModel {
     Whisper1,
 }
 
-// #[derive(Builder)]
-// pub struct FileMetaBuilder {
-//     #[builder(default)]
-//     file: Vec<u8>,
-//     #[builder(default)]
-//     filename: String,
-//     #[builder(default)]
-//     content_type: String,
-// }
-
-// impl FileMetaBuilder {
-//     pub fn build(self) -> Result<FileMeta, Box<dyn std::error::Error>> {
-//         Ok(FileMeta {
-//             file: self.file,
-//             filename: self.filename,
-//             content_type: self.content_type,
-//         })
-//     }
-// }
-
 #[derive(Builder, Clone, Debug, Default, Serialize)]
 #[builder(name = "CreateTranscriptionRequestArgs")]
 #[builder(pattern = "mutable")]
@@ -324,8 +299,26 @@ pub struct CreateTranslationRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct AudioResponse {
+pub struct VerboseJsonForAudioResponse {
+    pub task: Option<String>,
+    pub language: Option<String>,
+    pub duration: Option<f32>,
+    pub segments: Option<Vec<Segment>>,
     pub text: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Segment {
+    pub id: u32,
+    pub seek: u32,
+    pub start: f32,
+    pub end: f32,
+    pub text: String,
+    pub tokens: Vec<u32>,
+    pub temperature: f32,
+    pub avg_logprob: f32,
+    pub compression_ratio: f32,
+    pub no_speech_prob: f32,
 }
 
 pub struct Audio<'a> {
@@ -339,12 +332,12 @@ impl<'a> Audio<'a> {
 
     /// Transcribes audio into the input language.
     #[tokio::main]
-    pub async fn transcribe(
+    pub async fn create_transcription(
         &self,
         req: &CreateTranscriptionRequest,
-    ) -> OpenAIResponse<AudioResponse> {
-        let file_part = reqwest::multipart::Part::stream(req.file.file_content.clone())
-            .file_name("file_name.mp4")
+    ) -> OpenAIResponse<VerboseJsonForAudioResponse> {
+        let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
+            .file_name(req.file.filename.clone())
             .mime_str("application/octet-stream")
             .unwrap();
 
@@ -368,21 +361,22 @@ impl<'a> Audio<'a> {
             form = form.text("temperature", temperature.to_string());
         }
 
-        println!("{:?}", form);
-
         self.openai.post_form("/audio/transcriptions", form).await
     }
 
     /// Translates audio into English.
     #[tokio::main]
-    pub async fn translate(&self, req: &CreateTranslationRequest) -> OpenAIResponse<AudioResponse> {
+    pub async fn create_translation(
+        &self,
+        req: &CreateTranslationRequest,
+    ) -> OpenAIResponse<VerboseJsonForAudioResponse> {
+        let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
+            .file_name(req.file.filename.clone())
+            .mime_str("application/octet-stream")
+            .unwrap();
+
         let mut form = Form::new()
-            .part(
-                req.file.filename.clone(),
-                reqwest::multipart::Part::bytes(req.file.file_content.clone())
-                    .file_name(req.file.filename.clone())
-                    .mime_str("application/octet-stream")?,
-            )
+            .part("file", file_part)
             .text("model", req.model.to_string());
 
         if let Some(prompt) = req.prompt.clone() {

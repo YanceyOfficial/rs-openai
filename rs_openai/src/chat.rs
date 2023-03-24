@@ -1,7 +1,9 @@
 //! Given a chat conversation, the model will return a chat completion response.
 
+use std::default::Default;
+
 use super::{OpenAI, OpenAIResponse};
-use crate::error::OpenAIError;
+use crate::shared::errors::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -119,7 +121,7 @@ pub struct ChatMessage {
 pub struct ChatResponse {
     pub id: String,
     pub object: String,
-    pub created: i64,
+    pub created: u32,
     pub choices: Vec<ChatChoice>,
     pub usage: ChatUsage,
 }

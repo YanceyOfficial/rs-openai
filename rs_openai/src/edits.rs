@@ -1,7 +1,7 @@
 //! Given a prompt and an instruction, the model will return an edited version of the prompt.
 
 use super::{OpenAI, OpenAIResponse};
-use crate::error::OpenAIError;
+use crate::shared::errors::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -45,7 +45,7 @@ pub struct CreateEditRequest {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EditResponse {
     pub object: String,
-    pub created: i64,
+    pub created: u32,
     pub choices: Vec<Choice>,
     pub usage: Usage,
 }

@@ -1,4 +1,4 @@
-use reqwest::header::HeaderMap;
+use reqwest::header::{HeaderMap, CONTENT_TYPE};
 use reqwest::multipart::Form;
 use reqwest::{Client, RequestBuilder};
 use serde::de::DeserializeOwned;
@@ -17,6 +17,8 @@ pub mod images;
 pub mod models;
 pub mod moderations;
 
+pub mod shared;
+
 pub use audio::Audio;
 pub use chat::Chat;
 pub use completions::Completions;
@@ -29,13 +31,7 @@ pub use images::Images;
 pub use models::Models;
 pub use moderations::Moderations;
 
-mod error;
-
-mod r#macro;
-
-use error::{ApiErrorResponse, OpenAIError};
-
-type OpenAIResponse<T> = Result<T, error::OpenAIError>;
+use shared::errors::{ApiErrorResponse, OpenAIError, OpenAIResponse, OpenAIResponseType};
 
 /// Default v1 API base url
 pub const API_BASE: &str = "https://api.openai.com/v1";
@@ -85,15 +81,23 @@ impl<'a> OpenAI<'a> {
 
         request = builder(request);
 
-        self.error_handler(request).await
+        self.resolve_response(request).await
     }
 
-    async fn error_handler<T>(&self, request: reqwest::RequestBuilder) -> Result<T, OpenAIError>
+    async fn resolve_response<T>(&self, request: reqwest::RequestBuilder) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
     {
         let response = request.send().await?;
         let status = response.status();
+        let is_text_plain = response
+            .headers()
+            .get(CONTENT_TYPE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_lowercase()
+            .contains("text/plain");
         let bytes = response.bytes().await?;
 
         if !status.is_success() {
@@ -103,9 +107,17 @@ impl<'a> OpenAI<'a> {
             return Err(OpenAIError::ApiError(api_error));
         }
 
+        if is_text_plain {
+            unsafe {
+                let text = String::from_utf8_unchecked(bytes.as_ref().to_vec());
+                return Ok(OpenAIResponseType::Text(text));
+            }
+        }
+
         let data: T =
             serde_json::from_slice(bytes.as_ref()).map_err(OpenAIError::JSONDeserialize)?;
-        Ok(data)
+
+        Ok(OpenAIResponseType::Json(data))
     }
 
     pub(crate) async fn get<T, F>(&self, route: &str, query: &F) -> OpenAIResponse<T>

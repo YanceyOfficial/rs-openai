@@ -3,7 +3,7 @@
 
 use super::{OpenAI, OpenAIResponse};
 use crate::chat::Stop;
-use crate::error::OpenAIError;
+use crate::shared::errors::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -136,7 +136,7 @@ type Map<K, V> = HashMap<K, V>; // HashMap to represent a key-value map
 pub struct CompletionResponse {
     pub id: String,
     pub object: String,
-    pub created: i64,
+    pub created: u32,
     pub model: String,
     pub choices: Vec<CompletionChoice>,
     pub usage: Usage,

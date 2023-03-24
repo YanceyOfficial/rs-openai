@@ -3,4 +3,6 @@ members = [
     "rs_openai",
     "examples/audio",
     "examples/models",
+    "examples/images",
+    "examples/engines",
 ]

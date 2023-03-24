@@ -41,3 +41,11 @@ pub struct ApiErrorDetail {
 pub struct ApiErrorResponse {
     pub error: ApiErrorDetail,
 }
+
+#[derive(Debug)]
+pub enum OpenAIResponseType<T> {
+    Json(T),
+    Text(String),
+}
+
+pub type OpenAIResponse<T> = Result<OpenAIResponseType<T>, OpenAIError>;
