@@ -1,21 +1,16 @@
 //! Given a chat conversation, the model will return a chat completion response.
 
 use std::default::Default;
-
-use super::{OpenAI, OpenAIResponse};
 use crate::shared::errors::OpenAIError;
+use crate::shared::types::Stop;
+use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum Stop {
-    String(String),
-    ArrayOfString(Vec<String>),
-}
+
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateChatRequestArgs")]
+#[builder(name = "CreateChatRequestBuilder")]
 #[builder(pattern = "mutable")]
 #[builder(setter(into, strip_option), default)]
 #[builder(derive(Debug))]

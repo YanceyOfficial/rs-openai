@@ -2,13 +2,13 @@
 //!
 //! Related guide: [Fine-tune models](https://platform.openai.com/docs/guides/fine-tuning)
 
-use super::{OpenAI, OpenAIResponse};
+use crate::{OpenAI, OpenAIResponse};
 use crate::shared::errors::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateFineTuneRequestArgs")]
+#[builder(name = "CreateFineTuneRequestBuilder")]
 #[builder(pattern = "mutable")]
 #[builder(setter(into, strip_option), default)]
 #[builder(derive(Debug))]
@@ -47,7 +47,7 @@ pub struct CreateFineTuneRequest {
     /// The number of epochs to train the model for.
     /// An epoch refers to one full cycle through the training dataset.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub n_epochs: Option<i32>,
+    pub n_epochs: Option<u32>,
 
     /// The batch size to use for training.
     /// The batch size is the number of training examples used to train a single forward and backward pass.
@@ -55,7 +55,7 @@ pub struct CreateFineTuneRequest {
     /// By default, the batch size will be dynamically configured to be ~0.2% of the number of examples in the training set, capped at 256.
     /// In general, we've found that larger batch sizes tend to work better for larger datasets.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub batch_size: Option<i32>,
+    pub batch_size: Option<u32>,
 
     /// The learning rate multiplier to use for training.
     /// The fine-tuning learning rate is the original learning rate used for pretraining multiplied by this value.
@@ -84,7 +84,7 @@ pub struct CreateFineTuneRequest {
     ///
     /// This parameter is required for multiclass classification.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub classification_n_classes: Option<i32>,
+    pub classification_n_classes: Option<u32>,
 
     /// The positive class in binary classification.
     ///
@@ -110,7 +110,7 @@ pub struct FineTuneResponse {
     pub id: String,
     pub object: String,
     pub model: String,
-    pub created_at: i64,
+    pub created_at: u32,
     pub events: Vec<FineTuneEvent>,
     pub fine_tuned_model: Option<String>,
     pub hyperparams: HyperParams,
@@ -119,13 +119,13 @@ pub struct FineTuneResponse {
     pub status: String,
     pub validation_files: Vec<TrainingFile>,
     pub training_files: Vec<TrainingFile>,
-    pub updated_at: i64,
+    pub updated_at: u32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FineTuneEvent {
     pub object: String,
-    pub created_at: i64,
+    pub created_at: u32,
     pub level: String,
     pub message: String,
 }
@@ -143,7 +143,7 @@ pub struct TrainingFile {
     pub id: String,
     pub object: String,
     pub bytes: i32,
-    pub created_at: i64,
+    pub created_at: u32,
     pub filename: String,
     pub purpose: String,
 }

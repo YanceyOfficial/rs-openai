@@ -1,6 +1,6 @@
-use crate::chat::Stop;
-use crate::moderations::ModerationInput;
-use crate::completions::Prompt;
+use crate::shared::types::Stop;
+use crate::apis::completions::Prompt;
+use crate::apis::moderations::ModerationInput;
 
 macro_rules! impl_from {
     ($from_typ:ty, $to_typ:ty) => {
@@ -50,9 +50,9 @@ impl_from!(String, ModerationInput);
 impl_from!(&String, ModerationInput);
 impl_from!(&str, ModerationInput);
 
-// impl_from!(String, Stop);
-// impl_from!(&String, Stop);
-// impl_from!(&str, Stop);
+impl_from!(String, Stop);
+impl_from!(&String, Stop);
+impl_from!(&str, Stop);
 
 impl_from!(String, Prompt);
 impl_from!(&String, Prompt);

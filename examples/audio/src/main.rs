@@ -1,7 +1,7 @@
 use dotenvy::dotenv;
 use rs_openai::{
     audio::{
-        AudioModel, CreateTranscriptionRequestArgs, CreateTranslationRequestArgs, ResponseFormat,
+        AudioModel, CreateTranscriptionRequestBuilder, CreateTranslationRequestBuilder, ResponseFormat,
     },
     shared::errors::OpenAIResponseType,
     shared::types::FileMeta,
@@ -33,7 +33,7 @@ fn create_transcription(
     client: &OpenAI,
     buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let request = CreateTranscriptionRequestArgs::default()
+    let request = CreateTranscriptionRequestBuilder::default()
         .file(FileMeta {
             buffer,
             filename: "dear_abe_san.mp4".into(),
@@ -53,7 +53,7 @@ fn create_transcription(
 }
 
 fn create_translation(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
-    let request = CreateTranslationRequestArgs::default()
+    let request = CreateTranslationRequestBuilder::default()
         .file(FileMeta {
             buffer,
             filename: "dear_abe_san.mp4".into(),

@@ -2,9 +2,9 @@
 //!
 //! Related guide: [Speech to text](https://platform.openai.com/docs/guides/speech-to-text)
 
-use super::{OpenAI, OpenAIResponse};
 use crate::shared::errors::OpenAIError;
 use crate::shared::types::FileMeta;
+use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use reqwest::multipart::Form;
 use serde::{Deserialize, Serialize};
@@ -237,7 +237,7 @@ pub enum AudioModel {
 }
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateTranscriptionRequestArgs")]
+#[builder(name = "CreateTranscriptionRequestBuilder")]
 #[builder(pattern = "mutable")]
 #[builder(setter(into, strip_option), default)]
 #[builder(derive(Debug))]
@@ -270,7 +270,7 @@ pub struct CreateTranscriptionRequest {
 }
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateTranslationRequestArgs")]
+#[builder(name = "CreateTranslationRequestBuilder")]
 #[builder(pattern = "mutable")]
 #[builder(setter(into, strip_option), default)]
 #[builder(derive(Debug))]

@@ -1,12 +1,14 @@
 //! Files are used to upload documents that can be used with features like [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tunes).
 
-use super::{OpenAI, OpenAIResponse};
+use crate::{OpenAI, OpenAIResponse};
 use crate::shared::errors::OpenAIError;
+use crate::shared::types::FileMeta;
 use derive_builder::Builder;
+use reqwest::multipart::Form;
 use serde::{Deserialize, Serialize};
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "UploadFileRequestArgs")]
+#[builder(name = "UploadFileRequestBuilder")]
 #[builder(pattern = "mutable")]
 #[builder(setter(into, strip_option), default)]
 #[builder(derive(Debug))]
@@ -15,7 +17,7 @@ pub struct UploadFileRequest {
     /// Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be uploaded.
     ///
     /// If the `purpose` is set to "fine-tune", each line is a JSON record with "prompt" and "completion" fields representing your [training examples](https://platform.openai.com/docs/guides/fine-tuning/prepare-training-data).
-    pub file: String,
+    pub file: FileMeta,
 
     /// The intended purpose of the uploaded documents.
     ///
@@ -24,7 +26,7 @@ pub struct UploadFileRequest {
     pub purpose: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct FileResponse {
     pub id: String,
     pub object: String,
@@ -34,13 +36,13 @@ pub struct FileResponse {
     pub purpose: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct FileListResponse {
     pub data: Vec<FileResponse>,
     pub object: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct DeleteFileResponse {
     pub id: String,
     pub object: String,
@@ -61,6 +63,23 @@ impl<'a> Files<'a> {
         self.openai.get("/files", &()).await
     }
 
+    /// Upload a file that contains document(s) to be used across various endpoints/features.
+    /// Currently, the size of all the files uploaded by one organization can be up to 1 GB.
+    /// Please contact us if you need to increase the storage limit.
+    #[tokio::main]
+    pub async fn upload(&self, req: &UploadFileRequest) -> OpenAIResponse<FileResponse> {
+        let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
+            .file_name(req.file.filename.clone())
+            .mime_str("application/octet-stream")
+            .unwrap();
+
+        let form = Form::new()
+            .part("file", file_part)
+            .text("purpose", req.purpose.to_string());
+
+        self.openai.post_form("/files", form).await
+    }
+
     /// Delete a file.
     ///
     /// # Path parameters
@@ -69,14 +88,6 @@ impl<'a> Files<'a> {
     #[tokio::main]
     pub async fn delete(&self, file_id: &str) -> OpenAIResponse<DeleteFileResponse> {
         self.openai.delete(&format!("/files/{file_id}"), &()).await
-    }
-
-    /// Upload a file that contains document(s) to be used across various endpoints/features.
-    /// Currently, the size of all the files uploaded by one organization can be up to 1 GB.
-    /// Please contact us if you need to increase the storage limit.
-    #[tokio::main]
-    pub async fn upload(&self, req: &UploadFileRequest) -> OpenAIResponse<FileResponse> {
-        self.openai.post("/files", req).await
     }
 
     /// Returns information about a specific file.

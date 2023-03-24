@@ -1,8 +1,8 @@
 use dotenvy::dotenv;
 use rs_openai::{
     images::{
-        CreateImageEditRequestArgs, CreateImageRequestArgs, CreateImageVariationRequestArgs,
-        ResponseFormat,
+        CreateImageEditRequestBuilder, CreateImageRequestBuilder,
+        CreateImageVariationRequestBuilder, ResponseFormat,
     },
     shared::errors::OpenAIResponseType,
     shared::types::FileMeta,
@@ -20,19 +20,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         org_id: None,
     });
 
-    // let mut file = File::open("./assets/worldcup.jpg").unwrap();
-    // let mut buffer = Vec::new();
-    // file.read_to_end(&mut buffer)?;
+    let mut file = File::open("./assets/worldcup.jpg").unwrap();
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
 
     create(&client)?;
-    // create_edit(&client, buffer.clone())?;
-    // create_variations(&client, buffer.clone())?;
+    create_edit(&client, buffer.clone())?;
+    create_variations(&client, buffer.clone())?;
 
     Ok(())
 }
 
 fn create(client: &OpenAI) -> Result<(), Box<dyn std::error::Error>> {
-    let request = CreateImageRequestArgs::default()
+    let request = CreateImageRequestBuilder::default()
         .prompt("world cup 2022, argentina celebration.")
         .response_format(ResponseFormat::B64Json)
         .build()?;
@@ -49,7 +49,7 @@ fn create(client: &OpenAI) -> Result<(), Box<dyn std::error::Error>> {
 
 #[allow(unused)]
 fn create_edit(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
-    let request = CreateImageEditRequestArgs::default()
+    let request = CreateImageEditRequestBuilder::default()
         .image(FileMeta {
             buffer,
             filename: "worldcup.jpg".into(),
@@ -68,7 +68,7 @@ fn create_edit(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn std::erro
 
 #[allow(unused)]
 fn create_variations(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
-    let request = CreateImageVariationRequestArgs::default()
+    let request = CreateImageVariationRequestBuilder::default()
         .image(FileMeta {
             buffer,
             filename: "worldcup.jpg".into(),

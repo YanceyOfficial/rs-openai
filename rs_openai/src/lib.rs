@@ -5,33 +5,17 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt::Debug;
 
-pub mod audio;
-pub mod chat;
-pub mod completions;
-pub mod edits;
-pub mod embeddings;
-pub mod engines;
-pub mod files;
-pub mod fine_tunes;
-pub mod images;
-pub mod models;
-pub mod moderations;
-
+pub mod apis;
 pub mod shared;
 
-pub use audio::Audio;
-pub use chat::Chat;
-pub use completions::Completions;
-pub use edits::Edits;
-pub use embeddings::Embeddings;
-pub use engines::Engines;
-pub use files::Files;
-pub use fine_tunes::FineTunes;
-pub use images::Images;
-pub use models::Models;
-pub use moderations::Moderations;
+#[doc(inline)]
+pub use apis::{
+    audio, chat, completions, edits, embeddings, engines, files, fine_tunes, images, models,
+    moderations,
+};
 
-use shared::errors::{ApiErrorResponse, OpenAIError, OpenAIResponse, OpenAIResponseType};
+#[doc(inline)]
+pub use shared::errors::{ApiErrorResponse, OpenAIError, OpenAIResponse, OpenAIResponseType};
 
 /// Default v1 API base url
 pub const API_BASE: &str = "https://api.openai.com/v1";
@@ -168,55 +152,55 @@ impl<'a> OpenAI<'a> {
             .await
     }
 
-    pub fn audio(&self) -> Audio {
-        Audio::new(self)
+    pub fn audio(&self) -> audio::Audio {
+        audio::Audio::new(self)
     }
 
-    pub fn chat(&self) -> Chat {
-        Chat::new(self)
+    pub fn chat(&self) -> chat::Chat {
+        chat::Chat::new(self)
     }
 
-    pub fn completions(&self) -> Completions {
-        Completions::new(self)
+    pub fn completions(&self) -> completions::Completions {
+        completions::Completions::new(self)
     }
 
-    pub fn edits(&self) -> Edits {
-        Edits::new(self)
+    pub fn edits(&self) -> edits::Edits {
+        edits::Edits::new(self)
     }
 
-    pub fn embeddings(&self) -> Embeddings {
-        Embeddings::new(self)
+    pub fn embeddings(&self) -> embeddings::Embeddings {
+        embeddings::Embeddings::new(self)
     }
 
-    pub fn engines(&self) -> Engines {
-        Engines::new(self)
+    pub fn engines(&self) -> engines::Engines {
+        engines::Engines::new(self)
     }
 
-    pub fn files(&self) -> Files {
-        Files::new(self)
+    pub fn files(&self) -> files::Files {
+        files::Files::new(self)
     }
 
-    pub fn fine_tunes(&self) -> FineTunes {
-        FineTunes::new(self)
+    pub fn fine_tunes(&self) -> fine_tunes::FineTunes {
+        fine_tunes::FineTunes::new(self)
     }
 
-    pub fn images(&self) -> Images {
-        Images::new(self)
+    pub fn images(&self) -> images::Images {
+        images::Images::new(self)
     }
 
-    pub fn models(&self) -> Models {
-        Models::new(self)
+    pub fn models(&self) -> models::Models {
+        models::Models::new(self)
     }
 
-    pub fn moderations(&self) -> Moderations {
-        Moderations::new(self)
+    pub fn moderations(&self) -> moderations::Moderations {
+        moderations::Moderations::new(self)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use apis::moderations::CreateModerationRequestBuilder;
     use dotenvy::dotenv;
-    use moderations::CreateModerationRequestArgs;
     use std::env;
 
     use super::*;
@@ -236,7 +220,7 @@ mod tests {
         // let res = openai.engines().retrieve("text-davinci-003");
         // println!("{:?}", res);
 
-        let req = CreateModerationRequestArgs::default()
+        let req = CreateModerationRequestBuilder::default()
             .input(["Do You Want To Build A Snowman?", "I will kill you."])
             .build()
             .unwrap();

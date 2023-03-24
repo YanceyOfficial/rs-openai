@@ -6,7 +6,7 @@
 //!
 //! Please use their replacement, [Models](https://platform.openai.com/docs/api-reference/models), instead. [Learn more](https://help.openai.com/TODO).
 
-use super::{OpenAI, OpenAIResponse};
+use crate::{OpenAI, OpenAIResponse};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]

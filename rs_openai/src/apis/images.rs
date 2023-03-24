@@ -2,7 +2,7 @@
 //!
 //! Related guide: [Image generation](https://platform.openai.com/docs/guides/images)
 
-use super::{OpenAI, OpenAIResponse};
+use crate::{OpenAI, OpenAIResponse};
 use crate::shared::errors::OpenAIError;
 use crate::shared::types::FileMeta;
 use derive_builder::Builder;
@@ -32,7 +32,7 @@ pub enum ImageSize {
 }
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateImageRequestArgs")]
+#[builder(name = "CreateImageRequestBuilder")]
 #[builder(pattern = "mutable")]
 #[builder(setter(into, strip_option), default)]
 #[builder(derive(Debug))]
@@ -59,7 +59,7 @@ pub struct CreateImageRequest {
 }
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateImageEditRequestArgs")]
+#[builder(name = "CreateImageEditRequestBuilder")]
 #[builder(pattern = "mutable")]
 #[builder(setter(into, strip_option), default)]
 #[builder(derive(Debug))]
@@ -96,7 +96,7 @@ pub struct CreateImageEditRequest {
 }
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateImageVariationRequestArgs")]
+#[builder(name = "CreateImageVariationRequestBuilder")]
 #[builder(pattern = "mutable")]
 #[builder(setter(into, strip_option), default)]
 #[builder(derive(Debug))]

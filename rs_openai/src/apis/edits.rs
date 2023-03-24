@@ -1,12 +1,12 @@
 //! Given a prompt and an instruction, the model will return an edited version of the prompt.
 
-use super::{OpenAI, OpenAIResponse};
+use crate::{OpenAI, OpenAIResponse};
 use crate::shared::errors::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateEditRequestArgs")]
+#[builder(name = "CreateEditRequestBuilder")]
 #[builder(pattern = "mutable")]
 #[builder(setter(into, strip_option), default)]
 #[builder(derive(Debug))]
