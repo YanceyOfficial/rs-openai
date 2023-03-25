@@ -1,7 +1,7 @@
 //! Files are used to upload documents that can be used with features like [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tunes).
 
 use crate::{OpenAI, OpenAIResponse};
-use crate::shared::errors::OpenAIError;
+use crate::shared::response_wrapper::OpenAIError;
 use crate::shared::types::FileMeta;
 use derive_builder::Builder;
 use reqwest::multipart::Form;
@@ -31,7 +31,7 @@ pub struct FileResponse {
     pub id: String,
     pub object: String,
     pub bytes: u64,
-    pub created_at: u64,
+    pub created_at: u32,
     pub filename: String,
     pub purpose: String,
 }

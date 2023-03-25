@@ -1,7 +1,7 @@
 //! Given a prompt and an instruction, the model will return an edited version of the prompt.
 
 use crate::{OpenAI, OpenAIResponse};
-use crate::shared::errors::OpenAIError;
+use crate::shared::response_wrapper::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 

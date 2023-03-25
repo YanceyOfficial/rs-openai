@@ -3,7 +3,7 @@
 //! Related guide: [Image generation](https://platform.openai.com/docs/guides/images)
 
 use crate::{OpenAI, OpenAIResponse};
-use crate::shared::errors::OpenAIError;
+use crate::shared::response_wrapper::OpenAIError;
 use crate::shared::types::FileMeta;
 use derive_builder::Builder;
 use reqwest::multipart::Form;

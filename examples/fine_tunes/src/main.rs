@@ -36,9 +36,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", retrieve);
 
     let cancel = client.fine_tunes().cancel("");
-    println!("{:?}", retrieve);
+    println!("{:?}", cancel);
 
-    let event = client.fine_tunes().retrieve_content()
+    let event = client.fine_tunes().retrieve_content("");
+    println!("{:?}", event);
 
     Ok(())
 }

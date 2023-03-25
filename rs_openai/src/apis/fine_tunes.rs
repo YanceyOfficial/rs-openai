@@ -2,8 +2,8 @@
 //!
 //! Related guide: [Fine-tune models](https://platform.openai.com/docs/guides/fine-tuning)
 
+use crate::shared::response_wrapper::OpenAIError;
 use crate::{OpenAI, OpenAIResponse};
-use crate::shared::errors::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -220,25 +220,36 @@ impl<'a> FineTunes<'a> {
 
     /// Get fine-grained status updates for a fine-tune job.
     ///
+    /// Only events generated so far will be returned.
+    ///
     /// # Path parameters
     ///
     /// - `fine_tune_id` - The ID of the fine-tune job to get events for.
-    ///
-    /// # Query parameters
-    ///
-    /// - `stream`
-    ///     - Whether to stream events for the fine-tune job. If set to true,
-    /// events will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available.
-    /// The stream will terminate with a `data: [DONE]` message when the job is finished (succeeded, cancelled, or failed).
-    ///     - If set to false, only events generated so far will be returned.
     #[tokio::main]
-    pub async fn retrieve_content(
+    pub async fn retrieve_content(&self, fine_tune_id: &str) -> OpenAIResponse<EventListResponse> {
+        self.openai
+            .get(&format!("/fine-tunes/{fine_tune_id}/events"), &())
+            .await
+    }
+
+    /// Get fine-grained status updates for a fine-tune job by stream.
+    ///
+    /// Events will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available.
+    /// The stream will terminate with a `data: [DONE]` message when the job is finished (succeeded, cancelled, or failed).
+    ///
+    /// # Path parameters
+    ///
+    /// - `fine_tune_id` - The ID of the fine-tune job to get events for.
+    #[tokio::main]
+    pub async fn r1etrieve_content_stream(
         &self,
         fine_tune_id: &str,
-        stream: Option<bool>,
     ) -> OpenAIResponse<EventListResponse> {
         self.openai
-            .get(&format!("/fine-tunes/{fine_tune_id}/events"), &stream)
+            .get(
+                &format!("/fine-tunes/{fine_tune_id}/events"),
+                &("stream", true),
+            )
             .await
     }
 

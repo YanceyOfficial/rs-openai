@@ -3,7 +3,7 @@
 //! Related guide: [Moderations](https://platform.openai.com/docs/guides/moderation)
 
 use crate::{OpenAI, OpenAIResponse};
-use crate::shared::errors::OpenAIError;
+use crate::shared::response_wrapper::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 

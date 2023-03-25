@@ -4,7 +4,7 @@ use rs_openai::{
         CreateImageEditRequestBuilder, CreateImageRequestBuilder,
         CreateImageVariationRequestBuilder, ResponseFormat,
     },
-    shared::errors::OpenAIResponseType,
+    shared::response_wrapper::OpenAIResponseType,
     shared::types::FileMeta,
     OpenAI,
 };

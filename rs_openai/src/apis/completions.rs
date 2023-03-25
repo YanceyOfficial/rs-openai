@@ -1,7 +1,7 @@
 //! Given a prompt, the model will return one or more predicted completions,
 //! and can also return the probabilities of alternative tokens at each position.
 
-use crate::shared::errors::OpenAIError;
+use crate::shared::response_wrapper::OpenAIError;
 use crate::shared::types::Stop;
 use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 // Struct for the prompt parameter
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum Prompt {
+pub enum Prompt { 
     String(String),
     ArrayOfString(Vec<String>),
     ArrayOfTokens(Vec<String>),

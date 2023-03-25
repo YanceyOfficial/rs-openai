@@ -1,7 +1,7 @@
 //! Given a chat conversation, the model will return a chat completion response.
 
 use std::default::Default;
-use crate::shared::errors::OpenAIError;
+use crate::shared::response_wrapper::OpenAIError;
 use crate::shared::types::Stop;
 use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;

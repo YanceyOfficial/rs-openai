@@ -1,3 +1,3 @@
 pub mod types;
-pub mod errors;
+pub mod response_wrapper;
 pub mod r#macro;

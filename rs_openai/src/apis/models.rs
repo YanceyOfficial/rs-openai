@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct ModelPermission {
     pub id: String,
     pub object: String,
-    pub created: u64,
+    pub created: u32,
     pub allow_create_engine: bool,
     pub allow_sampling: bool,
     pub allow_logprobs: bool,
@@ -16,7 +16,7 @@ pub struct ModelPermission {
     pub allow_view: bool,
     pub allow_fine_tuning: bool,
     pub organization: String,
-    pub group: Option<String>,
+    pub group: Option<String>, // Unknown type, assume to `Option<String>`
     pub is_blocking: bool,
 }
 
@@ -24,15 +24,15 @@ pub struct ModelPermission {
 pub struct ModelResponse {
     pub id: String,
     pub object: String,
-    pub created: u64,
+    pub created: u32,
     pub owned_by: String,
     pub permission: Vec<ModelPermission>,
     pub root: String,
-    pub parent: Option<String>,
+    pub parent: Option<String>, // Unknown type, assume to `Option<String>`
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ModelListResponse {
+pub struct ListModelResponse {
     pub object: String,
     pub data: Vec<ModelResponse>,
 }
@@ -46,8 +46,7 @@ impl<'a> Models<'a> {
         Self { openai }
     }
 
-    /// Retrieves a model instance, providing basic information about the model such as
-    /// the owner and permissioning.
+    /// Retrieves a model instance, providing basic information about the model such as the owner and permissioning.
     ///
     /// # Path parameters
     ///
@@ -57,10 +56,9 @@ impl<'a> Models<'a> {
         self.openai.get(&format!("/models/{model}"), &()).await
     }
 
-    /// Lists the currently available models, and provides basic information about each
-    /// one such as the owner and availability.
+    /// Lists the currently available models, and provides basic information about each one such as the owner and availability.
     #[tokio::main]
-    pub async fn list(&self) -> OpenAIResponse<ModelListResponse> {
+    pub async fn list(&self) -> OpenAIResponse<ListModelResponse> {
         self.openai.get("/models", &()).await
     }
 }

@@ -3,7 +3,7 @@ use rs_openai::{
     audio::{
         AudioModel, CreateTranscriptionRequestBuilder, CreateTranslationRequestBuilder, ResponseFormat,
     },
-    shared::errors::OpenAIResponseType,
+    shared::response_wrapper::OpenAIResponseType,
     shared::types::FileMeta,
     OpenAI,
 };

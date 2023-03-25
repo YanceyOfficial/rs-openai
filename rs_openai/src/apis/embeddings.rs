@@ -3,7 +3,7 @@
 //! Related guide: [Embeddings](https://platform.openai.com/docs/guides/embeddings)
 
 use crate::{OpenAI, OpenAIResponse};
-use crate::shared::errors::OpenAIError;
+use crate::shared::response_wrapper::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
