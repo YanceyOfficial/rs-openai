@@ -7,7 +7,7 @@ use crate::shared::response_wrapper::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(untagged)]
 pub enum ModerationInput {
     String(String),

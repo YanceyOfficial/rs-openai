@@ -1,7 +1,7 @@
 //! Given a prompt and an instruction, the model will return an edited version of the prompt.
 
-use crate::{OpenAI, OpenAIResponse};
 use crate::shared::response_wrapper::OpenAIError;
+use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -25,24 +25,34 @@ pub struct CreateEditRequest {
 
     /// How many edits to generate for the input and instruction.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub n: Option<i32>,
+    pub n: Option<u8>, // default: 1
 
     /// What sampling temperature to use, between 0 and 2.
     /// Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
     ///
     /// We generally recommend altering this or `top_p` but not both.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub temperature: Option<f32>,
+    pub temperature: Option<f32>, // min: 0, max: 2, default: 1
 
     /// An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass.
     /// So 0.1 means only the tokens comprising the top 10% probability mass are considered.
     ///
     /// We generally recommend altering this or `temperature` but not both.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub top_p: Option<f32>,
+    pub top_p: Option<f32>, //  default: 1
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+impl CreateEditRequestBuilder {
+    pub fn new(model: impl Into<String>, instruction_text: impl Into<String>) -> Self {
+        Self {
+            model: Some(model.into()),
+            instruction_text: Some(instruction_text.into()),
+            ..Self::default()
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
 pub struct EditResponse {
     pub object: String,
     pub created: u32,
@@ -50,17 +60,17 @@ pub struct EditResponse {
     pub usage: Usage,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct Choice {
     pub text: String,
-    pub index: i32,
+    pub index: u32,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct Usage {
-    pub prompt_tokens: i32,
-    pub completion_tokens: i32,
-    pub total_tokens: i32,
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u32,
 }
 
 pub struct Edits<'a> {
@@ -73,7 +83,7 @@ impl<'a> Edits<'a> {
     }
     /// Creates a new edit for the provided input, instruction, and parameters.
     #[tokio::main]
-    pub async fn create_edit(&self, req: &CreateEditRequest) -> OpenAIResponse<EditResponse> {
+    pub async fn create(&self, req: &CreateEditRequest) -> OpenAIResponse<EditResponse> {
         self.openai.post("/edits", req).await
     }
 }

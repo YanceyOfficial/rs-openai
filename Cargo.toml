@@ -7,4 +7,7 @@ members = [
     "examples/engines",
     "examples/moderations",
     "examples/fine_tunes",
+    "examples/completions",
+    "examples/chat",
+    "examples/edits",
 ]

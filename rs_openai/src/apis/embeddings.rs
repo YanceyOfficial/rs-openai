@@ -7,6 +7,15 @@ use crate::shared::response_wrapper::OpenAIError;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Clone)]
+#[serde(untagged)]
+pub enum EmbeddingInput {
+    String(String),
+    ArrayOfString(Vec<String>),
+    ArrayOfTokens(Vec<u16>),
+    ArrayOfTokenArrays(Vec<Vec<u16>>),
+}
+
 #[derive(Builder, Clone, Debug, Default, Serialize)]
 #[builder(name = "CreateEmbeddingRequestBuilder")]
 #[builder(pattern = "mutable")]
@@ -20,7 +29,7 @@ pub struct CreateEmbeddingRequest {
 
     /// Input text to get embeddings for, encoded as a string or array of tokens.
     /// To get embeddings for multiple inputs in a single request, pass an array of strings or array of token arrays. Each input must not exceed 8192 tokens in length.
-    pub input: Vec<String>,
+    pub input: EmbeddingInput,
 
     /// A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
     #[serde(skip_serializing_if = "Option::is_none")]

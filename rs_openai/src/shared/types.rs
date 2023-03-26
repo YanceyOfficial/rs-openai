@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 #[derive(Debug, Serialize, Clone, Default)]
 pub struct FileMeta {
@@ -6,7 +6,7 @@ pub struct FileMeta {
     pub filename: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(untagged)]
 pub enum Stop {
     String(String),
