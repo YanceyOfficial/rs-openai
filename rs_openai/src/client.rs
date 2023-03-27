@@ -39,14 +39,8 @@ impl<'a> OpenAI<'a> {
         headers
     }
 
-    async fn openai_request<T, F>(
-        &self,
-        method: reqwest::Method,
-        route: &str,
-        builder: F,
-    ) -> OpenAIResponse<T>
+    fn openai_request<F>(&self, method: reqwest::Method, route: &str, builder: F) -> RequestBuilder
     where
-        T: DeserializeOwned + Debug,
         F: FnOnce(RequestBuilder) -> RequestBuilder,
     {
         let client = Client::new();
@@ -57,8 +51,7 @@ impl<'a> OpenAI<'a> {
             .bearer_auth(self.api_key);
 
         request = builder(request);
-
-        self.resolve_response(request).await
+        request
     }
 
     async fn resolve_response<T>(&self, request: reqwest::RequestBuilder) -> OpenAIResponse<T>
@@ -82,23 +75,42 @@ impl<'a> OpenAI<'a> {
         Ok(data)
     }
 
+    async fn resolve_text_response(
+        &self,
+        request: reqwest::RequestBuilder,
+    ) -> OpenAIResponse<String> {
+        let response = request.send().await?;
+        let status = response.status();
+        let text = response.text().await?;
+
+        if !status.is_success() {
+            let api_error: ApiErrorResponse =
+                serde_json::from_slice(text.as_ref()).map_err(OpenAIError::JSONDeserialize)?;
+
+            return Err(OpenAIError::ApiError(api_error));
+        }
+
+        Ok(text)
+    }
+
     pub(crate) async fn get<T, F>(&self, route: &str, query: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
         F: Serialize,
     {
-        self.openai_request::<T, _>(reqwest::Method::GET, route, |request| request.query(query))
-            .await
+        let request =
+            self.openai_request(reqwest::Method::GET, route, |request| request.query(query));
+        self.resolve_response(request).await
     }
 
-    pub(crate) async fn post_form<T>(&self, route: &str, form_data: Form) -> OpenAIResponse<T>
+    pub(crate) async fn get_stream<T, F>(&self, route: &str, query: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
+        F: Serialize,
     {
-        self.openai_request::<T, _>(reqwest::Method::POST, route, |request| {
-            request.multipart(form_data)
-        })
-        .await
+        let request =
+            self.openai_request(reqwest::Method::GET, route, |request| request.query(query));
+        self.resolve_response(request).await
     }
 
     pub(crate) async fn post<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
@@ -106,18 +118,40 @@ impl<'a> OpenAI<'a> {
         T: DeserializeOwned + Debug,
         F: Serialize,
     {
-        self.openai_request::<T, _>(reqwest::Method::POST, route, |request| request.json(json))
-            .await
+        let request =
+            self.openai_request(reqwest::Method::POST, route, |request| request.json(json));
+        self.resolve_response(request).await
     }
 
-    #[allow(unused)]
-    pub(crate) async fn put<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
+    pub(crate) async fn post_form<T>(&self, route: &str, form_data: Form) -> OpenAIResponse<T>
+    where
+        T: DeserializeOwned + Debug,
+    {
+        let request = self.openai_request(reqwest::Method::POST, route, |request| {
+            request.multipart(form_data)
+        });
+        self.resolve_response(request).await
+    }
+
+    pub(crate) async fn post_form_with_text_response(
+        &self,
+        route: &str,
+        form_data: Form,
+    ) -> OpenAIResponse<String> {
+        let request = self.openai_request(reqwest::Method::POST, route, |request| {
+            request.multipart(form_data)
+        });
+        self.resolve_text_response(request).await
+    }
+
+    pub(crate) async fn post_stream<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
         F: Serialize,
     {
-        self.openai_request::<T, _>(reqwest::Method::PUT, route, |request| request.json(json))
-            .await
+        let request =
+            self.openai_request(reqwest::Method::POST, route, |request| request.json(json));
+        self.resolve_response(request).await
     }
 
     #[allow(unused)]
@@ -126,8 +160,9 @@ impl<'a> OpenAI<'a> {
         T: DeserializeOwned + Debug,
         F: Serialize,
     {
-        self.openai_request::<T, _>(reqwest::Method::DELETE, route, |request| request.json(json))
-            .await
+        let request =
+            self.openai_request(reqwest::Method::DELETE, route, |request| request.json(json));
+        self.resolve_response(request).await
     }
 
     pub fn audio(&self) -> audio::Audio {

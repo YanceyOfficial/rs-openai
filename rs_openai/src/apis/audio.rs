@@ -330,46 +330,78 @@ impl<'a> Audio<'a> {
         Self { openai }
     }
 
-    /// Transcribes audio into the input language.
+    /// Transcribes audio into the input language, response is `application/json`.
     #[tokio::main]
     pub async fn create_transcription(
         &self,
         req: &CreateTranscriptionRequest,
     ) -> OpenAIResponse<VerboseJsonForAudioResponse> {
-        let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
-            .file_name(req.file.filename.clone())
-            .mime_str("application/octet-stream")
-            .unwrap();
-
-        let mut form = Form::new()
-            .part("file", file_part)
-            .text("model", req.model.to_string());
-
-        if let Some(language) = req.language.clone() {
-            form = form.text("laguage", language.to_string());
+        if !self.is_json_type(req.response_format.clone()) {
+            return Err(OpenAIError::InvalidArgument(
+    "When `response_format` is set to `ResponseFormat::Text` or `ResponseFormat::Vtt or `ResponseFormat::Srt`, use Audio::create_transcription_with_text_response".into(),
+));
         }
 
-        if let Some(prompt) = req.prompt.clone() {
-            form = form.text("prompt", prompt);
-        }
-
-        if let Some(response_format) = req.response_format.clone() {
-            form = form.text("response_format", response_format.to_string());
-        }
-
-        if let Some(temperature) = req.temperature {
-            form = form.text("temperature", temperature.to_string());
-        }
-
+        let form = self.create_transcription_form(req);
         self.openai.post_form("/audio/transcriptions", form).await
     }
 
-    /// Translates audio into English.
+    /// Translates audio into English, response is `application/json`.
     #[tokio::main]
     pub async fn create_translation(
         &self,
         req: &CreateTranslationRequest,
     ) -> OpenAIResponse<VerboseJsonForAudioResponse> {
+        if !self.is_json_type(req.response_format.clone())
+        {
+            return Err(OpenAIError::InvalidArgument(
+        "When `response_format` is set to `ResponseFormat::Text` or `ResponseFormat::Vtt or `ResponseFormat::Srt`, use Audio::create_translation_with_text_response".into(),
+    ));
+        }
+
+        let form = self.create_translation_form(req);
+        self.openai.post_form("/audio/translations", form).await
+    }
+
+    /// Transcribes audio into the input language, response is `text/plain`.
+    #[tokio::main]
+    pub async fn create_transcription_with_text_response(
+        &self,
+        req: &CreateTranscriptionRequest,
+    ) -> OpenAIResponse<String> {
+        if self.is_json_type(req.response_format.clone())
+        {
+            return Err(OpenAIError::InvalidArgument(
+            "When response_format is `None` or `ResponseFormat::Json` or `ResponseFormat::VerboseJson`, use Audio::create_transcription".into(),
+        ));
+        }
+
+        let form = self.create_transcription_form(req);
+        self.openai
+            .post_form_with_text_response("/audio/transcriptions", form)
+            .await
+    }
+
+    /// Translates audio into English, response is `text/plain`.
+    #[tokio::main]
+    pub async fn create_translation_with_text_response(
+        &self,
+        req: &CreateTranslationRequest,
+    ) -> OpenAIResponse<String> {
+        if !self.is_json_type(req.response_format.clone())
+        {
+            return Err(OpenAIError::InvalidArgument(
+                "When response_format is `None` or `ResponseFormat::Json` or `ResponseFormat::VerboseJson`, use Audio::create_translation".into(),
+            ));
+        }
+
+        let form = self.create_translation_form(req);
+        self.openai
+            .post_form_with_text_response("/audio/translations", form)
+            .await
+    }
+
+    fn create_transcription_form(&self, req: &CreateTranscriptionRequest) -> Form {
         let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
             .file_name(req.file.filename.clone())
             .mime_str("application/octet-stream")
@@ -391,6 +423,49 @@ impl<'a> Audio<'a> {
             form = form.text("temperature", temperature.to_string());
         }
 
-        self.openai.post_form("/audio/translations", form).await
+        if let Some(language) = req.language.clone() {
+            form = form.text("laguage", language.to_string());
+        }
+        form
+    }
+
+    fn create_translation_form(&self, req: &CreateTranslationRequest) -> Form {
+        let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
+            .file_name(req.file.filename.clone())
+            .mime_str("application/octet-stream")
+            .unwrap();
+
+        let mut form = Form::new()
+            .part("file", file_part)
+            .text("model", req.model.to_string());
+
+        if let Some(prompt) = req.prompt.clone() {
+            form = form.text("prompt", prompt);
+        }
+
+        if let Some(response_format) = req.response_format.clone() {
+            form = form.text("response_format", response_format.to_string());
+        }
+
+        if let Some(temperature) = req.temperature {
+            form = form.text("temperature", temperature.to_string());
+        }
+
+        form
+    }
+
+    fn is_json_type(&self, format_type: Option<ResponseFormat>) -> bool {
+        if format_type.is_none() {
+            return true;
+        }
+
+        let format_type_display = format_type.unwrap().to_string();
+        if format_type_display == ResponseFormat::Json.to_string()
+            || format_type_display == ResponseFormat::VerboseJson.to_string()
+        {
+            return true;
+        }
+
+        return false;
     }
 }

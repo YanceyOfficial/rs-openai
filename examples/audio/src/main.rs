@@ -24,7 +24,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     file.read_to_end(&mut buffer)?;
 
     create_transcription(&client, buffer.clone())?;
+    create_transcription_with_text_response(&client, buffer.clone())?;
     create_translation(&client, buffer.clone())?;
+    create_translation_with_text_response(&client, buffer.clone())?;
 
     Ok(())
 }
@@ -49,6 +51,29 @@ fn create_transcription(
     Ok(())
 }
 
+fn create_transcription_with_text_response(
+    client: &OpenAI,
+    buffer: Vec<u8>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let req = CreateTranscriptionRequestBuilder::default()
+        .file(FileMeta {
+            buffer,
+            filename: "dear_abe_san.mp4".into(),
+        })
+        .model(AudioModel::Whisper1)
+        .response_format(ResponseFormat::Vtt)
+        .language(Language::Japanese)
+        .build()?;
+
+    let res = client
+        .audio()
+        .create_transcription_with_text_response(&req)
+        .unwrap();
+    println!("{:?}", res);
+
+    Ok(())
+}
+
 fn create_translation(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateTranslationRequestBuilder::default()
         .file(FileMeta {
@@ -59,6 +84,25 @@ fn create_translation(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn st
         .build()?;
 
     let res = client.audio().create_translation(&req);
+    println!("{:?}", res.unwrap());
+
+    Ok(())
+}
+
+fn create_translation_with_text_response(
+    client: &OpenAI,
+    buffer: Vec<u8>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let req = CreateTranslationRequestBuilder::default()
+        .file(FileMeta {
+            buffer,
+            filename: "dear_abe_san.mp4".into(),
+        })
+        .model(AudioModel::Whisper1)
+        .response_format(ResponseFormat::Srt)
+        .build()?;
+
+    let res = client.audio().create_translation_with_text_response(&req);
     println!("{:?}", res.unwrap());
 
     Ok(())
