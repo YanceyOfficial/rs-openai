@@ -3,7 +3,6 @@
 //! Related guide: [Fine-tune models](https://platform.openai.com/docs/guides/fine-tuning)
 
 use crate::shared::response_wrapper::OpenAIError;
-use crate::shared::utils::is_stream;
 use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -247,7 +246,7 @@ impl<'a> FineTunes<'a> {
         fine_tune_id: &str,
     ) -> OpenAIResponse<EventListResponse> {
         self.openai
-            .get_stream(
+            .get(
                 &format!("/fine-tunes/{fine_tune_id}/events"),
                 &("stream", true),
             )

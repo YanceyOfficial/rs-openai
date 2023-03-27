@@ -3,12 +3,14 @@ pub use crate::apis::{
     moderations,
 };
 use crate::shared::response_wrapper::{ApiErrorResponse, OpenAIError, OpenAIResponse};
-use reqwest::header::HeaderMap;
-use reqwest::multipart::Form;
-use reqwest::{Client, RequestBuilder};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use futures::StreamExt;
+use reqwest::{header::HeaderMap, multipart::Form, Client, Method, RequestBuilder};
+use reqwest_eventsource::{Event, EventSource, RequestBuilderExt};
+use serde::{de::DeserializeOwned, Serialize};
+use std::error::Error;
 use std::fmt::Debug;
+use std::marker::Send;
+use tokio::sync::mpsc::{channel, Receiver};
 
 // Default v1 API base url
 pub const API_BASE: &str = "https://api.openai.com/v1";
@@ -39,7 +41,7 @@ impl OpenAI {
         headers
     }
 
-    fn openai_request<F>(&self, method: reqwest::Method, route: &str, builder: F) -> RequestBuilder
+    fn openai_request<F>(&self, method: Method, route: &str, builder: F) -> RequestBuilder
     where
         F: FnOnce(RequestBuilder) -> RequestBuilder,
     {
@@ -54,7 +56,7 @@ impl OpenAI {
         request
     }
 
-    async fn resolve_response<T>(&self, request: reqwest::RequestBuilder) -> OpenAIResponse<T>
+    async fn resolve_response<T>(&self, request: RequestBuilder) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
     {
@@ -75,10 +77,7 @@ impl OpenAI {
         Ok(data)
     }
 
-    async fn resolve_text_response(
-        &self,
-        request: reqwest::RequestBuilder,
-    ) -> OpenAIResponse<String> {
+    async fn resolve_text_response(&self, request: RequestBuilder) -> OpenAIResponse<String> {
         let response = request.send().await?;
         let status = response.status();
         let text = response.text().await?;
@@ -98,18 +97,7 @@ impl OpenAI {
         T: DeserializeOwned + Debug,
         F: Serialize,
     {
-        let request =
-            self.openai_request(reqwest::Method::GET, route, |request| request.query(query));
-        self.resolve_response(request).await
-    }
-
-    pub(crate) async fn get_stream<T, F>(&self, route: &str, query: &F) -> OpenAIResponse<T>
-    where
-        T: DeserializeOwned + Debug,
-        F: Serialize,
-    {
-        let request =
-            self.openai_request(reqwest::Method::GET, route, |request| request.query(query));
+        let request = self.openai_request(Method::GET, route, |request| request.query(query));
         self.resolve_response(request).await
     }
 
@@ -118,8 +106,7 @@ impl OpenAI {
         T: DeserializeOwned + Debug,
         F: Serialize,
     {
-        let request =
-            self.openai_request(reqwest::Method::POST, route, |request| request.json(json));
+        let request = self.openai_request(Method::POST, route, |request| request.json(json));
         self.resolve_response(request).await
     }
 
@@ -127,10 +114,25 @@ impl OpenAI {
     where
         T: DeserializeOwned + Debug,
     {
-        let request = self.openai_request(reqwest::Method::POST, route, |request| {
-            request.multipart(form_data)
-        });
+        let request =
+            self.openai_request(Method::POST, route, |request| request.multipart(form_data));
         self.resolve_response(request).await
+    }
+
+    pub(crate) async fn post_stream<T, F>(
+        &self,
+        route: &str,
+        json: &F,
+    ) -> Result<Receiver<OpenAIResponse<T>>, Box<dyn Error>>
+    where
+        T: DeserializeOwned + Debug + Send + 'static,
+        F: Serialize,
+    {
+        let event_source = self
+            .openai_request(Method::POST, route, |request| request.json(json))
+            .eventsource()
+            .unwrap();
+        self.stream_sse(event_source).await
     }
 
     pub(crate) async fn post_form_with_text_response(
@@ -138,20 +140,9 @@ impl OpenAI {
         route: &str,
         form_data: Form,
     ) -> OpenAIResponse<String> {
-        let request = self.openai_request(reqwest::Method::POST, route, |request| {
-            request.multipart(form_data)
-        });
-        self.resolve_text_response(request).await
-    }
-
-    pub(crate) async fn post_stream<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
-    where
-        T: DeserializeOwned + Debug,
-        F: Serialize,
-    {
         let request =
-            self.openai_request(reqwest::Method::POST, route, |request| request.json(json));
-        self.resolve_response(request).await
+            self.openai_request(Method::POST, route, |request| request.multipart(form_data));
+        self.resolve_text_response(request).await
     }
 
     #[allow(unused)]
@@ -160,9 +151,58 @@ impl OpenAI {
         T: DeserializeOwned + Debug,
         F: Serialize,
     {
-        let request =
-            self.openai_request(reqwest::Method::DELETE, route, |request| request.json(json));
+        let request = self.openai_request(Method::DELETE, route, |request| request.json(json));
         self.resolve_response(request).await
+    }
+
+    async fn stream_sse<T>(
+        &self,
+        mut event_source: EventSource,
+    ) -> Result<Receiver<OpenAIResponse<T>>, Box<dyn Error>>
+    where
+        T: DeserializeOwned + Debug + Send + 'static,
+    {
+        let (tx, mut rx) = channel::<OpenAIResponse<T>>(32);
+
+        let sse_task = tokio::spawn(async move {
+            while let Some(evt) = event_source.next().await {
+                match evt {
+                    Err(e) => {
+                        if let Err(_) = tx.send(Err(OpenAIError::StreamError(e.to_string()))).await
+                        {
+                            break;
+                        }
+                    }
+                    Ok(evt) => match evt {
+                        Event::Message(message) => {
+                            if message.data == "[DONE]" {
+                                break;
+                            }
+
+                            let response = match serde_json::from_str::<T>(&message.data) {
+                                Err(e) => Err(OpenAIError::JSONDeserialize(e)),
+                                Ok(output) => Ok(output),
+                            };
+
+                            if let Err(_) = tx.send(response).await {
+                                break;
+                            }
+                        }
+                        _ => continue,
+                    },
+                }
+            }
+
+            event_source.close();
+        });
+
+        while let Some(res) = rx.recv().await {
+            println!("{:?}", res);
+        }
+
+        sse_task.await?;
+
+        Ok(rx)
     }
 
     pub fn audio(&self) -> audio::Audio {

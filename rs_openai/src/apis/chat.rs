@@ -8,6 +8,8 @@ use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::default::Default;
+use std::error::Error;
+use tokio::sync::mpsc::Receiver;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, strum::Display)]
 #[serde(rename_all = "lowercase")]
@@ -161,15 +163,14 @@ impl<'a> Chat<'a> {
     }
 
     /// Creates a completion for the chat message.
-    #[tokio::main]
     pub async fn create_stream(
         &self,
         req: &CreateChatRequest,
-    ) -> OpenAIResponse<ChatResponse> {
+    ) -> Result<Receiver<OpenAIResponse<ChatResponse>>, Box<dyn Error>> {
         if !is_stream(req.stream) {
-            return Err(OpenAIError::InvalidArgument(
+            return Err(Box::new(OpenAIError::InvalidArgument(
                 "When stream is false, use Chat::create".into(),
-            ));
+            )));
         }
 
         self.openai.post_stream("/chat/completions", req).await
