@@ -58,7 +58,7 @@ pub struct Usage {
 }
 
 pub struct Embeddings<'a> {
-    openai: &'a OpenAI<'a>,
+    openai: &'a OpenAI,
 }
 
 impl<'a> Embeddings<'a> {

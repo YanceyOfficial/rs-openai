@@ -50,7 +50,7 @@ pub struct DeleteFileResponse {
 }
 
 pub struct Files<'a> {
-    openai: &'a OpenAI<'a>,
+    openai: &'a OpenAI,
 }
 
 impl<'a> Files<'a> {

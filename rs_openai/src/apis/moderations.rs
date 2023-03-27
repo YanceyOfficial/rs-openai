@@ -88,7 +88,7 @@ pub struct ModerationCategoryScores {
 }
 
 pub struct Moderations<'a> {
-    openai: &'a OpenAI<'a>,
+    openai: &'a OpenAI,
 }
 
 impl<'a> Moderations<'a> {

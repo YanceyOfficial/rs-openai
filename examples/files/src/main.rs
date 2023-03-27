@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = var("OPENAI_API_KEY").unwrap();
 
     let client = OpenAI::new(&OpenAI {
-        api_key: &api_key,
+        api_key,
         org_id: None,
     });
 

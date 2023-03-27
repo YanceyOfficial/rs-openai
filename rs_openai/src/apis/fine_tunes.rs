@@ -169,7 +169,7 @@ pub struct DeleteFileResponse {
 }
 
 pub struct FineTunes<'a> {
-    openai: &'a OpenAI<'a>,
+    openai: &'a OpenAI,
 }
 
 impl<'a> FineTunes<'a> {

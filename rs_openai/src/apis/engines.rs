@@ -24,7 +24,7 @@ pub struct EngineListResponse {
 }
 
 pub struct Engines<'a> {
-    openai: &'a OpenAI<'a>,
+    openai: &'a OpenAI,
 }
 
 impl<'a> Engines<'a> {

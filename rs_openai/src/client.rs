@@ -16,23 +16,23 @@ pub const API_BASE: &str = "https://api.openai.com/v1";
 /// Name for organization header
 pub const ORGANIZATION_HEADER: &str = "OpenAI-Organization";
 
-pub struct OpenAI<'a> {
-    pub api_key: &'a str,
-    pub org_id: Option<&'a str>,
+pub struct OpenAI {
+    pub api_key: String,
+    pub org_id: Option<String>,
 }
 
-impl<'a> OpenAI<'a> {
+impl OpenAI {
     pub fn new(&self) -> Self {
         Self {
-            api_key: self.api_key,
-            org_id: self.org_id,
+            api_key: self.api_key.to_owned(),
+            org_id: self.org_id.to_owned(),
         }
     }
 
     fn headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
 
-        if let Some(org_id) = self.org_id {
+        if let Some(org_id) = &self.org_id {
             headers.insert(ORGANIZATION_HEADER, org_id.parse().unwrap());
         }
 
@@ -48,7 +48,7 @@ impl<'a> OpenAI<'a> {
         let mut request = client
             .request(method, API_BASE.to_string() + route)
             .headers(self.headers())
-            .bearer_auth(self.api_key);
+            .bearer_auth(&self.api_key);
 
         request = builder(request);
         request

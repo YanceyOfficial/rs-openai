@@ -63,7 +63,7 @@ pub struct Usage {
 }
 
 pub struct Edits<'a> {
-    openai: &'a OpenAI<'a>,
+    openai: &'a OpenAI,
 }
 
 impl<'a> Edits<'a> {

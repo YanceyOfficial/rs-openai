@@ -38,7 +38,7 @@ pub struct ListModelResponse {
 }
 
 pub struct Models<'a> {
-    openai: &'a OpenAI<'a>,
+    openai: &'a OpenAI,
 }
 
 impl<'a> Models<'a> {

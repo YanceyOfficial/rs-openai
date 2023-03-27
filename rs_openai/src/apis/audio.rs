@@ -322,7 +322,7 @@ pub struct Segment {
 }
 
 pub struct Audio<'a> {
-    openai: &'a OpenAI<'a>,
+    openai: &'a OpenAI,
 }
 
 impl<'a> Audio<'a> {

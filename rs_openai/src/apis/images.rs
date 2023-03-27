@@ -144,7 +144,7 @@ pub struct ImageResponse {
 }
 
 pub struct Images<'a> {
-    openai: &'a OpenAI<'a>,
+    openai: &'a OpenAI
 }
 
 impl<'a> Images<'a> {

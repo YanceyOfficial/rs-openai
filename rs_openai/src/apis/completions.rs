@@ -157,7 +157,7 @@ pub struct Usage {
 }
 
 pub struct Completions<'a> {
-    openai: &'a OpenAI<'a>,
+    openai: &'a OpenAI,
 }
 
 impl<'a> Completions<'a> {

@@ -140,7 +140,7 @@ pub struct ChatResponse {
 }
 
 pub struct Chat<'a> {
-    openai: &'a OpenAI<'a>,
+    openai: &'a OpenAI,
 }
 
 impl<'a> Chat<'a> {
