@@ -7,9 +7,9 @@
 //! Please use their replacement, [Models](https://platform.openai.com/docs/api-reference/models), instead. [Learn more](https://help.openai.com/TODO).
 
 use crate::{OpenAI, OpenAIResponse};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct EngineResponse {
     pub id: String,
     pub object: String,
@@ -17,7 +17,7 @@ pub struct EngineResponse {
     pub ready: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct EngineListResponse {
     pub data: Vec<EngineResponse>,
     pub object: String,

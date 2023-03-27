@@ -14,27 +14,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         org_id: None,
     });
 
-    // let req = CreateChatRequestBuilder::default()
-    //     .model("gpt-3.5-turbo")
-    //     .messages(vec![ChatCompletionMessageRequestBuilder::default()
-    //         .role(Role::User)
-    //         .content("To Solve LeetCode's problem 81 in Rust.")
-    //         .build()?])
-    //     .build()?;
-
-    // let res = client.chat().create(&req);
-    // println!("{:?}", res);
-
-    let req = CreateChatRequestBuilder::new(
-        "gpt-3.5-turbo",
-        vec![ChatCompletionMessageRequestBuilder::default()
+    let req = CreateChatRequestBuilder::default()
+        .model("gpt-3.5-turbo")
+        .messages(vec![ChatCompletionMessageRequestBuilder::default()
             .role(Role::User)
-            .content("To Solve LeetCode's problem 82 in Rust.")
-            .build()?],
-    )
-    .top_p(1_f32)
-    .n(1)
-    .build()?;
+            .content("To Solve LeetCode's problem 81 in Rust.")
+            .build()?])
+        .build()?;
+
+    let res = client.chat().create(&req);
+    println!("{:?}", res);
 
     let res = client.chat().create(&req);
     println!("{:?}", res);

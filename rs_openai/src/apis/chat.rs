@@ -109,16 +109,6 @@ pub struct CreateChatRequest {
     pub user: Option<String>,
 }
 
-impl CreateChatRequestBuilder {
-    pub fn new(model: impl Into<String>, messages: Vec<ChatCompletionMessage>) -> Self {
-        Self {
-            model: Some(model.into()),
-            messages: Some(messages),
-            ..Self::default()
-        }
-    }
-}
-
 #[derive(Debug, Deserialize)]
 pub struct Message {
     pub role: String,

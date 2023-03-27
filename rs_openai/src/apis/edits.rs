@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 #[builder(setter(into, strip_option), default)]
 #[builder(derive(Debug))]
 #[builder(build_fn(error = "OpenAIError"))]
-
 pub struct CreateEditRequest {
     /// ID of the model to use. You can use the `text-davinci-edit-001` or `code-davinci-edit-001` model with this endpoint.
     pub model: String,
@@ -40,16 +39,6 @@ pub struct CreateEditRequest {
     /// We generally recommend altering this or `temperature` but not both.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f32>, //  default: 1
-}
-
-impl CreateEditRequestBuilder {
-    pub fn new(model: impl Into<String>, instruction_text: impl Into<String>) -> Self {
-        Self {
-            model: Some(model.into()),
-            instruction_text: Some(instruction_text.into()),
-            ..Self::default()
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,8 +1,8 @@
 //! Files are used to upload documents that can be used with features like [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tunes).
 
-use crate::{OpenAI, OpenAIResponse};
 use crate::shared::response_wrapper::OpenAIError;
 use crate::shared::types::FileMeta;
+use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use reqwest::multipart::Form;
 use serde::{Deserialize, Serialize};

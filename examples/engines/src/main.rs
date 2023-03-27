@@ -11,11 +11,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         org_id: None,
     });
 
-    let list = client.engines().list();
-    println!("{:?}", list);
+    // list
+    let res = client.engines().list();
+    println!("{:?}", res);
 
-    let retrieve = client.engines().retrieve("text-davinci-003");
-    println!("{:?}", retrieve);
+    // retrieve
+    let res = client.engines().retrieve("text-davinci-003");
+    println!("{:?}", res);
 
     Ok(())
 }

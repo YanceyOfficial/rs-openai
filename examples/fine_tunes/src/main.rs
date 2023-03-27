@@ -11,6 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         org_id: None,
     });
 
+    // create
     let req = CreateFineTuneRequestBuilder::default()
         .training_file("")
         .validation_file("")
@@ -26,20 +27,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .suffix("")
         .build()?;
 
-    let create = client.fine_tunes().create(&req);
-    println!("{:?}", create);
+    let res = client.fine_tunes().create(&req);
+    println!("{:?}", res);
 
-    let list = client.fine_tunes().list();
-    println!("{:?}", list);
+    // list
+    let res = client.fine_tunes().list();
+    println!("{:?}", res);
 
-    let retrieve = client.fine_tunes().retrieve("");
-    println!("{:?}", retrieve);
+    // retrieve
+    let res = client.fine_tunes().retrieve("");
+    println!("{:?}", res);
 
-    let cancel = client.fine_tunes().cancel("");
-    println!("{:?}", cancel);
+    // cancel
+    let res = client.fine_tunes().cancel("");
+    println!("{:?}", res);
 
-    let event = client.fine_tunes().retrieve_content("");
-    println!("{:?}", event);
+    // retrieve_content
+    let res = client.fine_tunes().retrieve_content("");
+    println!("{:?}", res);
 
     Ok(())
 }

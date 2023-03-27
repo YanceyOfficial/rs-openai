@@ -132,9 +132,9 @@ pub struct FineTuneEvent {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct HyperParams {
-    pub batch_size: i32,
+    pub batch_size: u32,
     pub learning_rate_multiplier: f32,
-    pub n_epochs: i32,
+    pub n_epochs: u32,
     pub prompt_loss_weight: f32,
 }
 
@@ -142,25 +142,25 @@ pub struct HyperParams {
 pub struct TrainingFile {
     pub id: String,
     pub object: String,
-    pub bytes: i32,
+    pub bytes: u32,
     pub created_at: u32,
     pub filename: String,
     pub purpose: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct FineTuneListResponse {
     pub object: String,
     pub data: Vec<FineTuneResponse>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct EventListResponse {
     pub object: String,
     pub data: Vec<FineTuneEvent>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct DeleteFileResponse {
     pub id: String,
     pub object: String,
@@ -241,7 +241,7 @@ impl<'a> FineTunes<'a> {
     ///
     /// - `fine_tune_id` - The ID of the fine-tune job to get events for.
     #[tokio::main]
-    pub async fn r1etrieve_content_stream(
+    pub async fn retrieve_content_with_stream(
         &self,
         fine_tune_id: &str,
     ) -> OpenAIResponse<EventListResponse> {

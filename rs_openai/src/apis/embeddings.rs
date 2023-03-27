@@ -2,8 +2,8 @@
 //!
 //! Related guide: [Embeddings](https://platform.openai.com/docs/guides/embeddings)
 
-use crate::{OpenAI, OpenAIResponse};
 use crate::shared::response_wrapper::OpenAIError;
+use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -48,13 +48,13 @@ pub struct EmbeddingResponse {
 pub struct EmbeddingData {
     pub object: String,
     pub embedding: Vec<f32>,
-    pub index: usize,
+    pub index: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Usage {
-    pub prompt_tokens: usize,
-    pub total_tokens: usize,
+    pub prompt_tokens: u32,
+    pub total_tokens: u32,
 }
 
 pub struct Embeddings<'a> {

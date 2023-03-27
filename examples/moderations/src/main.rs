@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use rs_openai::{
-    moderations::{CreateModerationRequestBuilder, Model},
+    moderations::{CreateModerationRequestBuilder, ModerationModel},
     OpenAI,
 };
 use std::env::var;
@@ -14,16 +14,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         org_id: None,
     });
 
+    // create
     let req = CreateModerationRequestBuilder::default()
-        // The `input` parameter supports both of String and Vec<String>.
         .input(["Do you want to build a snowman?", "I will kill you."])
-
-        // The `model` parameter is optional, defaults to "text-moderation-latest".
-        .model(Model::Latest)
+        .model(ModerationModel::Latest)
         .build()?;
 
-    let list = client.moderations().create(&req);
-    println!("{:?}", list);
+    let res = client.moderations().create(&req);
+    println!("{:?}", res);
 
     Ok(())
 }

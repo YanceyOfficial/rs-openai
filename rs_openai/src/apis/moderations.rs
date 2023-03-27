@@ -15,7 +15,7 @@ pub enum ModerationInput {
 }
 
 #[derive(Debug, Serialize, Default, Clone)]
-pub enum Model {
+pub enum ModerationModel {
     #[default]
     #[serde(rename = "text-moderation-latest")]
     Latest,
@@ -40,7 +40,7 @@ pub struct CreateModerationRequest {
     /// If you use `text-moderation-stable`, we will provide advanced notice before updating the model.
     /// Accuracy of `text-moderation-stable` may be slightly lower than for `text-moderation-latest`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub model: Option<Model>, // default: "text-moderation-latest"
+    pub model: Option<ModerationModel>, // default: "text-moderation-latest"
 }
 
 #[derive(Debug, Deserialize)]

@@ -130,15 +130,6 @@ pub struct CreateCompletionRequest {
     pub user: Option<String>,
 }
 
-impl CreateCompletionRequestBuilder {
-    pub fn new(model: impl Into<String>) -> Self {
-        Self {
-            model: Some(model.into()),
-            ..Self::default()
-        }
-    }
-}
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct CompletionResponse {
     pub id: String,
@@ -181,7 +172,6 @@ impl<'a> Completions<'a> {
     ) -> OpenAIResponse<CompletionResponse> {
         self.openai.post("/completions", req).await
     }
-
 
     /// Creates a completion for the provided prompt and parameters.
     #[tokio::main]

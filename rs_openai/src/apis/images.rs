@@ -64,15 +64,6 @@ pub struct CreateImageRequest {
     pub user: Option<String>,
 }
 
-impl CreateImageRequestBuilder {
-    pub fn new(prompt: impl Into<String>) -> Self {
-        Self {
-            prompt: Some(prompt.into()),
-            ..Self::default()
-        }
-    }
-}
-
 #[derive(Builder, Clone, Debug, Default, Serialize)]
 #[builder(name = "CreateImageEditRequestBuilder")]
 #[builder(pattern = "mutable")]
@@ -110,16 +101,6 @@ pub struct CreateImageEditRequest {
     pub user: Option<String>,
 }
 
-impl CreateImageEditRequestBuilder {
-    pub fn new(image: FileMeta, prompt: impl Into<String>) -> Self {
-        Self {
-            image: Some(image),
-            prompt: Some(prompt.into()),
-            ..Self::default()
-        }
-    }
-}
-
 #[derive(Builder, Clone, Debug, Default, Serialize)]
 #[builder(name = "CreateImageVariationRequestBuilder")]
 #[builder(pattern = "mutable")]
@@ -146,15 +127,6 @@ pub struct CreateImageVariationRequest {
     /// [Learn more](https://beta.openai.com/docs/api-reference/authentication)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
-}
-
-impl CreateImageVariationRequestBuilder {
-    pub fn new(image: FileMeta) -> Self {
-        Self {
-            image: Some(image),
-            ..Self::default()
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Clone)]

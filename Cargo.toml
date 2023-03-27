@@ -10,4 +10,6 @@ members = [
     "examples/completions",
     "examples/chat",
     "examples/edits",
+    "examples/embeddings",
+    "examples/files",
 ]
