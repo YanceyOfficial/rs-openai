@@ -1,10 +1,9 @@
 use dotenvy::dotenv;
 use rs_openai::{
     audio::{
-        AudioModel, CreateTranscriptionRequestBuilder, CreateTranslationRequestBuilder,
-        ResponseFormat,Language
+        AudioModel, CreateTranscriptionRequestBuilder, CreateTranslationRequestBuilder, Language,
+        ResponseFormat,
     },
-    shared::response_wrapper::OpenAIResponseType,
     shared::types::FileMeta,
     OpenAI,
 };
@@ -45,11 +44,7 @@ fn create_transcription(
         .build()?;
 
     let res = client.audio().create_transcription(&req).unwrap();
-
-    match res {
-        OpenAIResponseType::Json(j) => println!("{:?}", j),
-        OpenAIResponseType::Text(t) => println!("{}", t),
-    }
+    println!("{:?}", res);
 
     Ok(())
 }
@@ -64,7 +59,6 @@ fn create_translation(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn st
         .build()?;
 
     let res = client.audio().create_translation(&req);
-
     println!("{:?}", res.unwrap());
 
     Ok(())

@@ -2,8 +2,8 @@ pub use crate::apis::{
     audio, chat, completions, edits, embeddings, engines, files, fine_tunes, images, models,
     moderations,
 };
-use crate::shared::response_wrapper::{ApiErrorResponse, OpenAIError, OpenAIResponse, OpenAIResponseType};
-use reqwest::header::{HeaderMap, CONTENT_TYPE};
+use crate::shared::response_wrapper::{ApiErrorResponse, OpenAIError, OpenAIResponse};
+use reqwest::header::HeaderMap;
 use reqwest::multipart::Form;
 use reqwest::{Client, RequestBuilder};
 use serde::de::DeserializeOwned;
@@ -67,14 +67,6 @@ impl<'a> OpenAI<'a> {
     {
         let response = request.send().await?;
         let status = response.status();
-        let is_text_plain = response
-            .headers()
-            .get(CONTENT_TYPE)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_lowercase()
-            .contains("text/plain");
         let bytes = response.bytes().await?;
 
         if !status.is_success() {
@@ -84,17 +76,10 @@ impl<'a> OpenAI<'a> {
             return Err(OpenAIError::ApiError(api_error));
         }
 
-        if is_text_plain {
-            unsafe {
-                let text = String::from_utf8_unchecked(bytes.as_ref().to_vec());
-                return Ok(OpenAIResponseType::Text(text));
-            }
-        }
-
         let data: T =
             serde_json::from_slice(bytes.as_ref()).map_err(OpenAIError::JSONDeserialize)?;
 
-        Ok(OpenAIResponseType::Json(data))
+        Ok(data)
     }
 
     pub(crate) async fn get<T, F>(&self, route: &str, query: &F) -> OpenAIResponse<T>

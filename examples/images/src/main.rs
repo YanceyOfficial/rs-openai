@@ -4,7 +4,6 @@ use rs_openai::{
         CreateImageEditRequestBuilder, CreateImageRequestBuilder,
         CreateImageVariationRequestBuilder, ImageSize, ResponseFormat,
     },
-    shared::response_wrapper::OpenAIResponseType,
     shared::types::FileMeta,
     OpenAI,
 };
@@ -39,19 +38,15 @@ fn read_image(path: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 }
 
 fn create(client: &OpenAI) -> Result<(), Box<dyn std::error::Error>> {
-    let request = CreateImageRequestBuilder::default()
+    let req = CreateImageRequestBuilder::default()
         .prompt("An oil painting with beach and sunshine.")
         .response_format(ResponseFormat::Url)
         .size(ImageSize::S512x512)
         .n(2)
         .build()?;
 
-    let response = client.images().create(&request).unwrap();
-
-    match response {
-        OpenAIResponseType::Json(j) => println!("{:?}", j),
-        OpenAIResponseType::Text(t) => println!("{}", t),
-    }
+    let res = client.images().create(&req).unwrap();
+    println!("{:?}", res);
 
     Ok(())
 }
@@ -62,7 +57,7 @@ fn create_edit(
     origin_buffer: Vec<u8>,
     transparent_buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let request = CreateImageEditRequestBuilder::default()
+    let req = CreateImageEditRequestBuilder::default()
         .image(FileMeta {
             buffer: origin_buffer,
             filename: "worldcup.png".into(),
@@ -75,19 +70,15 @@ fn create_edit(
         .n(2)
         .build()?;
 
-    let response = client.images().create_edit(&request).unwrap();
-
-    match response {
-        OpenAIResponseType::Json(j) => println!("{:?}", j),
-        OpenAIResponseType::Text(t) => println!("{}", t),
-    }
+    let res = client.images().create_edit(&req).unwrap();
+    println!("{:?}", res);
 
     Ok(())
 }
 
 #[allow(unused)]
 fn create_variations(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
-    let request = CreateImageVariationRequestBuilder::default()
+    let req = CreateImageVariationRequestBuilder::default()
         .image(FileMeta {
             buffer,
             filename: "worldcup.png".into(),
@@ -95,12 +86,8 @@ fn create_variations(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn std
         .n(2)
         .build()?;
 
-    let response = client.images().create_variations(&request).unwrap();
-
-    match response {
-        OpenAIResponseType::Json(j) => println!("{:?}", j),
-        OpenAIResponseType::Text(t) => println!("{}", t),
-    }
+    let res = client.images().create_variations(&req).unwrap();
+    println!("{:?}", res);
 
     Ok(())
 }
