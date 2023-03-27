@@ -3,6 +3,7 @@
 //! Related guide: [Fine-tune models](https://platform.openai.com/docs/guides/fine-tuning)
 
 use crate::shared::response_wrapper::OpenAIError;
+use crate::shared::utils::is_stream;
 use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -241,12 +242,12 @@ impl<'a> FineTunes<'a> {
     ///
     /// - `fine_tune_id` - The ID of the fine-tune job to get events for.
     #[tokio::main]
-    pub async fn retrieve_content_with_stream(
+    pub async fn retrieve_content_stream(
         &self,
         fine_tune_id: &str,
     ) -> OpenAIResponse<EventListResponse> {
         self.openai
-            .get(
+            .get_stream(
                 &format!("/fine-tunes/{fine_tune_id}/events"),
                 &("stream", true),
             )

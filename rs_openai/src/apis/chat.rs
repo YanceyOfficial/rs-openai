@@ -2,6 +2,7 @@
 
 use crate::shared::response_wrapper::OpenAIError;
 use crate::shared::types::Stop;
+use crate::shared::utils::is_stream;
 use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -150,15 +151,27 @@ impl<'a> Chat<'a> {
     /// Creates a completion for the chat message.
     #[tokio::main]
     pub async fn create(&self, req: &CreateChatRequest) -> OpenAIResponse<ChatResponse> {
+        if is_stream(req.stream) {
+            return Err(OpenAIError::InvalidArgument(
+                "When stream is true, use Chat::create_stream".into(),
+            ));
+        }
+
         self.openai.post("/chat/completions", req).await
     }
 
     /// Creates a completion for the chat message.
     #[tokio::main]
-    pub async fn create_with_stream(
+    pub async fn create_stream(
         &self,
         req: &CreateChatRequest,
     ) -> OpenAIResponse<ChatResponse> {
-        self.openai.post("/chat/completions", req).await
+        if !is_stream(req.stream) {
+            return Err(OpenAIError::InvalidArgument(
+                "When stream is false, use Chat::create".into(),
+            ));
+        }
+
+        self.openai.post_stream("/chat/completions", req).await
     }
 }

@@ -2,6 +2,7 @@
 
 use crate::shared::response_wrapper::OpenAIError;
 use crate::shared::types::Stop;
+use crate::shared::utils::is_stream;
 use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -170,15 +171,27 @@ impl<'a> Completions<'a> {
         &self,
         req: &CreateCompletionRequest,
     ) -> OpenAIResponse<CompletionResponse> {
+        if is_stream(req.stream) {
+            return Err(OpenAIError::InvalidArgument(
+                "When stream is true, use Completions::create_stream".into(),
+            ));
+        }
+
         self.openai.post("/completions", req).await
     }
 
     /// Creates a completion for the provided prompt and parameters.
     #[tokio::main]
-    pub async fn create_with_stream(
+    pub async fn create_stream(
         &self,
         req: &CreateCompletionRequest,
     ) -> OpenAIResponse<CompletionResponse> {
-        self.openai.post("/completions", req).await
+        if !is_stream(req.stream) {
+            return Err(OpenAIError::InvalidArgument(
+                "When stream is false, use Completions::create".into(),
+            ));
+        }
+
+        self.openai.post_stream("/completions", req).await
     }
 }
