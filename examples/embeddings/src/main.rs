@@ -2,7 +2,8 @@ use dotenvy::dotenv;
 use rs_openai::{embeddings::CreateEmbeddingRequestBuilder, OpenAI};
 use std::env::var;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
@@ -21,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build()?;
 
-    let res = client.embeddings().create(&req);
+    let res = client.embeddings().create(&req).await?;
     println!("{:?}", res);
 
     Ok(())

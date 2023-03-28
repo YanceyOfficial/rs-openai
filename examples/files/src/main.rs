@@ -3,7 +3,8 @@ use rs_openai::{files::UploadFileRequestBuilder, shared::types::FileMeta, OpenAI
 use std::io::prelude::*;
 use std::{env::var, fs::File};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
@@ -13,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // list
-    let res = client.files().list();
+    let res = client.files().list().await?;
     println!("{:?}", res);
 
     // upload
@@ -29,19 +30,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .purpose("fine-tune".to_string())
         .build()?;
 
-    let res = client.files().upload(&req);
+    let res = client.files().upload(&req).await?;
     println!("{:?}", res);
 
     // delete
-    let res = client.files().delete("");
+    let res = client.files().delete("").await?;
     println!("{:?}", res);
 
     // retrieve
-    let res = client.files().retrieve("");
+    let res = client.files().retrieve("").await?;
     println!("{:?}", res);
 
     // retrieve_content
-    let res = client.files().retrieve_content("");
+    let res = client.files().retrieve_content("").await?;
     println!("{:?}", res);
 
     Ok(())

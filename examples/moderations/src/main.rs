@@ -5,7 +5,8 @@ use rs_openai::{
 };
 use std::env::var;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
@@ -20,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .model(ModerationModel::Latest)
         .build()?;
 
-    let res = client.moderations().create(&req);
+    let res = client.moderations().create(&req).await?;
     println!("{:?}", res);
 
     Ok(())

@@ -2,7 +2,8 @@ use dotenvy::dotenv;
 use rs_openai::{edits::CreateEditRequestBuilder, OpenAI};
 use std::env::var;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
@@ -17,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .instruction_text("Fix the spelling mistakes.")
         .build()?;
 
-    let res = client.edits().create(&req);
+    let res = client.edits().create(&req).await?;
     println!("{:?}", res);
 
     Ok(())

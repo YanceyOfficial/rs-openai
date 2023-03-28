@@ -2,7 +2,8 @@ use dotenvy::dotenv;
 use rs_openai::OpenAI;
 use std::env::var;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
@@ -12,11 +13,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // list
-    let res = client.engines().list();
+    let res = client.engines().list().await?;
     println!("{:?}", res);
 
     // retrieve
-    let res = client.engines().retrieve("text-davinci-003");
+    let res = client.engines().retrieve("text-davinci-003").await?;
     println!("{:?}", res);
 
     Ok(())

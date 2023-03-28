@@ -2,7 +2,8 @@ use dotenvy::dotenv;
 use rs_openai::{fine_tunes::CreateFineTuneRequestBuilder, OpenAI};
 use std::env::var;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
@@ -27,24 +28,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .suffix("")
         .build()?;
 
-    let res = client.fine_tunes().create(&req);
+    let res = client.fine_tunes().create(&req).await?;
     println!("{:?}", res);
 
     // list
-    let res = client.fine_tunes().list();
+    let res = client.fine_tunes().list().await?;
     println!("{:?}", res);
 
     // retrieve
-    let res = client.fine_tunes().retrieve("");
+    let res = client.fine_tunes().retrieve("").await?;
     println!("{:?}", res);
 
     // cancel
-    let res = client.fine_tunes().cancel("");
+    let res = client.fine_tunes().cancel("").await?;
     println!("{:?}", res);
 
     // retrieve_content
-    let res = client.fine_tunes().retrieve_content("");
+    let res = client.fine_tunes().retrieve_content("").await?;
     println!("{:?}", res);
+
+    // retrieve_content_stream
+    // let mut stream = client.fine_tunes().retrieve_content_stream("").await?;
 
     Ok(())
 }

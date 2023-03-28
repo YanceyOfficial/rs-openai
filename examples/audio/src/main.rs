@@ -10,7 +10,8 @@ use rs_openai::{
 use std::io::prelude::*;
 use std::{env::var, fs::File};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
@@ -31,7 +32,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn create_transcription(
+#[tokio::main]
+async fn create_transcription(
     client: &OpenAI,
     buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -45,13 +47,14 @@ fn create_transcription(
         .language(Language::Japanese)
         .build()?;
 
-    let res = client.audio().create_transcription(&req).unwrap();
+    let res = client.audio().create_transcription(&req).await?;
     println!("{:?}", res);
 
     Ok(())
 }
 
-fn create_transcription_with_text_response(
+#[tokio::main]
+async fn create_transcription_with_text_response(
     client: &OpenAI,
     buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -68,13 +71,17 @@ fn create_transcription_with_text_response(
     let res = client
         .audio()
         .create_transcription_with_text_response(&req)
-        .unwrap();
+        .await?;
     println!("{:?}", res);
 
     Ok(())
 }
 
-fn create_translation(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn create_translation(
+    client: &OpenAI,
+    buffer: Vec<u8>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateTranslationRequestBuilder::default()
         .file(FileMeta {
             buffer,
@@ -83,13 +90,14 @@ fn create_translation(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn st
         .model(AudioModel::Whisper1)
         .build()?;
 
-    let res = client.audio().create_translation(&req);
-    println!("{:?}", res.unwrap());
+    let res = client.audio().create_translation(&req).await?;
+    println!("{:?}", res);
 
     Ok(())
 }
 
-fn create_translation_with_text_response(
+#[tokio::main]
+async fn create_translation_with_text_response(
     client: &OpenAI,
     buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -102,8 +110,11 @@ fn create_translation_with_text_response(
         .response_format(ResponseFormat::Srt)
         .build()?;
 
-    let res = client.audio().create_translation_with_text_response(&req);
-    println!("{:?}", res.unwrap());
+    let res = client
+        .audio()
+        .create_translation_with_text_response(&req)
+        .await?;
+    println!("{:?}", res);
 
     Ok(())
 }

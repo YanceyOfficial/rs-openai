@@ -10,7 +10,8 @@ use rs_openai::{
 use std::io::prelude::*;
 use std::{env::var, fs::File};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
@@ -29,7 +30,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn read_image(path: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn read_image(path: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut file = File::open(path).unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
@@ -37,7 +39,8 @@ fn read_image(path: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     Ok(buffer)
 }
 
-fn create(client: &OpenAI) -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn create(client: &OpenAI) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateImageRequestBuilder::default()
         .prompt("An oil painting with beach and sunshine.")
         .response_format(ResponseFormat::Url)
@@ -45,14 +48,15 @@ fn create(client: &OpenAI) -> Result<(), Box<dyn std::error::Error>> {
         .n(2)
         .build()?;
 
-    let res = client.images().create(&req).unwrap();
+    let res = client.images().create(&req).await?;
     println!("{:?}", res);
 
     Ok(())
 }
 
 #[allow(unused)]
-fn create_edit(
+#[tokio::main]
+async fn create_edit(
     client: &OpenAI,
     origin_buffer: Vec<u8>,
     transparent_buffer: Vec<u8>,
@@ -70,14 +74,18 @@ fn create_edit(
         .n(2)
         .build()?;
 
-    let res = client.images().create_edit(&req).unwrap();
+    let res = client.images().create_edit(&req).await?;
     println!("{:?}", res);
 
     Ok(())
 }
 
 #[allow(unused)]
-fn create_variations(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn create_variations(
+    client: &OpenAI,
+    buffer: Vec<u8>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateImageVariationRequestBuilder::default()
         .image(FileMeta {
             buffer,
@@ -86,7 +94,7 @@ fn create_variations(client: &OpenAI, buffer: Vec<u8>) -> Result<(), Box<dyn std
         .n(2)
         .build()?;
 
-    let res = client.images().create_variations(&req).unwrap();
+    let res = client.images().create_variations(&req).await?;
     println!("{:?}", res);
 
     Ok(())

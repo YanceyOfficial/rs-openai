@@ -10,3 +10,4 @@ publish = false
 dotenvy = "0.15.7"
 rs_openai = {path = "../../rs_openai"}
 tokio = { version = "1.26.0", features = ["full"] }
+futures = "0.3.27"
