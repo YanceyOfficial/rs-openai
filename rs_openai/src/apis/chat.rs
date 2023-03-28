@@ -118,16 +118,16 @@ pub struct Message {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ChatUsage {
-    pub prompt_tokens: i32,
-    pub completion_tokens: i32,
-    pub total_tokens: i32,
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u32,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ChatChoice {
     pub message: ChatCompletionMessage,
     pub finish_reason: String,
-    pub index: i32,
+    pub index: u32,
 }
 
 #[derive(Debug, Deserialize, Clone)]

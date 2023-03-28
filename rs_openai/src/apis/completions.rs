@@ -145,26 +145,21 @@ pub struct CompletionResponse {
 #[derive(Debug, Deserialize, Clone)]
 pub struct CompletionChoice {
     pub text: String,
-    pub index: usize,
+    pub index: u32,
     pub logprobs: Option<u8>,
     pub finish_reason: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Usage {
-    pub prompt_tokens: usize,
-    pub completion_tokens: usize,
-    pub total_tokens: usize,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct Delta {
-    pub content: Option<String>,
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u32,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct CompletionChoiceStream {
-    pub delta: Delta,
+    pub text: String,
     pub index: usize,
     pub logprobs: Option<u8>,
     pub finish_reason: Option<String>,
