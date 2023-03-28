@@ -14,6 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         org_id: None,
     });
 
+    // create
     let req = CreateCompletionRequestBuilder::default()
         .model("text-davinci-003")
         .prompt("What's your name?")
@@ -23,6 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let res = client.completions().create(&req).await?;
     println!("{:?}", res);
 
+    // create_stream
     let req = CreateCompletionRequestBuilder::default()
         .model("text-davinci-003")
         .prompt("What's your name?")
@@ -35,9 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut lock = stdout().lock();
     while let Some(data) = stream.next().await {
         data.unwrap().choices.iter().for_each(|choice| {
-            if let Some(ref content) = choice.delta.content {
-                write!(lock, "{}", content).unwrap();
-            }
+            write!(lock, "{}", choice.text).unwrap();
         });
 
         stdout().flush()?;
