@@ -5,11 +5,9 @@ use crate::shared::types::Stop;
 use crate::shared::utils::is_stream;
 use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
+use futures::Stream;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::default::Default;
-use std::error::Error;
-use tokio::sync::mpsc::Receiver;
+use std::{collections::HashMap, pin::Pin};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, strum::Display)]
 #[serde(rename_all = "lowercase")]
@@ -112,33 +110,54 @@ pub struct CreateChatRequest {
     pub user: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Message {
     pub role: String,
     pub content: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ChatUsage {
     pub prompt_tokens: i32,
     pub completion_tokens: i32,
     pub total_tokens: i32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ChatChoice {
     pub message: ChatCompletionMessage,
     pub finish_reason: String,
     pub index: i32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ChatResponse {
     pub id: String,
     pub object: String,
     pub created: u32,
     pub choices: Vec<ChatChoice>,
     pub usage: ChatUsage,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Delta {
+    pub content: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ChatChoiceStream {
+    pub delta: Delta,
+    pub finish_reason: Option<String>,
+    pub index: u32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ChatStreamResponse {
+    pub id: String,
+    pub object: String,
+    pub model: String,
+    pub created: u32,
+    pub choices: Vec<ChatChoiceStream>,
 }
 
 pub struct Chat<'a> {
@@ -151,7 +170,6 @@ impl<'a> Chat<'a> {
     }
 
     /// Creates a completion for the chat message.
-    #[tokio::main]
     pub async fn create(&self, req: &CreateChatRequest) -> OpenAIResponse<ChatResponse> {
         if is_stream(req.stream) {
             return Err(OpenAIError::InvalidArgument(
@@ -166,13 +184,14 @@ impl<'a> Chat<'a> {
     pub async fn create_stream(
         &self,
         req: &CreateChatRequest,
-    ) -> Result<Receiver<OpenAIResponse<ChatResponse>>, Box<dyn Error>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = OpenAIResponse<ChatStreamResponse>> + Send>>, OpenAIError>
+    {
         if !is_stream(req.stream) {
-            return Err(Box::new(OpenAIError::InvalidArgument(
+            return Err(OpenAIError::InvalidArgument(
                 "When stream is false, use Chat::create".into(),
-            )));
+            ));
         }
 
-        self.openai.post_stream("/chat/completions", req).await
+        Ok(self.openai.post_stream("/chat/completions", req).await)
     }
 }

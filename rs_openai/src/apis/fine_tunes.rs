@@ -6,6 +6,8 @@ use crate::shared::response_wrapper::OpenAIError;
 use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
+use futures::Stream;
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
 #[builder(name = "CreateFineTuneRequestBuilder")]
@@ -105,7 +107,7 @@ pub struct CreateFineTuneRequest {
     suffix: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct FineTuneResponse {
     pub id: String,
     pub object: String,
@@ -122,7 +124,7 @@ pub struct FineTuneResponse {
     pub updated_at: u32,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct FineTuneEvent {
     pub object: String,
     pub created_at: u32,
@@ -130,7 +132,7 @@ pub struct FineTuneEvent {
     pub message: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct HyperParams {
     pub batch_size: u32,
     pub learning_rate_multiplier: f32,
@@ -138,7 +140,7 @@ pub struct HyperParams {
     pub prompt_loss_weight: f32,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct TrainingFile {
     pub id: String,
     pub object: String,
@@ -148,19 +150,19 @@ pub struct TrainingFile {
     pub purpose: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct FineTuneListResponse {
     pub object: String,
     pub data: Vec<FineTuneResponse>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct EventListResponse {
     pub object: String,
     pub data: Vec<FineTuneEvent>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct DeleteFileResponse {
     pub id: String,
     pub object: String,
@@ -181,7 +183,6 @@ impl<'a> FineTunes<'a> {
     /// OpenAIResponse includes details of the enqueued job including job status and the name of the fine-tuned models once complete.
     ///
     /// [Learn more about Fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
-    #[tokio::main]
     pub async fn create(&self, req: &CreateFineTuneRequest) -> OpenAIResponse<FineTuneResponse> {
         self.openai.post("/fine-tunes", req).await
     }
@@ -193,7 +194,6 @@ impl<'a> FineTunes<'a> {
     /// - `fine_tune_id` - The ID of the fine-tune job
     ///
     /// [Learn more about Fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
-    #[tokio::main]
     pub async fn retrieve(&self, fine_tune_id: &str) -> OpenAIResponse<FineTuneResponse> {
         self.openai
             .get(&format!("/fine-tunes/{fine_tune_id}"), &())
@@ -205,7 +205,6 @@ impl<'a> FineTunes<'a> {
     /// # Path parameters
     ///
     /// - `fine_tune_id` - The ID of the fine-tune job to cancel
-    #[tokio::main]
     pub async fn cancel(&self, fine_tune_id: &str) -> OpenAIResponse<FineTuneResponse> {
         self.openai
             .post(&format!("/fine-tunes/{fine_tune_id}/cancel"), &())
@@ -213,7 +212,6 @@ impl<'a> FineTunes<'a> {
     }
 
     /// List your organization's fine-tuning jobs
-    #[tokio::main]
     pub async fn list(&self) -> OpenAIResponse<FineTuneListResponse> {
         self.openai.get("/fine-tunes", &()).await
     }
@@ -225,7 +223,6 @@ impl<'a> FineTunes<'a> {
     /// # Path parameters
     ///
     /// - `fine_tune_id` - The ID of the fine-tune job to get events for.
-    #[tokio::main]
     pub async fn retrieve_content(&self, fine_tune_id: &str) -> OpenAIResponse<EventListResponse> {
         self.openai
             .get(&format!("/fine-tunes/{fine_tune_id}/events"), &())
@@ -240,13 +237,12 @@ impl<'a> FineTunes<'a> {
     /// # Path parameters
     ///
     /// - `fine_tune_id` - The ID of the fine-tune job to get events for.
-    #[tokio::main]
     pub async fn retrieve_content_stream(
         &self,
         fine_tune_id: &str,
-    ) -> OpenAIResponse<EventListResponse> {
+    ) -> Pin<Box<dyn Stream<Item = OpenAIResponse<EventListResponse>> + Send>> {
         self.openai
-            .get(
+            .get_stream(
                 &format!("/fine-tunes/{fine_tune_id}/events"),
                 &("stream", true),
             )
@@ -258,7 +254,6 @@ impl<'a> FineTunes<'a> {
     /// # Path parameters
     ///
     /// - `model` - The model to delete
-    #[tokio::main]
     pub async fn delete_model(&self, model: &str) -> OpenAIResponse<DeleteFileResponse> {
         self.openai.delete(&format!("/models/{model}"), &()).await
     }

@@ -51,13 +51,11 @@ impl<'a> Models<'a> {
     /// # Path parameters
     ///
     /// - `model` - The ID of the model to use for this request.
-    #[tokio::main]
     pub async fn retrieve(&self, model: &str) -> OpenAIResponse<ModelResponse> {
         self.openai.get(&format!("/models/{model}"), &()).await
     }
 
     /// Lists the currently available models, and provides basic information about each one such as the owner and availability.
-    #[tokio::main]
     pub async fn list(&self) -> OpenAIResponse<ListModelResponse> {
         self.openai.get("/models", &()).await
     }

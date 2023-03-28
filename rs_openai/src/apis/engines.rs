@@ -9,7 +9,7 @@
 use crate::{OpenAI, OpenAIResponse};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct EngineResponse {
     pub id: String,
     pub object: String,
@@ -17,7 +17,7 @@ pub struct EngineResponse {
     pub ready: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct EngineListResponse {
     pub data: Vec<EngineResponse>,
     pub object: String,
@@ -37,7 +37,6 @@ impl<'a> Engines<'a> {
     #[deprecated(
         note = "The Engines endpoints are deprecated. Please use their replacement, Models, instead."
     )]
-    #[tokio::main]
     pub async fn list(&self) -> OpenAIResponse<EngineListResponse> {
         self.openai.get("/engines", &()).await
     }
@@ -50,7 +49,6 @@ impl<'a> Engines<'a> {
     #[deprecated(
         note = "The Engines endpoints are deprecated. Please use their replacement, Models, instead."
     )]
-    #[tokio::main]
     pub async fn retrieve(&self, engine_id: &str) -> OpenAIResponse<EngineResponse> {
         self.openai.get(&format!("/engines/{engine_id}"), &()).await
     }

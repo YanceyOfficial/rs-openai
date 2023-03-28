@@ -153,13 +153,11 @@ impl<'a> Images<'a> {
     }
 
     /// Creates an image given a prompt.
-    #[tokio::main]
     pub async fn create(&self, req: &CreateImageRequest) -> OpenAIResponse<ImageResponse> {
         self.openai.post("/images/generations", req).await
     }
 
     /// Creates an edited or extended image given an original image and a prompt.
-    #[tokio::main]
     pub async fn create_edit(&self, req: &CreateImageEditRequest) -> OpenAIResponse<ImageResponse> {
         let file_part = reqwest::multipart::Part::stream(req.image.buffer.clone())
             .file_name(req.image.filename.clone())
@@ -199,7 +197,6 @@ impl<'a> Images<'a> {
     }
 
     /// Creates a variation of a given image.
-    #[tokio::main]
     pub async fn create_variations(
         &self,
         req: &CreateImageVariationRequest,

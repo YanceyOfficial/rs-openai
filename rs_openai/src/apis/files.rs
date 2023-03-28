@@ -26,7 +26,7 @@ pub struct UploadFileRequest {
     pub purpose: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct FileResponse {
     pub id: String,
     pub object: String,
@@ -36,13 +36,13 @@ pub struct FileResponse {
     pub purpose: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct FileListResponse {
     pub data: Vec<FileResponse>,
     pub object: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct DeleteFileResponse {
     pub id: String,
     pub object: String,
@@ -58,7 +58,6 @@ impl<'a> Files<'a> {
         Self { openai }
     }
     /// Returns a list of files that belong to the user's organization.
-    #[tokio::main]
     pub async fn list(&self) -> OpenAIResponse<FileListResponse> {
         self.openai.get("/files", &()).await
     }
@@ -66,7 +65,6 @@ impl<'a> Files<'a> {
     /// Upload a file that contains document(s) to be used across various endpoints/features.
     /// Currently, the size of all the files uploaded by one organization can be up to 1 GB.
     /// Please contact us if you need to increase the storage limit.
-    #[tokio::main]
     pub async fn upload(&self, req: &UploadFileRequest) -> OpenAIResponse<FileResponse> {
         let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
             .file_name(req.file.filename.clone())
@@ -85,7 +83,6 @@ impl<'a> Files<'a> {
     /// # Path parameters
     ///
     /// - `file_id` - The ID of the file to use for this request
-    #[tokio::main]
     pub async fn delete(&self, file_id: &str) -> OpenAIResponse<DeleteFileResponse> {
         self.openai.delete(&format!("/files/{file_id}"), &()).await
     }
@@ -95,7 +92,6 @@ impl<'a> Files<'a> {
     /// # Path parameters
     ///
     /// - `file_id` - The ID of the file to use for this request
-    #[tokio::main]
     pub async fn retrieve(&self, file_id: &str) -> OpenAIResponse<FileResponse> {
         self.openai.get(&format!("/files/{file_id}"), &()).await
     }
@@ -105,7 +101,6 @@ impl<'a> Files<'a> {
     /// # Path parameters
     ///
     /// - `file_id` - The ID of the file to use for this request
-    #[tokio::main]
     pub async fn retrieve_content(&self, file_id: &str) -> OpenAIResponse<String> {
         self.openai
             .get(&format!("/files/{file_id}/content"), &())

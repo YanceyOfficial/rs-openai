@@ -22,3 +22,5 @@ serde_json = "1.0.94"
 strum = { version = "0.24.1", features = ["derive"] }
 thiserror = "1.0.40"
 tokio = { version = "1.26.0", features = ["full"] }
+tokio-stream = "0.1.12"
+tracing = "0.1.37"

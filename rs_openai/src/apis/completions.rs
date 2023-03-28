@@ -5,8 +5,10 @@ use crate::shared::types::Stop;
 use crate::shared::utils::is_stream;
 use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
+use futures::Stream;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::pin::Pin;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
@@ -70,7 +72,6 @@ pub struct CreateCompletionRequest {
     /// If set, tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message.
     ///
     /// For streamed progress, use [`create_with_stream`](create_with_stream).
-    #[builder(setter(skip))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>, // default: false
 
@@ -145,7 +146,7 @@ pub struct CompletionResponse {
 pub struct CompletionChoice {
     pub text: String,
     pub index: usize,
-    pub logprobs: Option<i32>,
+    pub logprobs: Option<u8>,
     pub finish_reason: String,
 }
 
@@ -154,6 +155,28 @@ pub struct Usage {
     pub prompt_tokens: usize,
     pub completion_tokens: usize,
     pub total_tokens: usize,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Delta {
+    pub content: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct CompletionChoiceStream {
+    pub delta: Delta,
+    pub index: usize,
+    pub logprobs: Option<u8>,
+    pub finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct CompletionStreamResponse {
+    pub id: String,
+    pub object: String,
+    pub created: u32,
+    pub model: String,
+    pub choices: Vec<CompletionChoiceStream>,
 }
 
 pub struct Completions<'a> {
@@ -166,7 +189,6 @@ impl<'a> Completions<'a> {
     }
 
     /// Creates a completion for the provided prompt and parameters.
-    #[tokio::main]
     pub async fn create(
         &self,
         req: &CreateCompletionRequest,
@@ -181,17 +203,19 @@ impl<'a> Completions<'a> {
     }
 
     /// Creates a completion for the provided prompt and parameters.
-    #[tokio::main]
     pub async fn create_stream(
         &self,
         req: &CreateCompletionRequest,
-    ) -> OpenAIResponse<CompletionResponse> {
+    ) -> Result<
+        Pin<Box<dyn Stream<Item = OpenAIResponse<CompletionStreamResponse>> + Send>>,
+        OpenAIError,
+    > {
         if !is_stream(req.stream) {
             return Err(OpenAIError::InvalidArgument(
                 "When stream is false, use Completions::create".into(),
             ));
         }
 
-        self.openai.post("/completions", req).await
+        Ok(self.openai.post_stream("/completions", req).await)
     }
 }

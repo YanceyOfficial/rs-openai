@@ -298,7 +298,7 @@ pub struct CreateTranslationRequest {
     pub temperature: Option<f32>, // min: 0, max: 1, default: 0
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct VerboseJsonForAudioResponse {
     pub task: Option<String>,
     pub language: Option<String>,
@@ -307,7 +307,7 @@ pub struct VerboseJsonForAudioResponse {
     pub text: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Segment {
     pub id: u32,
     pub seek: u32,
@@ -331,7 +331,6 @@ impl<'a> Audio<'a> {
     }
 
     /// Transcribes audio into the input language, response is `application/json`.
-    #[tokio::main]
     pub async fn create_transcription(
         &self,
         req: &CreateTranscriptionRequest,
@@ -347,13 +346,11 @@ impl<'a> Audio<'a> {
     }
 
     /// Translates audio into English, response is `application/json`.
-    #[tokio::main]
     pub async fn create_translation(
         &self,
         req: &CreateTranslationRequest,
     ) -> OpenAIResponse<VerboseJsonForAudioResponse> {
-        if !self.is_json_type(req.response_format.clone())
-        {
+        if !self.is_json_type(req.response_format.clone()) {
             return Err(OpenAIError::InvalidArgument(
         "When `response_format` is set to `ResponseFormat::Text` or `ResponseFormat::Vtt or `ResponseFormat::Srt`, use Audio::create_translation_with_text_response".into(),
     ));
@@ -364,13 +361,11 @@ impl<'a> Audio<'a> {
     }
 
     /// Transcribes audio into the input language, response is `text/plain`.
-    #[tokio::main]
     pub async fn create_transcription_with_text_response(
         &self,
         req: &CreateTranscriptionRequest,
     ) -> OpenAIResponse<String> {
-        if self.is_json_type(req.response_format.clone())
-        {
+        if self.is_json_type(req.response_format.clone()) {
             return Err(OpenAIError::InvalidArgument(
             "When response_format is `None` or `ResponseFormat::Json` or `ResponseFormat::VerboseJson`, use Audio::create_transcription".into(),
         ));
@@ -383,13 +378,11 @@ impl<'a> Audio<'a> {
     }
 
     /// Translates audio into English, response is `text/plain`.
-    #[tokio::main]
     pub async fn create_translation_with_text_response(
         &self,
         req: &CreateTranslationRequest,
     ) -> OpenAIResponse<String> {
-        if !self.is_json_type(req.response_format.clone())
-        {
+        if !self.is_json_type(req.response_format.clone()) {
             return Err(OpenAIError::InvalidArgument(
                 "When response_format is `None` or `ResponseFormat::Json` or `ResponseFormat::VerboseJson`, use Audio::create_translation".into(),
             ));

@@ -41,7 +41,7 @@ pub struct CreateEditRequest {
     pub top_p: Option<f32>, //  default: 1
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct EditResponse {
     pub object: String,
     pub created: u32,
@@ -49,13 +49,13 @@ pub struct EditResponse {
     pub usage: Usage,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Choice {
     pub text: String,
     pub index: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
@@ -70,8 +70,8 @@ impl<'a> Edits<'a> {
     pub fn new(openai: &'a OpenAI) -> Self {
         Self { openai }
     }
+    
     /// Creates a new edit for the provided input, instruction, and parameters.
-    #[tokio::main]
     pub async fn create(&self, req: &CreateEditRequest) -> OpenAIResponse<EditResponse> {
         self.openai.post("/edits", req).await
     }

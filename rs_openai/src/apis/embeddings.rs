@@ -67,7 +67,6 @@ impl<'a> Embeddings<'a> {
     }
 
     /// Creates an embedding vector representing the input text.
-    #[tokio::main]
     pub async fn create(&self, req: &CreateEmbeddingRequest) -> OpenAIResponse<EmbeddingResponse> {
         self.openai.post("/embeddings", req).await
     }
