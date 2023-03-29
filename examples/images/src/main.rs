@@ -24,8 +24,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let transparent_image = read_image("./assets/worldcup-transparent.png").unwrap();
 
     create(&client)?;
-    create_edit(&client, origin_image.clone(), transparent_image.clone())?;
-    create_variations(&client, origin_image.clone())?;
+    create_edit(&client, origin_image.clone(), transparent_image)?;
+    create_variations(&client, origin_image)?;
 
     Ok(())
 }

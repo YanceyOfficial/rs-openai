@@ -179,7 +179,10 @@ impl OpenAI {
             while let Some(evt) = event_source.next().await {
                 match evt {
                     Err(e) => {
-                        if let Err(_) = tx.send(Err(OpenAIError::StreamError(e.to_string()))) {
+                        if tx
+                            .send(Err(OpenAIError::StreamError(e.to_string())))
+                            .is_err()
+                        {
                             break;
                         }
                     }
@@ -194,7 +197,7 @@ impl OpenAI {
                                 Ok(output) => Ok(output),
                             };
 
-                            if let Err(_) = tx.send(response) {
+                            if tx.send(response).is_err() {
                                 break;
                             }
                         }

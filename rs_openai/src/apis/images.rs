@@ -144,7 +144,7 @@ pub struct ImageResponse {
 }
 
 pub struct Images<'a> {
-    openai: &'a OpenAI
+    openai: &'a OpenAI,
 }
 
 impl<'a> Images<'a> {
@@ -170,7 +170,7 @@ impl<'a> Images<'a> {
 
         if let Some(mask) = req.mask.clone() {
             let file_part = reqwest::multipart::Part::stream(req.image.buffer.clone())
-                .file_name(mask.filename.clone())
+                .file_name(mask.filename)
                 .mime_str("application/octet-stream")
                 .unwrap();
 
@@ -190,7 +190,7 @@ impl<'a> Images<'a> {
         }
 
         if let Some(user) = req.user.clone() {
-            form = form.text("user", user.to_string());
+            form = form.text("user", user);
         }
 
         self.openai.post_form("/images/edits", form).await
@@ -213,7 +213,7 @@ impl<'a> Images<'a> {
         }
 
         if let Some(size) = req.size.clone() {
-            form = form.text("size", size.to_string());
+            form = form.text("size", size);
         }
 
         if let Some(response_format) = req.response_format.clone() {
@@ -221,7 +221,7 @@ impl<'a> Images<'a> {
         }
 
         if let Some(user) = req.user.clone() {
-            form = form.text("user", user.to_string());
+            form = form.text("user", user);
         }
 
         self.openai.post_form("/images/variations", form).await

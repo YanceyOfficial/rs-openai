@@ -459,6 +459,6 @@ impl<'a> Audio<'a> {
             return true;
         }
 
-        return false;
+        false
     }
 }
