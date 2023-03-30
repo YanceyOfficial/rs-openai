@@ -57,3 +57,5 @@
 pub mod apis;
 pub mod client;
 pub mod shared;
+
+pub use client::OpenAI;

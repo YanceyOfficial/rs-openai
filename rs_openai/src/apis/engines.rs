@@ -7,7 +7,7 @@
 //! Please use their replacement, [Models](https://platform.openai.com/docs/api-reference/models), instead. [Learn more](https://help.openai.com/TODO).
 
 use crate::client::OpenAI;
-use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
+use crate::shared::response_wrapper::OpenAIResponse;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
