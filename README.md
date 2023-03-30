@@ -18,7 +18,7 @@ rs_openai = { version = "0.3.1" }
 
 ## Features
 
-- [x] Audio
+- [x] Audio (including Text and Json resposne value)
 - [x] Chat (including SSE streaming)
 - [x] Completions (including SSE streaming)
 - [x] Edits
@@ -29,7 +29,7 @@ rs_openai = { version = "0.3.1" }
 - [x] Images
 - [x] Models
 - [x] Moderations
-- [ ] Enhance backoff
+- [ ] Enhances backoff
 - [ ] Supports Microsoft Azure Endpoints
 
 ## Usage
