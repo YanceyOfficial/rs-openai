@@ -4,6 +4,8 @@
 ![Crates.io](https://img.shields.io/crates/d/rs_openai?style=flat-square&logo=appveyor)
 ![Crates.io](https://img.shields.io/crates/l/rs_openai?style=flat-square&logo=appveyor)
 ![docs.rs](https://img.shields.io/docsrs/rs_openai?style=flat-square&logo=appveyor)
+[![build](https://github.com/YanceyOfficial/rs-openai/actions/workflows/rust.yml/badge.svg)](https://github.com/YanceyOfficial/rs-openai/actions/workflows/rust.yml)
+[![rust-clippy analyze](https://github.com/YanceyOfficial/rs-openai/actions/workflows/rust-clippy.yml/badge.svg)](https://github.com/YanceyOfficial/rs-openai/actions/workflows/rust-clippy.yml)
 
 The OpenAI Rust library provides convenient access to the OpenAI API from Rust applications.
 
