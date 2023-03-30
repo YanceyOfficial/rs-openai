@@ -10,8 +10,7 @@ use rs_openai::{
 use std::io::prelude::*;
 use std::{env::var, fs::File};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 

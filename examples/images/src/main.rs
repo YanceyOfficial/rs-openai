@@ -10,8 +10,7 @@ use rs_openai::{
 use std::io::prelude::*;
 use std::{env::var, fs::File};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+ fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
@@ -42,10 +41,10 @@ async fn read_image(path: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 #[tokio::main]
 async fn create(client: &OpenAI) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateImageRequestBuilder::default()
-        .prompt("An oil painting with beach and sunshine.")
+        .prompt("生成\"社区共建\"图标")
         .response_format(ResponseFormat::Url)
         .size(ImageSize::S512x512)
-        .n(2)
+        .n(10)
         .build()?;
 
     let res = client.images().create(&req).await?;
@@ -54,7 +53,6 @@ async fn create(client: &OpenAI) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[allow(unused)]
 #[tokio::main]
 async fn create_edit(
     client: &OpenAI,
@@ -80,7 +78,6 @@ async fn create_edit(
     Ok(())
 }
 
-#[allow(unused)]
 #[tokio::main]
 async fn create_variations(
     client: &OpenAI,
