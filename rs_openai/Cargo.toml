@@ -8,7 +8,7 @@ repository = "https://github.com/YanceyOfficial/rs-openai"
 homepage = "https://yanceyleo.com"
 license = "MIT"
 keywords = ["openai"]
-readme = "README.md"
+readme = "../README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
