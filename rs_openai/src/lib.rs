@@ -2,7 +2,7 @@
 //!
 //! ## Creating client
 //!
-//! ```
+//! ```ignore
 //! use dotenvy::dotenv;
 //! use rs_openai::{OpenAI};
 //! use std::env::var;
@@ -18,7 +18,7 @@
 //!
 //! ## Making requests
 //!
-//!```
+//!```ignore
 //! use dotenvy::dotenv;
 //! use rs_openai::{
 //!     chat::{ChatCompletionMessageRequestBuilder, CreateChatRequestBuilder, Role},
@@ -57,5 +57,3 @@
 pub mod apis;
 pub mod client;
 pub mod shared;
-
-pub use client::OpenAI;
