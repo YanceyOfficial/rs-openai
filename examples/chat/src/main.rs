@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .stream(true)
         .build()?;
 
-    let mut stream = client.chat().create_stream(&req).await?;
+    let mut stream = client.chat().create_with_stream(&req).await?;
 
     let mut lock = stdout().lock();
     while let Some(response) = stream.next().await {

@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let res = client.completions().create(&req).await?;
     println!("{:?}", res);
 
-    // create_stream
+    // create_with_stream
     let req = CreateCompletionRequestBuilder::default()
         .model("text-davinci-003")
         .prompt("What's your name?")
@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .stream(true)
         .build()?;
 
-    let mut stream = client.completions().create_stream(&req).await?;
+    let mut stream = client.completions().create_with_stream(&req).await?;
 
     let mut lock = stdout().lock();
     while let Some(data) = stream.next().await {
