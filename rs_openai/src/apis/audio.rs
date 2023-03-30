@@ -2,9 +2,9 @@
 //!
 //! Related guide: [Speech to text](https://platform.openai.com/docs/guides/speech-to-text)
 
-use crate::shared::response_wrapper::OpenAIError;
+use crate::client::OpenAI;
+use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
 use crate::shared::types::FileMeta;
-use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use reqwest::multipart::Form;
 use serde::{Deserialize, Serialize};

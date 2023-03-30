@@ -1,7 +1,7 @@
 //! Given a prompt and an instruction, the model will return an edited version of the prompt.
 
-use crate::shared::response_wrapper::OpenAIError;
-use crate::{OpenAI, OpenAIResponse};
+use crate::client::OpenAI;
+use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -70,7 +70,7 @@ impl<'a> Edits<'a> {
     pub fn new(openai: &'a OpenAI) -> Self {
         Self { openai }
     }
-    
+
     /// Creates a new edit for the provided input, instruction, and parameters.
     pub async fn create(&self, req: &CreateEditRequest) -> OpenAIResponse<EditResponse> {
         self.openai.post("/edits", req).await

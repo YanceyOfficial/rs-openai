@@ -2,8 +2,8 @@
 //!
 //! Related guide: [Fine-tune models](https://platform.openai.com/docs/guides/fine-tuning)
 
-use crate::shared::response_wrapper::OpenAIError;
-use crate::{OpenAI, OpenAIResponse};
+use crate::client::OpenAI;
+use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
 use derive_builder::Builder;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
@@ -244,8 +244,10 @@ impl<'a> FineTunes<'a> {
     pub async fn retrieve_content_stream(
         &self,
         fine_tune_id: &str,
-    ) -> Result<Pin<Box<dyn Stream<Item = OpenAIResponse<EventListResponse>> + Send>>,OpenAIError> {
-        Ok(self.openai
+    ) -> Result<Pin<Box<dyn Stream<Item = OpenAIResponse<EventListResponse>> + Send>>, OpenAIError>
+    {
+        Ok(self
+            .openai
             .get_stream(
                 &format!("/fine-tunes/{fine_tune_id}/events"),
                 &("stream", true),

@@ -1,9 +1,9 @@
 //! Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
 
-use crate::shared::response_wrapper::OpenAIError;
+use crate::client::OpenAI;
+use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
 use crate::shared::types::Stop;
 use crate::shared::utils::is_stream;
-use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
@@ -71,7 +71,7 @@ pub struct CreateCompletionRequest {
     /// Whether to stream back partial progress.
     /// If set, tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message.
     ///
-    /// For streamed progress, use [`create_with_stream`](create_with_stream).
+    /// For streamed progress, use [`create_with_stream`](Completions::create_with_stream).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>, // default: false
 
@@ -190,7 +190,7 @@ impl<'a> Completions<'a> {
     ) -> OpenAIResponse<CompletionResponse> {
         if is_stream(req.stream) {
             return Err(OpenAIError::InvalidArgument(
-                "When stream is true, use Completions::create_stream".into(),
+                "When stream is true, use Completions::create_with_stream".into(),
             ));
         }
 
@@ -198,7 +198,7 @@ impl<'a> Completions<'a> {
     }
 
     /// Creates a completion for the provided prompt and parameters.
-    pub async fn create_stream(
+    pub async fn create_with_stream(
         &self,
         req: &CreateCompletionRequest,
     ) -> Result<

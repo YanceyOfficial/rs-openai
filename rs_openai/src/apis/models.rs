@@ -1,7 +1,8 @@
 //! List and describe the various models available in the API.
 //! You can refer to the [Models](https://platform.openai.com/docs/models/overview) documentation to understand what models are available and the differences between them.
 
-use crate::{OpenAI, OpenAIResponse};
+use crate::client::OpenAI;
+use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]

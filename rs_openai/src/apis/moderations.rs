@@ -2,8 +2,8 @@
 //!
 //! Related guide: [Moderations](https://platform.openai.com/docs/guides/moderation)
 
-use crate::{OpenAI, OpenAIResponse};
-use crate::shared::response_wrapper::OpenAIError;
+use crate::client::OpenAI;
+use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -97,7 +97,10 @@ impl<'a> Moderations<'a> {
     }
 
     /// Classifies if text violates OpenAI's Content Policy.
-    pub async fn create(&self, req: &CreateModerationRequest) -> OpenAIResponse<ModerationResponse> {
+    pub async fn create(
+        &self,
+        req: &CreateModerationRequest,
+    ) -> OpenAIResponse<ModerationResponse> {
         self.openai.post("/moderations", req).await
     }
 }
