@@ -1,6 +1,6 @@
-# RS-OpenAI Contributing Guide
+# OpenAI Rust Library Contributing Guide
 
-Thank you for your interest in contributing to RS-OpenAI! We welcome all contributions, whether it's reporting an issue, fixing a bug, or implementing a new feature. Before you get started, please take a moment to review the following guidelines.
+Thank you for your interest in contributing to OpenAI Rust Library! We welcome all contributions, whether it's reporting an issue, fixing a bug, or implementing a new feature. Before you get started, please take a moment to review the following guidelines.
 
 ## Pull Request Guidelines
 

@@ -20,7 +20,7 @@ pub struct CreateEditRequest {
     pub input: Option<String>,
 
     /// The instruction that tells the model how to edit the prompt.
-    pub instruction_text: String,
+    pub instruction: String,
 
     /// How many edits to generate for the input and instruction.
     #[serde(skip_serializing_if = "Option::is_none")]
