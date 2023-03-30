@@ -1,15 +1,4 @@
 [workspace]
 members = [
-    "rs_openai",
-    "examples/audio",
-    "examples/models",
-    "examples/images",
-    "examples/engines",
-    "examples/moderations",
-    "examples/fine_tunes",
-    "examples/completions",
-    "examples/chat",
-    "examples/edits",
-    "examples/embeddings",
-    "examples/files",
+    "rs_openai"
 ]

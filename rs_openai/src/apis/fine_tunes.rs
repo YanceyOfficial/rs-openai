@@ -5,9 +5,9 @@
 use crate::shared::response_wrapper::OpenAIError;
 use crate::{OpenAI, OpenAIResponse};
 use derive_builder::Builder;
+use futures::Stream;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
-use futures::Stream;
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
 #[builder(name = "CreateFineTuneRequestBuilder")]
@@ -113,7 +113,7 @@ pub struct FineTuneResponse {
     pub object: String,
     pub model: String,
     pub created_at: u32,
-    pub events: Vec<FineTuneEvent>,
+    pub events: Option<Vec<FineTuneEvent>>,
     pub fine_tuned_model: Option<String>,
     pub hyperparams: HyperParams,
     pub organization_id: String,
@@ -223,6 +223,8 @@ impl<'a> FineTunes<'a> {
     /// # Path parameters
     ///
     /// - `fine_tune_id` - The ID of the fine-tune job to get events for.
+    ///
+    /// TODO: Since free accounts cannot read fine-tune event content, I have to verify this api until purchase a Plus.
     pub async fn retrieve_content(&self, fine_tune_id: &str) -> OpenAIResponse<EventListResponse> {
         self.openai
             .get(&format!("/fine-tunes/{fine_tune_id}/events"), &())
@@ -237,16 +239,18 @@ impl<'a> FineTunes<'a> {
     /// # Path parameters
     ///
     /// - `fine_tune_id` - The ID of the fine-tune job to get events for.
+    ///
+    /// TODO: Since free accounts cannot read fine-tune event content, I have to verify this api until purchase a Plus.
     pub async fn retrieve_content_stream(
         &self,
         fine_tune_id: &str,
-    ) -> Pin<Box<dyn Stream<Item = OpenAIResponse<EventListResponse>> + Send>> {
-        self.openai
+    ) -> Result<Pin<Box<dyn Stream<Item = OpenAIResponse<EventListResponse>> + Send>>,OpenAIError> {
+        Ok(self.openai
             .get_stream(
                 &format!("/fine-tunes/{fine_tune_id}/events"),
                 &("stream", true),
             )
-            .await
+            .await)
     }
 
     /// Delete a fine-tuned model. You must have the Owner role in your organization.

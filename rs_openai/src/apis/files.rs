@@ -101,6 +101,8 @@ impl<'a> Files<'a> {
     /// # Path parameters
     ///
     /// - `file_id` - The ID of the file to use for this request
+    ///
+    /// TODO: Since free accounts cannot download fine-tune training files, I have to verify this api until purchase a Plus.
     pub async fn retrieve_content(&self, file_id: &str) -> OpenAIResponse<String> {
         self.openai
             .get(&format!("/files/{file_id}/content"), &())

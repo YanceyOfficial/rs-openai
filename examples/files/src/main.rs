@@ -18,13 +18,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", res);
 
     // upload
-    let mut file = File::open("./assets/training_file.jsonl").unwrap();
+    let mut file = File::open("./assets/books_training_file.jsonl").unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
 
     let req = UploadFileRequestBuilder::default()
         .file(FileMeta {
-            filename: "training_file.jsonl".into(),
+            filename: "books_training_file.jsonl".into(),
             buffer,
         })
         .purpose("fine-tune".to_string())
@@ -34,15 +34,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", res);
 
     // delete
-    let res = client.files().delete("").await?;
+    let res = client.files().delete("YOUR_FILE_ID").await?;
     println!("{:?}", res);
 
     // retrieve
-    let res = client.files().retrieve("").await?;
+    let res = client.files().retrieve("YOUR_FILE_ID").await?;
     println!("{:?}", res);
 
     // retrieve_content
-    let res = client.files().retrieve_content("").await?;
+    // TODO: Since free accounts cannot download fine-tune training files, I have to verify this api until purchase a Plus.
+    let res = client.files().retrieve_content("YOUR_FILE_ID").await?;
     println!("{:?}", res);
 
     Ok(())
