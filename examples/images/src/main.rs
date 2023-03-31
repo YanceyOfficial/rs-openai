@@ -10,7 +10,7 @@ use rs_openai::{
 use std::io::prelude::*;
 use std::{env::var, fs::File};
 
- fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
@@ -41,7 +41,7 @@ async fn read_image(path: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 #[tokio::main]
 async fn create(client: &OpenAI) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateImageRequestBuilder::default()
-        .prompt("生成\"社区共建\"图标")
+        .prompt("hypperealistic portrait photo of (beautiful japanese girl:1.3) with (black curly hair:0.9) standing in a street (night time shinjuku city street tokyo japan:1.3) harajuku girl (neon colors:0.8) (futuristic:1.3)")
         .response_format(ResponseFormat::Url)
         .size(ImageSize::S512x512)
         .n(10)
