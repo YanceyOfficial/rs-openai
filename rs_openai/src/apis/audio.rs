@@ -10,7 +10,6 @@ use reqwest::multipart::Form;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
-#[serde(rename_all = "snake_case")]
 pub enum ResponseFormat {
     #[default]
     #[strum(serialize = "json")]
@@ -229,7 +228,6 @@ pub enum Language {
 }
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
-#[serde(rename_all = "snake_case")]
 pub enum AudioModel {
     #[default]
     #[strum(serialize = "whisper-1")]
@@ -367,7 +365,7 @@ impl<'a> Audio<'a> {
     ) -> OpenAIResponse<String> {
         if self.is_json_type(req.response_format.clone()) {
             return Err(OpenAIError::InvalidArgument(
-            "When response_format is `None` or `ResponseFormat::Json` or `ResponseFormat::VerboseJson`, use Audio::create_transcription".into(),
+            "When `response_format` is `None` or `ResponseFormat::Json` or `ResponseFormat::VerboseJson`, use Audio::create_transcription".into(),
         ));
         }
 
@@ -382,7 +380,7 @@ impl<'a> Audio<'a> {
         &self,
         req: &CreateTranslationRequest,
     ) -> OpenAIResponse<String> {
-        if !self.is_json_type(req.response_format.clone()) {
+        if self.is_json_type(req.response_format.clone()) {
             return Err(OpenAIError::InvalidArgument(
                 "When response_format is `None` or `ResponseFormat::Json` or `ResponseFormat::VerboseJson`, use Audio::create_translation".into(),
             ));
