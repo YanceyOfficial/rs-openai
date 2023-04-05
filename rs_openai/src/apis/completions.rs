@@ -132,7 +132,7 @@ pub struct CreateCompletionRequest {
     pub user: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct CompletionResponse {
     pub id: String,
     pub object: String,
@@ -142,7 +142,7 @@ pub struct CompletionResponse {
     pub usage: Usage,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct CompletionChoice {
     pub text: String,
     pub index: u32,
@@ -150,14 +150,14 @@ pub struct CompletionChoice {
     pub finish_reason: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct CompletionChoiceStream {
     pub text: String,
     pub index: usize,
@@ -165,7 +165,7 @@ pub struct CompletionChoiceStream {
     pub finish_reason: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct CompletionStreamResponse {
     pub id: String,
     pub object: String,

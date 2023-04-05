@@ -3,9 +3,9 @@
 
 use crate::client::OpenAI;
 use crate::shared::response_wrapper::OpenAIResponse;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ModelPermission {
     pub id: String,
     pub object: String,
@@ -21,7 +21,7 @@ pub struct ModelPermission {
     pub is_blocking: bool,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ModelResponse {
     pub id: String,
     pub object: String,
@@ -32,7 +32,7 @@ pub struct ModelResponse {
     pub parent: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ListModelResponse {
     pub object: String,
     pub data: Vec<ModelResponse>,

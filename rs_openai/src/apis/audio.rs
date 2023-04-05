@@ -296,7 +296,7 @@ pub struct CreateTranslationRequest {
     pub temperature: Option<f32>, // min: 0, max: 1, default: 0
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct VerboseJsonForAudioResponse {
     pub task: Option<String>,
     pub language: Option<String>,
@@ -305,7 +305,7 @@ pub struct VerboseJsonForAudioResponse {
     pub text: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Segment {
     pub id: u32,
     pub seek: u32,

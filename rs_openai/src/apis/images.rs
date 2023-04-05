@@ -129,7 +129,7 @@ pub struct CreateImageVariationRequest {
     pub user: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ImageData {
     Url(String),
@@ -137,7 +137,7 @@ pub enum ImageData {
     #[serde(rename = "b64_json")]
     B64Json(String),
 }
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ImageResponse {
     pub created: i64,
     pub data: Vec<ImageData>,

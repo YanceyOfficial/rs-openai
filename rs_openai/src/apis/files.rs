@@ -26,7 +26,7 @@ pub struct UploadFileRequest {
     pub purpose: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct FileResponse {
     pub id: String,
     pub object: String,
@@ -36,13 +36,13 @@ pub struct FileResponse {
     pub purpose: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct FileListResponse {
     pub data: Vec<FileResponse>,
     pub object: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct DeleteFileResponse {
     pub id: String,
     pub object: String,

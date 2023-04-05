@@ -36,7 +36,7 @@ pub struct CreateEmbeddingRequest {
     pub user: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EmbeddingResponse {
     pub object: String,
     pub data: Vec<EmbeddingData>,
@@ -44,14 +44,14 @@ pub struct EmbeddingResponse {
     pub usage: Usage,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EmbeddingData {
     pub object: String,
     pub embedding: Vec<f32>,
     pub index: u32,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Usage {
     pub prompt_tokens: u32,
     pub total_tokens: u32,

@@ -110,27 +110,27 @@ pub struct CreateChatRequest {
     pub user: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Message {
     pub role: String,
     pub content: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ChatUsage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ChatChoice {
     pub message: ChatCompletionMessage,
     pub finish_reason: String,
     pub index: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ChatResponse {
     pub id: String,
     pub object: String,
@@ -139,19 +139,19 @@ pub struct ChatResponse {
     pub usage: ChatUsage,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Delta {
     pub content: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ChatChoiceStream {
     pub delta: Delta,
     pub finish_reason: Option<String>,
     pub index: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ChatStreamResponse {
     pub id: String,
     pub object: String,

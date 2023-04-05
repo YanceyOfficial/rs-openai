@@ -43,21 +43,21 @@ pub struct CreateModerationRequest {
     pub model: Option<ModerationModel>, // default: "text-moderation-latest"
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ModerationResponse {
     pub id: String,
     pub model: String,
     pub results: Vec<ModerationCategory>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ModerationCategory {
     pub categories: ModerationCategories,
     pub category_scores: ModerationCategoryScores,
     pub flagged: bool,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ModerationCategories {
     pub sexual: bool,
     pub hate: bool,
@@ -72,7 +72,7 @@ pub struct ModerationCategories {
     pub violence_graphic: bool,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ModerationCategoryScores {
     pub sexual: f32,
     pub hate: f32,

@@ -41,7 +41,7 @@ pub struct CreateEditRequest {
     pub top_p: Option<f32>, //  default: 1
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct EditResponse {
     pub object: String,
     pub created: u32,
@@ -49,13 +49,13 @@ pub struct EditResponse {
     pub usage: Usage,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Choice {
     pub text: String,
     pub index: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
