@@ -11,5 +11,6 @@ members = [
     "images",
     "models",
     "moderations",
+    "chat_stream_with_actix_web"
 ]
 resolver = "2"
