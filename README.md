@@ -13,7 +13,7 @@ The OpenAI Rust library provides convenient access to the OpenAI API from Rust a
 
 ```toml
 [dependencies]
-rs_openai = { version = "0.3.3" }
+rs_openai = { version = "0.3.4" }
 ```
 
 ## Features
