@@ -1,6 +1,6 @@
 [package]
 name = "rs_openai"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 authors = ["Yancey Leo <developer@yanceyleo.com>"]
 description = "The OpenAI Rust library provides convenient access to the OpenAI API from Rust applications."
