@@ -28,8 +28,14 @@ pub enum Role {
 #[builder(derive(Debug))]
 #[builder(build_fn(error = "OpenAIError"))]
 pub struct ChatCompletionMessage {
+    /// The role of the author of this message. One of `system`, `user`, or `assistant`.
     pub role: Role,
+
+    /// The contents of the message.
     pub content: String,
+
+    /// The name of the author of this message. May contain a-z, A-Z, 0-9, and underscores, with a maximum length of 64 characters.
+    pub name: Option<String>,
 }
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
@@ -43,7 +49,7 @@ pub struct CreateChatRequest {
     /// See the [model endpoint compatibility](https://platform.openai.com/docs/models/model-endpoint-compatibility) table for details on which models work with the Chat API.
     pub model: String,
 
-    /// The messages to generate chat completions for, in the [chat format](https://platform.openai.com/docs/guides/chat/introduction).
+    /// A list of messages describing the conversation so far.
     pub messages: Vec<ChatCompletionMessage>,
 
     /// What sampling temperature to use, between 0 and 2.
@@ -114,7 +120,6 @@ pub struct CreateChatRequest {
 pub struct Message {
     pub role: String,
     pub content: String,
-    pub name: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
