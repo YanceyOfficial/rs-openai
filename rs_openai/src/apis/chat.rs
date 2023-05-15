@@ -114,6 +114,7 @@ pub struct CreateChatRequest {
 pub struct Message {
     pub role: String,
     pub content: String,
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
