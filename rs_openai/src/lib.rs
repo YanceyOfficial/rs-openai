@@ -57,6 +57,7 @@
 pub mod apis;
 pub mod client;
 pub mod shared;
+pub mod interfaces;
 
 pub use apis::*;
 pub use client::*;

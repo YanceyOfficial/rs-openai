@@ -1,53 +1,9 @@
 //! Files are used to upload documents that can be used with features like [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tunes).
 
 use crate::client::OpenAI;
-use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
-use crate::shared::types::FileMeta;
-use derive_builder::Builder;
+use crate::interfaces::files;
+use crate::shared::response_wrapper::OpenAIResponse;
 use reqwest::multipart::Form;
-use serde::{Deserialize, Serialize};
-
-#[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "UploadFileRequestBuilder")]
-#[builder(pattern = "mutable")]
-#[builder(setter(into, strip_option), default)]
-#[builder(derive(Debug))]
-#[builder(build_fn(error = "OpenAIError"))]
-pub struct UploadFileRequest {
-    /// Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be uploaded.
-    ///
-    /// If the `purpose` is set to "fine-tune", each line is a JSON record with "prompt" and "completion" fields representing your [training examples](https://platform.openai.com/docs/guides/fine-tuning/prepare-training-data).
-    pub file: FileMeta,
-
-    /// The intended purpose of the uploaded documents.
-    ///
-    /// Use "fine-tune" for [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tunes).
-    /// This allows us to validate the format of the uploaded file.
-    pub purpose: String,
-}
-
-#[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct FileResponse {
-    pub id: String,
-    pub object: String,
-    pub bytes: u64,
-    pub created_at: u32,
-    pub filename: String,
-    pub purpose: String,
-}
-
-#[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct FileListResponse {
-    pub data: Vec<FileResponse>,
-    pub object: String,
-}
-
-#[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct DeleteFileResponse {
-    pub id: String,
-    pub object: String,
-    pub deleted: bool,
-}
 
 pub struct Files<'a> {
     openai: &'a OpenAI,
@@ -58,14 +14,17 @@ impl<'a> Files<'a> {
         Self { openai }
     }
     /// Returns a list of files that belong to the user's organization.
-    pub async fn list(&self) -> OpenAIResponse<FileListResponse> {
+    pub async fn list(&self) -> OpenAIResponse<files::FileListResponse> {
         self.openai.get("/files", &()).await
     }
 
     /// Upload a file that contains document(s) to be used across various endpoints/features.
     /// Currently, the size of all the files uploaded by one organization can be up to 1 GB.
     /// Please contact us if you need to increase the storage limit.
-    pub async fn upload(&self, req: &UploadFileRequest) -> OpenAIResponse<FileResponse> {
+    pub async fn upload(
+        &self,
+        req: &files::UploadFileRequest,
+    ) -> OpenAIResponse<files::FileResponse> {
         let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
             .file_name(req.file.filename.clone())
             .mime_str("application/octet-stream")
@@ -83,7 +42,7 @@ impl<'a> Files<'a> {
     /// # Path parameters
     ///
     /// - `file_id` - The ID of the file to use for this request
-    pub async fn delete(&self, file_id: &str) -> OpenAIResponse<DeleteFileResponse> {
+    pub async fn delete(&self, file_id: &str) -> OpenAIResponse<files::DeleteFileResponse> {
         self.openai.delete(&format!("/files/{file_id}"), &()).await
     }
 
@@ -92,7 +51,7 @@ impl<'a> Files<'a> {
     /// # Path parameters
     ///
     /// - `file_id` - The ID of the file to use for this request
-    pub async fn retrieve(&self, file_id: &str) -> OpenAIResponse<FileResponse> {
+    pub async fn retrieve(&self, file_id: &str) -> OpenAIResponse<files::FileResponse> {
         self.openai.get(&format!("/files/{file_id}"), &()).await
     }
 

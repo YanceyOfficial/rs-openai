@@ -7,6 +7,8 @@ use futures::{stream::StreamExt, Stream};
 use reqwest::{header::HeaderMap, multipart::Form, Client, Method, RequestBuilder};
 use reqwest_eventsource::{Event, EventSource, RequestBuilderExt};
 use serde::{de::DeserializeOwned, Serialize};
+use std::fs::File;
+use std::io::{self};
 use std::{fmt::Debug, pin::Pin};
 
 // Default v1 API base url
@@ -89,6 +91,24 @@ impl OpenAI {
         Ok(text)
     }
 
+    async fn resolve_file_response(request: RequestBuilder, filename: &str) -> OpenAIResponse<()> {
+        let response = request.send().await?;
+        let status = response.status();
+        let text = response.text().await?;
+
+        if !status.is_success() {
+            let api_error: ApiErrorResponse =
+                serde_json::from_slice(text.as_ref()).map_err(OpenAIError::JSONDeserialize)?;
+
+            return Err(OpenAIError::ApiError(api_error));
+        }
+
+        let mut file = File::create(filename).expect("failed to create file");
+        io::copy(&mut text.as_bytes(), &mut file).expect("failed to copy content");
+
+        Ok(())
+    }
+
     pub(crate) async fn get<T, F>(&self, route: &str, query: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
@@ -140,6 +160,19 @@ impl OpenAI {
         let request =
             self.openai_request(Method::POST, route, |request| request.multipart(form_data));
         Self::resolve_text_response(request).await
+    }
+
+    pub(crate) async fn post_with_file_response<T>(
+        &self,
+        route: &str,
+        json: &T,
+        filename: &str,
+    ) -> OpenAIResponse<()>
+    where
+        T: Serialize,
+    {
+        let request = self.openai_request(Method::POST, route, |request| request.json(json));
+        Self::resolve_file_response(request, filename).await
     }
 
     pub(crate) async fn post_stream<T, F>(

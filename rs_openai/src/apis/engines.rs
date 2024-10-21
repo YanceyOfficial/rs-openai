@@ -7,22 +7,8 @@
 //! Please use their replacement, [Models](https://platform.openai.com/docs/api-reference/models), instead. [Learn more](https://help.openai.com/TODO).
 
 use crate::client::OpenAI;
+use crate::interfaces::engines;
 use crate::shared::response_wrapper::OpenAIResponse;
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct EngineResponse {
-    pub id: String,
-    pub object: String,
-    pub owner: String,
-    pub ready: bool,
-}
-
-#[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct EngineListResponse {
-    pub data: Vec<EngineResponse>,
-    pub object: String,
-}
 
 pub struct Engines<'a> {
     openai: &'a OpenAI,
@@ -38,7 +24,7 @@ impl<'a> Engines<'a> {
     #[deprecated(
         note = "The Engines endpoints are deprecated. Please use their replacement, Models, instead."
     )]
-    pub async fn list(&self) -> OpenAIResponse<EngineListResponse> {
+    pub async fn list(&self) -> OpenAIResponse<engines::EngineListResponse> {
         self.openai.get("/engines", &()).await
     }
 
@@ -50,7 +36,7 @@ impl<'a> Engines<'a> {
     #[deprecated(
         note = "The Engines endpoints are deprecated. Please use their replacement, Models, instead."
     )]
-    pub async fn retrieve(&self, engine_id: &str) -> OpenAIResponse<EngineResponse> {
+    pub async fn retrieve(&self, engine_id: &str) -> OpenAIResponse<engines::EngineResponse> {
         self.openai.get(&format!("/engines/{engine_id}"), &()).await
     }
 }

@@ -1,6 +1,6 @@
-use crate::apis::completions::Prompt;
-use crate::apis::embeddings::EmbeddingInput;
-use crate::apis::moderations::ModerationInput;
+use crate::interfaces::completions::Prompt;
+use crate::interfaces::embeddings::EmbeddingInput;
+use crate::interfaces::moderations::ModerationInput;
 use crate::shared::types::Stop;
 
 macro_rules! impl_default {
