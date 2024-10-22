@@ -7,7 +7,7 @@ pub mod edits;
 pub mod embeddings;
 pub mod engines;
 pub mod files;
-pub mod fine_tunes;
+pub mod fine_tuning;
 pub mod images;
 pub mod models;
 pub mod moderations;

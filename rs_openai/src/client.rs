@@ -1,5 +1,5 @@
 use crate::apis::{
-    audio, chat, completions, edits, embeddings, engines, files, fine_tunes, images, models,
+    audio, chat, completions, edits, embeddings, engines, files, fine_tuning, images, models,
     moderations,
 };
 use crate::shared::response_wrapper::{ApiErrorResponse, OpenAIError, OpenAIResponse};
@@ -273,8 +273,8 @@ impl OpenAI {
         files::Files::new(self)
     }
 
-    pub fn fine_tunes(&self) -> fine_tunes::FineTunes {
-        fine_tunes::FineTunes::new(self)
+    pub fn fine_tuning(&self) -> fine_tuning::FineTuning {
+        fine_tuning::FineTuning::new(self)
     }
 
     pub fn images(&self) -> images::Images {

@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use futures::StreamExt;
-use rs_openai::{fine_tunes::CreateFineTuneRequestBuilder, OpenAI};
+use rs_openai::{fine_tuning::CreateFineTuneRequestBuilder, OpenAI};
 use std::env::var;
 use std::io::{stdout, Write};
 
@@ -24,29 +24,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .prompt_loss_weight(0.01)
         .build()?;
 
-    let res = client.fine_tunes().create(&req).await?;
+    let res = client.fine_tuning().create(&req).await?;
     println!("{:?}", res);
 
     // list
-    let res = client.fine_tunes().list().await?;
+    let res = client.fine_tuning().list().await?;
     println!("{:?}", res);
 
     // retrieve
-    let res = client.fine_tunes().retrieve("").await?;
+    let res = client.fine_tuning().retrieve("").await?;
     println!("{:?}", res);
 
     // cancel
-    let res = client.fine_tunes().cancel("").await?;
+    let res = client.fine_tuning().cancel("").await?;
     println!("{:?}", res);
 
     // retrieve_content
     // TODO: Since free accounts cannot read fine-tune event content, I have to verify this api until purchase a Plus.
-    let res = client.fine_tunes().retrieve_content("").await?;
+    let res = client.fine_tuning().retrieve_content("").await?;
     println!("{:?}", res);
 
     // retrieve_content_stream
     // TODO: Since free accounts cannot read fine-tune event content, I have to verify this api until purchase a Plus.
-    let mut stream = client.fine_tunes().retrieve_content_stream("").await?;
+    let mut stream = client.fine_tuning().retrieve_content_stream("").await?;
 
     let mut lock = stdout().lock();
     while let Some(response) = stream.next().await {

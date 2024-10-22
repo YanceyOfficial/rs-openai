@@ -7,7 +7,7 @@ members = [
     "embeddings",
     "engines",
     "files",
-    "fine_tunes",
+    "fine_tuning",
     "images",
     "models",
     "moderations",
