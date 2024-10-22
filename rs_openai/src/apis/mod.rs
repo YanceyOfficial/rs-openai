@@ -11,4 +11,5 @@ pub mod fine_tunes;
 pub mod images;
 pub mod models;
 pub mod moderations;
+pub mod threads;
 pub mod uploads;
