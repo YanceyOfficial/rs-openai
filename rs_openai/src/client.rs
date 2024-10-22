@@ -118,21 +118,21 @@ impl OpenAI {
         Self::resolve_response(request).await
     }
 
-    pub(crate) async fn get_stream<T, F>(
-        &self,
-        route: &str,
-        query: &F,
-    ) -> Pin<Box<dyn Stream<Item = OpenAIResponse<T>> + Send>>
-    where
-        T: DeserializeOwned + Debug + Send + 'static,
-        F: Serialize,
-    {
-        let event_source = self
-            .openai_request(Method::GET, route, |request| request.query(query))
-            .eventsource()
-            .unwrap();
-        Self::stream_sse(event_source).await
-    }
+    // pub(crate) async fn get_stream<T, F>(
+    //     &self,
+    //     route: &str,
+    //     query: &F,
+    // ) -> Pin<Box<dyn Stream<Item = OpenAIResponse<T>> + Send>>
+    // where
+    //     T: DeserializeOwned + Debug + Send + 'static,
+    //     F: Serialize,
+    // {
+    //     let event_source = self
+    //         .openai_request(Method::GET, route, |request| request.query(query))
+    //         .eventsource()
+    //         .unwrap();
+    //     Self::stream_sse(event_source).await
+    // }
 
     pub(crate) async fn post<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
     where
