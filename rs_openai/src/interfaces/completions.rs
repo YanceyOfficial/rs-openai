@@ -1,3 +1,5 @@
+#[allow(unused)]
+use crate::apis;
 use crate::shared::response_wrapper::OpenAIError;
 use crate::shared::types::Stop;
 use derive_builder::Builder;
@@ -65,7 +67,7 @@ pub struct CreateCompletionRequest {
     /// Whether to stream back partial progress.
     /// If set, tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message.
     ///
-    /// For streamed progress, use [`create_with_stream`](Completions::create_with_stream).
+    /// For streamed progress, use [`create_with_stream`](apis::completions::Completions::create_with_stream).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>, // default: false
 
