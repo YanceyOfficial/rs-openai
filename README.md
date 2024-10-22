@@ -131,7 +131,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 Check out the full [API documentation](https://platform.openai.com/docs/api-reference/) for examples of all the available functions.
 
-- Visit [examples](https://github.com/YanceyOfficial/rs-openai/tree/master/examples) directory on how to use async-openai.
+- Visit [examples](https://github.com/YanceyOfficial/rs-openai/tree/master/examples) directory on how to use rs_openai.
 
 - Visit [docs.rs/rs_openai](https://docs.rs/rs_openai) for docs.
 
