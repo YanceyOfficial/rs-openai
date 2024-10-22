@@ -1,5 +1,5 @@
 //! List and describe the various models available in the API.
-//! You can refer to the [Models](https://platform.openai.com/docs/models/overview) documentation to understand what models are available and the differences between them.
+//! You can refer to the [Models](https://platform.openai.com/docs/models) documentation to understand what models are available and the differences between them.
 
 use crate::client::OpenAI;
 use crate::interfaces::models;
@@ -26,5 +26,14 @@ impl<'a> Models<'a> {
     /// Lists the currently available models, and provides basic information about each one such as the owner and availability.
     pub async fn list(&self) -> OpenAIResponse<models::ListModelResponse> {
         self.openai.get("/models", &()).await
+    }
+
+    /// Delete a fine-tuned model. You must have the Owner role in your organization to delete a model.
+    ///
+    /// # Path parameters
+    ///
+    /// - `model` - The model to delete
+    pub async fn delete(&self, model: &str) -> OpenAIResponse<models::DeleteModelResponse> {
+        self.openai.delete(&format!("/models/{model}"), &()).await
     }
 }

@@ -1,34 +1,27 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct ModelPermission {
-    pub id: String,
-    pub object: String,
-    pub created: u32,
-    pub allow_create_engine: bool,
-    pub allow_sampling: bool,
-    pub allow_logprobs: bool,
-    pub allow_search_indices: bool,
-    pub allow_view: bool,
-    pub allow_fine_tuning: bool,
-    pub organization: String,
-    pub group: Option<serde_json::Value>,
-    pub is_blocking: bool,
-}
-
+/// Describes an OpenAI model offering that can be used with the API.
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ModelResponse {
+    // The model identifier, which can be referenced in the API endpoints.
     pub id: String,
+    /// The object type, which is always "model".
     pub object: String,
+    /// The Unix timestamp (in seconds) when the model was created.
     pub created: u32,
+    /// The organization that owns the model.
     pub owned_by: String,
-    pub permission: Vec<ModelPermission>,
-    pub root: String,
-    pub parent: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ListModelResponse {
     pub object: String,
     pub data: Vec<ModelResponse>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct DeleteModelResponse {
+    pub id: String,
+    pub object: String,
+    pub deleted: bool,
 }
