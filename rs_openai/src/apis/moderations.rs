@@ -1,6 +1,4 @@
-//! Given a input text, outputs if the model classifies it as violating OpenAI's content policy.
-//!
-//! Related guide: [Moderations](https://platform.openai.com/docs/guides/moderation)
+//! Given a input text, outputs if the model classifies it as violating OpenAI's content policy. Related guide: [Moderations](https://platform.openai.com/docs/guides/moderation)
 
 use crate::client::OpenAI;
 use crate::interfaces::moderations;
@@ -15,7 +13,7 @@ impl<'a> Moderations<'a> {
         Self { openai }
     }
 
-    /// Classifies if text violates OpenAI's Content Policy.
+    /// Classifies if text and/or image inputs are potentially harmful. Learn more in the [moderation guide](https://platform.openai.com/docs/guides/moderation).
     pub async fn create(
         &self,
         req: &moderations::CreateModerationRequest,
