@@ -263,7 +263,7 @@ pub enum SttModel {
 }
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
-pub enum AudioSpeechModel {
+pub enum TtsModel {
     #[default]
     #[strum(serialize = "tts-1")]
     Whisper1,
@@ -279,7 +279,7 @@ pub enum AudioSpeechModel {
 #[builder(build_fn(error = "OpenAIError"))]
 pub struct CreateSpeechRequest {
     /// One of the available [TTS models](https://platform.openai.com/docs/models/tts): `tts-1` or `tts-1-hd`
-    pub model: AudioSpeechModel,
+    pub model: TtsModel,
 
     /// The text to generate audio for. The maximum length is 4096 characters.
     pub input: String,
@@ -290,7 +290,7 @@ pub struct CreateSpeechRequest {
 
     /// The format to audio in. Supported formats are `mp3`, `opus`, `aac`, `flac`, `wav`, and `pcm`.
     /// #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<SttResponseFormat>, // default: mp3
+    pub response_format: Option<TtsResponseFormat>, // default: mp3
 
     /// The speed of the generated audio. Select a value from `0.25` to `4.0`. `1.0` is the default.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -304,11 +304,15 @@ pub struct CreateSpeechRequest {
 #[builder(derive(Debug))]
 #[builder(build_fn(error = "OpenAIError"))]
 pub struct CreateTranscriptionRequest {
-    /// The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+    /// The audio file object (not file name) to transcribe, in one of these formats: flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
     pub file: FileMeta,
 
-    /// ID of the model to use. Only `whisper-1` is currently available.
+    /// ID of the model to use. Only `whisper-1` (which is powered by our open source Whisper V2 model) is currently available.
     pub model: SttModel,
+
+    /// The language of the input audio. Supplying the input language in [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) format will improve accuracy and latency.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<Language>,
 
     /// An optional text to guide the model's style or continue a previous audio segment.
     /// The [prompt](https://platform.openai.com/docs/guides/speech-to-text/prompting) should match the audio language.
@@ -325,9 +329,11 @@ pub struct CreateTranscriptionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>, // min: 0, max: 1, default: 0
 
-    /// The language of the input audio. Supplying the input language in [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) format will improve accuracy and latency.
+    /// The timestamp granularities to populate for this transcription.
+    /// `response_format` must be set `verbose_json` to use timestamp granularities.
+    /// Either or both of these options are supported: `word`, or `segment`. Note: There is no additional latency for segment timestamps, but generating word timestamps incurs additional latency.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub language: Option<Language>,
+    pub timestamp_granularities: Option<Vec<TimestampGranularity>>, // Defaults to segment
 }
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
@@ -337,10 +343,10 @@ pub struct CreateTranscriptionRequest {
 #[builder(derive(Debug))]
 #[builder(build_fn(error = "OpenAIError"))]
 pub struct CreateTranslationRequest {
-    /// The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+    /// The audio file object (not file name) to transcribe, in one of these formats: flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
     pub file: FileMeta,
 
-    /// ID of the model to use. Only `whisper-1` is currently available.
+    /// ID of the model to use. Only `whisper-1` (which is powered by our open source Whisper V2 model) is currently available.
     pub model: SttModel,
 
     /// An optional text to guide the model's style or continue a previous audio segment.
@@ -350,34 +356,71 @@ pub struct CreateTranslationRequest {
 
     /// The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<SttResponseFormat>, // default: json
+    pub response_format: Option<SttResponseFormat>, // Defaults to json
 
-    /// The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random,
-    /// while lower values like 0.2 will make it more focused and deterministic.
+    /// The sampling temperature, between 0 and 1.
+    /// Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
     /// If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub temperature: Option<f32>, // min: 0, max: 1, default: 0
+    pub temperature: Option<f32>, // Defaults to 0
 }
 
+#[derive(Debug, Serialize, Default, Clone, strum::Display)]
+pub enum TimestampGranularity {
+    #[default]
+    #[strum(serialize = "segment")]
+    Segment,
+    #[strum(serialize = "word")]
+    Word,
+}
+
+/// Represents a verbose json transcription response returned by model, based on the provided input.
 #[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct VerboseJsonForAudioResponse {
-    pub task: Option<String>,
-    pub language: Option<String>,
-    pub duration: Option<f32>,
-    pub segments: Option<Vec<Segment>>,
+pub struct SttResponse {
+    /// The transcribed text.
     pub text: String,
+    /// Always `transcribe`.
+    pub task: Option<String>,
+    /// The language of the input audio.
+    pub language: Option<String>,
+    /// The duration of the input audio.
+    pub duration: Option<f32>,
+    /// Segments of the transcribed text and their corresponding details.
+    pub segments: Option<Vec<Segment>>,
+    /// Extracted words and their corresponding timestamps.
+    pub words: Option<Vec<Word>>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Segment {
+    /// Unique identifier of the segment.
     pub id: u32,
+    /// Seek offset of the segment.
     pub seek: u32,
+    /// Start time of the segment in seconds.
     pub start: f32,
+    /// End time of the segment in seconds.
     pub end: f32,
+    /// Text content of the segment.
     pub text: String,
+    /// Array of token IDs for the text content.
     pub tokens: Vec<u32>,
+    /// Temperature parameter used for generating the segment.
     pub temperature: f32,
+    /// Average logprob of the segment. If the value is lower than -1, consider the logprobs failed.
     pub avg_logprob: f32,
+    /// Compression ratio of the segment. If the value is greater than 2.4, consider the compression failed.
     pub compression_ratio: f32,
+    /// Probability of no speech in the segment. If the value is higher than 1.0 and the `avg_logprob` is below -1, consider this segment silent.
     pub no_speech_prob: f32,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct Word {
+    /// The text content of the word.
+    pub word: String,
+    /// Start time of the word in seconds.
+    pub start: f32,
+    /// End time of the word in seconds.
+    pub end: f32,
 }

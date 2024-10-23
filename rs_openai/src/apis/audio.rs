@@ -1,10 +1,9 @@
-//! Learn how to turn audio into text.
-//!
-//! Related guide: [Speech to text](https://platform.openai.com/docs/guides/speech-to-text)
+//! Learn how to turn audio into text or text into audio. Related guide: [Speech to text](https://platform.openai.com/docs/guides/speech-to-text)
 
 use crate::client::OpenAI;
 use crate::interfaces::audio;
 use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
+use crate::shared::utils::generate_random_string;
 use reqwest::multipart::Form;
 
 pub struct Audio<'a> {
@@ -18,8 +17,10 @@ impl<'a> Audio<'a> {
 
     /// Generates audio from the input text.
     pub async fn create_speech(&self, req: &audio::CreateSpeechRequest) -> OpenAIResponse<()> {
+        let format = req.response_format.clone().unwrap_or_default();
+        let random_filename = generate_random_string(16);
         self.openai
-            .post_with_file_response("/audio/speech", req, "")
+            .post_with_file_response("/audio/speech", req, &format!("{random_filename}.{format}"))
             .await
     }
 
@@ -27,7 +28,7 @@ impl<'a> Audio<'a> {
     pub async fn create_transcription(
         &self,
         req: &audio::CreateTranscriptionRequest,
-    ) -> OpenAIResponse<audio::VerboseJsonForAudioResponse> {
+    ) -> OpenAIResponse<audio::SttResponse> {
         if !self.is_json_type(req.response_format.clone()) {
             return Err(OpenAIError::InvalidArgument(
     "When `response_format` is set to `SttResponseFormat::Text` or `SttResponseFormat::Vtt or `SttResponseFormat::Srt`, use Audio::create_transcription_with_text_response".into(),
@@ -42,7 +43,7 @@ impl<'a> Audio<'a> {
     pub async fn create_translation(
         &self,
         req: &audio::CreateTranslationRequest,
-    ) -> OpenAIResponse<audio::VerboseJsonForAudioResponse> {
+    ) -> OpenAIResponse<audio::SttResponse> {
         if !self.is_json_type(req.response_format.clone()) {
             return Err(OpenAIError::InvalidArgument(
         "When `response_format` is set to `SttResponseFormat::Text` or `SttResponseFormat::Vtt or `SttResponseFormat::Srt`, use Audio::create_translation_with_text_response".into(),
@@ -112,6 +113,16 @@ impl<'a> Audio<'a> {
         if let Some(language) = req.language.clone() {
             form = form.text("laguage", language.to_string());
         }
+
+        if let Some(timestamp_granularities) = req.timestamp_granularities.clone() {
+            for (index, value) in timestamp_granularities.iter().enumerate() {
+                form = form.text(
+                    format!("timestamp_granularities[{}]", index),
+                    value.to_string(),
+                );
+            }
+        }
+
         form
     }
 
