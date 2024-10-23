@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use rs_openai::{
-    moderations::{CreateModerationRequestBuilder, ModerationModel},
+    moderations::CreateModerationRequestBuilder,
     OpenAI,
 };
 use std::env::var;
@@ -18,7 +18,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // create
     let req = CreateModerationRequestBuilder::default()
         .input(["Do you want to build a snowman?", "I will kill you."])
-        .model(ModerationModel::Latest)
         .build()?;
 
     let res = client.moderations().create(&req).await?;
