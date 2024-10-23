@@ -1,4 +1,4 @@
-use crate::shared::{response_wrapper::OpenAIError, types::FileMeta};
+use crate::shared::{response_wrapper::OpenAIError, types::File};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 #[builder(build_fn(error = "OpenAIError"))]
 pub struct UploadFileRequest {
     /// The File object (not file name) to be uploaded.
-    pub file: FileMeta,
+    pub file: File,
 
     /// The intended purpose of the uploaded file.
 
@@ -39,7 +39,7 @@ pub struct UploadFileResponse {
 #[builder(build_fn(error = "OpenAIError"))]
 pub struct AddUploadPartRequest {
     /// The chunk of bytes for this Part.
-    pub data: FileMeta,
+    pub data: File,
 }
 
 /// The upload [Part](https://platform.openai.com/docs/api-reference/uploads/part-object) object.

@@ -1,5 +1,5 @@
 use crate::shared::response_wrapper::OpenAIError;
-use crate::shared::types::FileMeta;
+use crate::shared::types::File;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -67,7 +67,7 @@ pub struct CreateImageRequest {
 pub struct CreateImageEditRequest {
     /// The image to edit. Must be a valid PNG file, less than 4MB, and square.
     /// If mask is not provided, image must have transparency, which will be used as the mask.
-    pub image: FileMeta,
+    pub image: File,
 
     /// A text description of the desired image(s). The maximum length is 1000 characters.
     pub prompt: String,
@@ -75,7 +75,7 @@ pub struct CreateImageEditRequest {
     /// An additional image whose fully transparent areas (e.g. where alpha is zero) indicate where `image` should be edited.
     /// Must be a valid PNG file, less than 4MB, and have the same dimensions as `image`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub mask: Option<FileMeta>,
+    pub mask: Option<File>,
 
     /// The number of images to generate. Must be between 1 and 10.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -103,7 +103,7 @@ pub struct CreateImageEditRequest {
 #[builder(build_fn(error = "OpenAIError"))]
 pub struct CreateImageVariationRequest {
     /// The image to use as the basis for the variation(s). Must be a valid PNG file, less than 4MB, and square.
-    pub image: FileMeta,
+    pub image: File,
 
     /// The number of images to generate. Must be between 1 and 10.
     #[serde(skip_serializing_if = "Option::is_none")]

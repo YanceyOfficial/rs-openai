@@ -1,5 +1,5 @@
 use crate::shared::response_wrapper::OpenAIError;
-use crate::shared::types::FileMeta;
+use crate::shared::types::File;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -305,7 +305,7 @@ pub struct CreateSpeechRequest {
 #[builder(build_fn(error = "OpenAIError"))]
 pub struct CreateTranscriptionRequest {
     /// The audio file object (not file name) to transcribe, in one of these formats: flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
-    pub file: FileMeta,
+    pub file: File,
 
     /// ID of the model to use. Only `whisper-1` (which is powered by our open source Whisper V2 model) is currently available.
     pub model: SttModel,
@@ -344,7 +344,7 @@ pub struct CreateTranscriptionRequest {
 #[builder(build_fn(error = "OpenAIError"))]
 pub struct CreateTranslationRequest {
     /// The audio file object (not file name) to transcribe, in one of these formats: flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
-    pub file: FileMeta,
+    pub file: File,
 
     /// ID of the model to use. Only `whisper-1` (which is powered by our open source Whisper V2 model) is currently available.
     pub model: SttModel,
