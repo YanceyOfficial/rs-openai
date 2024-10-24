@@ -9,6 +9,7 @@ pub mod engines;
 pub mod files;
 pub mod fine_tuning;
 pub mod images;
+pub mod messages;
 pub mod models;
 pub mod moderations;
 pub mod threads;
