@@ -3,6 +3,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::models;
+pub use crate::interfaces::models::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
 pub struct Models<'a> {

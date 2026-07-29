@@ -4,11 +4,11 @@ use rs_openai::{
         CreateImageEditRequestBuilder, CreateImageRequestBuilder,
         CreateImageVariationRequestBuilder, ImageSize, ResponseFormat,
     },
-    shared::types::FileMeta,
+    shared::types::File,
     OpenAI,
 };
 use std::io::prelude::*;
-use std::{env::var, fs::File};
+use std::{env::var, fs::File as StdFile};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::main]
 async fn read_image(path: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut file = File::open(path).unwrap();
+    let mut file = StdFile::open(path).unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
 
@@ -60,11 +60,11 @@ async fn create_edit(
     transparent_buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateImageEditRequestBuilder::default()
-        .image(FileMeta {
+        .image(File {
             buffer: origin_buffer,
             filename: "worldcup.png".into(),
         })
-        .mask(FileMeta {
+        .mask(File {
             buffer: transparent_buffer,
             filename: "worldcup-transparent.png".into(),
         })
@@ -84,7 +84,7 @@ async fn create_variations(
     buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateImageVariationRequestBuilder::default()
-        .image(FileMeta {
+        .image(File {
             buffer,
             filename: "worldcup.png".into(),
         })

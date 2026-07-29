@@ -1,14 +1,14 @@
 use dotenvy::dotenv;
 use rs_openai::{
     audio::{
-        AudioModel, CreateTranscriptionRequestBuilder, CreateTranslationRequestBuilder, Language,
-        ResponseFormat,
+        CreateTranscriptionRequestBuilder, CreateTranslationRequestBuilder, Language,
+        SttModel, SttResponseFormat,
     },
-    shared::types::FileMeta,
+    shared::types::File,
     OpenAI,
 };
 use std::io::prelude::*;
-use std::{env::var, fs::File};
+use std::{env::var, fs::File as StdFile};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         org_id: None,
     });
 
-    let mut file = File::open("./assets/dear_abe_san.mp4").unwrap();
+    let mut file = StdFile::open("./assets/dear_abe_san.mp4").unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
 
@@ -37,12 +37,12 @@ async fn create_transcription(
     buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateTranscriptionRequestBuilder::default()
-        .file(FileMeta {
+        .file(File {
             buffer,
             filename: "dear_abe_san.mp4".into(),
         })
-        .model(AudioModel::Whisper1)
-        .response_format(ResponseFormat::Json)
+        .model(SttModel::Whisper1)
+        .response_format(SttResponseFormat::Json)
         .language(Language::Japanese)
         .build()?;
 
@@ -58,12 +58,12 @@ async fn create_transcription_with_text_response(
     buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateTranscriptionRequestBuilder::default()
-        .file(FileMeta {
+        .file(File {
             buffer,
             filename: "dear_abe_san.mp4".into(),
         })
-        .model(AudioModel::Whisper1)
-        .response_format(ResponseFormat::Vtt)
+        .model(SttModel::Whisper1)
+        .response_format(SttResponseFormat::Vtt)
         .language(Language::Japanese)
         .build()?;
 
@@ -82,11 +82,11 @@ async fn create_translation(
     buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateTranslationRequestBuilder::default()
-        .file(FileMeta {
+        .file(File {
             buffer,
             filename: "dear_abe_san.mp4".into(),
         })
-        .model(AudioModel::Whisper1)
+        .model(SttModel::Whisper1)
         .build()?;
 
     let res = client.audio().create_translation(&req).await?;
@@ -101,12 +101,12 @@ async fn create_translation_with_text_response(
     buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateTranslationRequestBuilder::default()
-        .file(FileMeta {
+        .file(File {
             buffer,
             filename: "dear_abe_san.mp4".into(),
         })
-        .model(AudioModel::Whisper1)
-        .response_format(ResponseFormat::Srt)
+        .model(SttModel::Whisper1)
+        .response_format(SttResponseFormat::Srt)
         .build()?;
 
     let res = client

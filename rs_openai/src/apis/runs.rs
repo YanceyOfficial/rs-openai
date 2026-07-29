@@ -4,6 +4,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::runs;
+pub use crate::interfaces::runs::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
 pub struct Runs<'a> {

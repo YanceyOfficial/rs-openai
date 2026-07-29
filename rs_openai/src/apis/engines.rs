@@ -8,6 +8,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::engines;
+pub use crate::interfaces::engines::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
 pub struct Engines<'a> {

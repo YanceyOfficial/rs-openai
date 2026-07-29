@@ -4,6 +4,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::messages;
+pub use crate::interfaces::messages::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
 pub struct Messages<'a> {

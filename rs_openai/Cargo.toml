@@ -1,7 +1,8 @@
 [package]
 name = "rs_openai"
-version = "0.5.0"
-edition = "2021"
+version = "0.6.0"
+edition.workspace = true
+rust-version.workspace = true
 authors = ["Yancey Leo <developer@yanceyleo.com>"]
 description = "The OpenAI Rust library provides convenient access to the OpenAI API from Rust applications."
 repository = "https://github.com/YanceyOfficial/rs-openai"
@@ -10,20 +11,19 @@ license = "MIT"
 keywords = ["openai"]
 readme = "../README.md"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lints]
+workspace = true
 
 [dependencies]
 backoff = "0.4.0"
 derive_builder = "0.20.2"
-dotenvy = "0.15.6"
-futures = "0.3.27"
-reqwest = { version = "0.12.8", features = ["json", "stream", "multipart"] }
+futures = { workspace = true }
+reqwest = { workspace = true }
 reqwest-eventsource = "0.6.0"
-serde = { version = "1.0.156", features = ["derive"] }
-serde_json = "1.0.94"
+serde = { workspace = true }
+serde_json = { workspace = true }
 strum = { version = "0.26.3", features = ["derive"] }
 thiserror = "1.0.40"
-tokio = { version = "1.26.0", features = ["full"] }
+tokio = { workspace = true }
 tokio-stream = "0.1.12"
-tracing = "0.1.37"
 rand = "0.8.5"

@@ -1,4 +1,35 @@
 [workspace]
+resolver = "2"
 members = [
-    "rs_openai"
+    "rs_openai",
+    "examples/audio",
+    "examples/chat",
+    "examples/chat_stream_with_actix_web",
+    "examples/completions",
+    "examples/edits",
+    "examples/embeddings",
+    "examples/engines",
+    "examples/files",
+    "examples/fine_tuning",
+    "examples/images",
+    "examples/models",
+    "examples/moderations",
 ]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+
+[workspace.dependencies]
+dotenvy = "0.15.7"
+futures = "0.3"
+reqwest = { version = "0.12", features = ["json", "stream", "multipart"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

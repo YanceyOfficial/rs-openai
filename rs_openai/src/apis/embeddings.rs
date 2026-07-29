@@ -4,6 +4,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::embeddings;
+pub use crate::interfaces::embeddings::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
 pub struct Embeddings<'a> {

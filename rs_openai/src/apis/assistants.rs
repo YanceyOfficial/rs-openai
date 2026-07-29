@@ -4,6 +4,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::assistants;
+pub use crate::interfaces::assistants::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
 pub struct Assistants<'a> {

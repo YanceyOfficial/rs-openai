@@ -2,6 +2,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::edits;
+pub use crate::interfaces::edits::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
 pub struct Edits<'a> {

@@ -1,18 +1,16 @@
 [package]
 name = "chat_stream_with_actix_web"
 version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition.workspace = true
 
 [dependencies]
 actix-web = "4"
 env_logger = "0.10.0"
 log = "0.4"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
 actix-cors = "0.6.2"
-futures = "0.3.27"
-dotenvy = "0.15.7"
+futures = { workspace = true }
+dotenvy = { workspace = true }
 actix-web-lab = "0.19.1"
-rs_openai = {path = "../../rs_openai"}
+rs_openai = { path = "../../rs_openai" }

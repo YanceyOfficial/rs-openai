@@ -2,6 +2,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::audio;
+pub use crate::interfaces::audio::*;
 use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
 use crate::shared::utils::generate_random_string;
 use reqwest::multipart::Form;

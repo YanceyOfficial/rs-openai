@@ -1,7 +1,7 @@
 use dotenvy::dotenv;
-use rs_openai::{files::UploadFileRequestBuilder, shared::types::FileMeta, OpenAI};
+use rs_openai::{files::UploadFileRequestBuilder, shared::types::File, OpenAI};
 use std::io::prelude::*;
-use std::{env::var, fs::File};
+use std::{env::var, fs::File as StdFile};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,12 +18,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", res);
 
     // upload
-    let mut file = File::open("./assets/books_training_file.jsonl").unwrap();
+    let mut file = StdFile::open("./assets/books_training_file.jsonl").unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
 
     let req = UploadFileRequestBuilder::default()
-        .file(FileMeta {
+        .file(File {
             filename: "books_training_file.jsonl".into(),
             buffer,
         })

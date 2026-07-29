@@ -1,13 +1,11 @@
 [package]
 name = "completions"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 publish = false
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-dotenvy = "0.15.7"
-rs_openai = {path = "../../rs_openai"}
-tokio = { version = "1.26.0", features = ["full"] }
-futures = "0.3.27"
+dotenvy = { workspace = true }
+rs_openai = { path = "../../rs_openai" }
+tokio = { workspace = true }
+futures = { workspace = true }

@@ -2,6 +2,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::chat;
+pub use crate::interfaces::chat::*;
 use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
 use crate::shared::utils::is_stream;
 use futures::Stream;

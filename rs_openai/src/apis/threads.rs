@@ -4,6 +4,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::threads;
+pub use crate::interfaces::threads::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
 pub struct Threads<'a> {

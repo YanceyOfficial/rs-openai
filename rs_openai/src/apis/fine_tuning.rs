@@ -2,6 +2,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::fine_tuning;
+pub use crate::interfaces::fine_tuning::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
 pub struct FineTuning<'a> {

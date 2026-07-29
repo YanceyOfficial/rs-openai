@@ -2,6 +2,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::files;
+pub use crate::interfaces::files::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 use reqwest::multipart::Form;
 
@@ -42,7 +43,7 @@ impl<'a> Files<'a> {
     /// # Path parameters
     ///
     /// - `file_id` - The ID of the file to use for this request
-    pub async fn add_upload(&self, file_id: &str) -> OpenAIResponse<files::DeleteFileResponse> {
+    pub async fn delete(&self, file_id: &str) -> OpenAIResponse<files::DeleteFileResponse> {
         self.openai.delete(&format!("/files/{file_id}"), &()).await
     }
 

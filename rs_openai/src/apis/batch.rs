@@ -3,6 +3,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::batch;
+pub use crate::interfaces::batch::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
 pub struct Batch<'a> {

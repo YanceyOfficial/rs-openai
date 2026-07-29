@@ -4,6 +4,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::images;
+pub use crate::interfaces::images::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 use reqwest::multipart::Form;
 

@@ -3,6 +3,7 @@
 
 use crate::client::OpenAI;
 use crate::interfaces::uploads;
+pub use crate::interfaces::uploads::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 use reqwest::multipart::Form;
 

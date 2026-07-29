@@ -1,6 +1,9 @@
 use dotenvy::dotenv;
 use futures::StreamExt;
-use rs_openai::{fine_tuning::CreateFineTuningRequestBuilder, OpenAI};
+use rs_openai::{
+    fine_tuning::{CreateFineTuningRequestBuilder, ListFineTuningRequestBuilder},
+    OpenAI,
+};
 use std::env::var;
 use std::io::{stdout, Write};
 
@@ -23,16 +26,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let res = client.fine_tuning().create(&req).await?;
     println!("{:?}", res);
 
+    let list_req = ListFineTuningRequestBuilder::default().build()?;
+
     // list
-    let res = client.fine_tuning().list().await?;
+    let res = client.fine_tuning().list(&list_req).await?;
     println!("{:?}", res);
 
     // list events
-    let res = client.fine_tuning().list_events("").await?;
+    let res = client
+        .fine_tuning()
+        .list_events("", &list_req)
+        .await?;
     println!("{:?}", res);
 
     // list checkpoints
-    let res = client.fine_tuning().list_checkpoints("").await?;
+    let res = client
+        .fine_tuning()
+        .list_checkpoints("", &list_req)
+        .await?;
     println!("{:?}", res);
 
     // retrieve
