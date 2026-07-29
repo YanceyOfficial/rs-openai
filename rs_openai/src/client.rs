@@ -39,6 +39,11 @@ pub struct OpenAI {
 }
 
 impl OpenAI {
+    /// Transient failures (5xx, timeouts, connect errors) are retried automatically
+    /// (up to 3 attempts, exponential backoff) on every request, including POST. This
+    /// can duplicate side effects if a request is processed server-side but the
+    /// response is lost in transit — matching the behavior of OpenAI's other official
+    /// SDKs (`openai-python`, `openai-node`), which retry the same way by default.
     pub fn new(api_key: impl Into<String>) -> Self {
         let raw = reqwest::Client::new();
         let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
@@ -304,71 +309,71 @@ impl OpenAI {
         Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx))
     }
 
-    pub fn assistants(&self) -> assistants::Assistants {
+    pub fn assistants(&self) -> assistants::Assistants<'_> {
         assistants::Assistants::new(self)
     }
 
-    pub fn audio(&self) -> audio::Audio {
+    pub fn audio(&self) -> audio::Audio<'_> {
         audio::Audio::new(self)
     }
 
-    pub fn batch(&self) -> batch::Batch {
+    pub fn batch(&self) -> batch::Batch<'_> {
         batch::Batch::new(self)
     }
 
-    pub fn chat(&self) -> chat::Chat {
+    pub fn chat(&self) -> chat::Chat<'_> {
         chat::Chat::new(self)
     }
 
-    pub fn completions(&self) -> completions::Completions {
+    pub fn completions(&self) -> completions::Completions<'_> {
         completions::Completions::new(self)
     }
 
-    pub fn edits(&self) -> edits::Edits {
+    pub fn edits(&self) -> edits::Edits<'_> {
         edits::Edits::new(self)
     }
 
-    pub fn embeddings(&self) -> embeddings::Embeddings {
+    pub fn embeddings(&self) -> embeddings::Embeddings<'_> {
         embeddings::Embeddings::new(self)
     }
 
-    pub fn engines(&self) -> engines::Engines {
+    pub fn engines(&self) -> engines::Engines<'_> {
         engines::Engines::new(self)
     }
 
-    pub fn files(&self) -> files::Files {
+    pub fn files(&self) -> files::Files<'_> {
         files::Files::new(self)
     }
 
-    pub fn fine_tuning(&self) -> fine_tuning::FineTuning {
+    pub fn fine_tuning(&self) -> fine_tuning::FineTuning<'_> {
         fine_tuning::FineTuning::new(self)
     }
 
-    pub fn images(&self) -> images::Images {
+    pub fn images(&self) -> images::Images<'_> {
         images::Images::new(self)
     }
 
-    pub fn messages(&self) -> messages::Messages {
+    pub fn messages(&self) -> messages::Messages<'_> {
         messages::Messages::new(self)
     }
 
-    pub fn models(&self) -> models::Models {
+    pub fn models(&self) -> models::Models<'_> {
         models::Models::new(self)
     }
 
-    pub fn moderations(&self) -> moderations::Moderations {
+    pub fn moderations(&self) -> moderations::Moderations<'_> {
         moderations::Moderations::new(self)
     }
 
-    pub fn runs(&self) -> runs::Runs {
+    pub fn runs(&self) -> runs::Runs<'_> {
         runs::Runs::new(self)
     }
 
-    pub fn threads(&self) -> threads::Threads {
+    pub fn threads(&self) -> threads::Threads<'_> {
         threads::Threads::new(self)
     }
 
-    pub fn upload(&self) -> uploads::Upload {
+    pub fn upload(&self) -> uploads::Upload<'_> {
         uploads::Upload::new(self)
     }
 }

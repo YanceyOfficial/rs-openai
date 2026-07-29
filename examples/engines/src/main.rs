@@ -9,13 +9,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = OpenAI::new(api_key);
 
-    // list
-    let res = client.engines().list().await?;
-    println!("{:?}", res);
+    // The Engines endpoints are deprecated; this example demonstrates the
+    // (still-supported) legacy API surface, so the deprecation warning is expected.
+    #[allow(deprecated)]
+    {
+        // list
+        let res = client.engines().list().await?;
+        println!("{:?}", res);
 
-    // retrieve
-    let res = client.engines().retrieve("text-davinci-003").await?;
-    println!("{:?}", res);
+        // retrieve
+        let res = client.engines().retrieve("text-davinci-003").await?;
+        println!("{:?}", res);
+    }
 
     Ok(())
 }

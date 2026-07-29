@@ -1,11 +1,9 @@
 use dotenvy::dotenv;
-use futures::StreamExt;
 use rs_openai::{
     OpenAI,
     fine_tuning::{CreateFineTuningRequestBuilder, ListFineTuningRequestBuilder},
 };
 use std::env::var;
-use std::io::{Write, stdout};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

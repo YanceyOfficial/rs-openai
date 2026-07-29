@@ -19,6 +19,8 @@ derive_builder = "0.20.2"
 futures = { workspace = true }
 reqwest = { workspace = true }
 reqwest-eventsource = "0.6.0"
+# pinned below latest: newer versions require reqwest 0.13, which conflicts with
+# reqwest-eventsource (reqwest 0.12-only, see SSE streaming in post_stream)
 reqwest-middleware = { version = "0.4", features = ["json", "multipart"] }
 reqwest-retry = "0.7"
 serde = { workspace = true }
