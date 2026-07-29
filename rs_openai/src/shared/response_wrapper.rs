@@ -2,12 +2,15 @@
 use serde::Deserialize;
 
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum OpenAIError {
     /// Underlying error from reqwest library after an API call was made
     #[error("http error: {0}")]
     Reqwest(#[from] reqwest::Error),
+    /// Error from the retry/middleware layer wrapping the HTTP client
+    #[error("http middleware error: {0}")]
+    Middleware(#[from] reqwest_middleware::Error),
     /// OpenAI returns error object with details of API call failure
-    // #[error("{}: {}", .0.r#type, .0.message)]
     #[error("{:?}", .0.error)]
     ApiError(ApiErrorResponse),
     /// Error when a response cannot be deserialized into a Rust type
@@ -20,9 +23,16 @@ pub enum OpenAIError {
     /// or when builder fails to build request before making API call
     #[error("invalid args: {0}")]
     InvalidArgument(String),
+    /// Error constructing an HTTP header value (e.g. an org/project ID with invalid bytes)
+    #[error("invalid header value: {0}")]
+    InvalidHeaderValue(String),
+    /// Error reading or writing a file (e.g. saving a text-to-speech response)
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct ApiErrorDetail {
     pub message: String,
     pub r#type: String,
@@ -32,6 +42,7 @@ pub struct ApiErrorDetail {
 
 /// OpenAI API returns error object on failure
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct ApiErrorResponse {
     pub error: ApiErrorDetail,
 }

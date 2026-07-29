@@ -26,10 +26,7 @@ async fn create_chat(req: HttpRequest) -> impl Responder {
 
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
-    let client = OpenAI::new(&OpenAI {
-        api_key,
-        org_id: None,
-    });
+    let client = OpenAI::new(api_key);
 
     let req = CreateChatRequestBuilder::default()
         .model("gpt-3.5-turbo")

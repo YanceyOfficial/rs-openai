@@ -45,6 +45,6 @@ impl<'a> Chat<'a> {
             ));
         }
 
-        Ok(self.openai.post_stream("/chat/completions", req).await)
+        self.openai.post_stream("/chat/completions", req).await
     }
 }

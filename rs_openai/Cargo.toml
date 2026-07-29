@@ -15,15 +15,19 @@ readme = "../README.md"
 workspace = true
 
 [dependencies]
-backoff = "0.4.0"
 derive_builder = "0.20.2"
 futures = { workspace = true }
 reqwest = { workspace = true }
 reqwest-eventsource = "0.6.0"
+reqwest-middleware = { version = "0.4", features = ["json", "multipart"] }
+reqwest-retry = "0.7"
 serde = { workspace = true }
 serde_json = { workspace = true }
 strum = { version = "0.26.3", features = ["derive"] }
-thiserror = "1.0.40"
+thiserror = "2"
 tokio = { workspace = true }
 tokio-stream = "0.1.12"
 rand = "0.8.5"
+
+[dev-dependencies]
+wiremock = "0.6.5"

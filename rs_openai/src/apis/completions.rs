@@ -45,6 +45,6 @@ impl<'a> Completions<'a> {
             ));
         }
 
-        Ok(self.openai.post_stream("/completions", req).await)
+        self.openai.post_stream("/completions", req).await
     }
 }

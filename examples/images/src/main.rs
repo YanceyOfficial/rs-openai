@@ -14,10 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
-    let client = OpenAI::new(&OpenAI {
-        api_key,
-        org_id: None,
-    });
+    let client = OpenAI::new(api_key);
 
     let origin_image = read_image("./assets/worldcup.png").unwrap();
     let transparent_image = read_image("./assets/worldcup-transparent.png").unwrap();

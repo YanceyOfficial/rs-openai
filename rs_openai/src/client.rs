@@ -1,61 +1,129 @@
 use crate::apis::{
-    audio, chat, completions, edits, embeddings, engines, files, fine_tuning, images, models,
-    moderations,
+    assistants, audio, batch, chat, completions, edits, embeddings, engines, files, fine_tuning,
+    images, messages, models, moderations, runs, threads, uploads,
 };
 use crate::shared::response_wrapper::{ApiErrorResponse, OpenAIError, OpenAIResponse};
 use futures::{Stream, stream::StreamExt};
-use reqwest::{Client, Method, RequestBuilder, header::HeaderMap, multipart::Form};
+use reqwest::{
+    Method,
+    header::{HeaderMap, HeaderValue},
+    multipart::Form,
+};
 use reqwest_eventsource::{Event, EventSource, RequestBuilderExt};
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use serde::{Serialize, de::DeserializeOwned};
 use std::fs::File;
-use std::io::{self};
+use std::io;
 use std::{fmt::Debug, pin::Pin};
 
-// Default v1 API base url
+/// Default v1 API base url
 pub const API_BASE: &str = "https://api.openai.com/v1";
 
 /// Name for organization header
 pub const ORGANIZATION_HEADER: &str = "OpenAI-Organization";
 
+/// Name for project header
+pub const PROJECT_HEADER: &str = "OpenAI-Project";
+
 pub struct OpenAI {
-    pub api_key: String,
-    pub org_id: Option<String>,
+    api_key: String,
+    org_id: Option<String>,
+    project_id: Option<String>,
+    base_url: String,
+    /// Retried, connection-pooled client used for every non-streaming request.
+    http: ClientWithMiddleware,
+    /// Plain client used only for SSE streaming: `reqwest-eventsource` only
+    /// extends `reqwest::RequestBuilder`, not the middleware-wrapped one.
+    raw: reqwest::Client,
 }
 
 impl OpenAI {
-    pub fn new(&self) -> Self {
+    pub fn new(api_key: impl Into<String>) -> Self {
+        let raw = reqwest::Client::new();
+        let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+        let http = ClientBuilder::new(raw.clone())
+            .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+            .build();
+
         Self {
-            api_key: self.api_key.to_owned(),
-            org_id: self.org_id.to_owned(),
+            api_key: api_key.into(),
+            org_id: None,
+            project_id: None,
+            base_url: API_BASE.to_string(),
+            http,
+            raw,
         }
     }
 
-    fn headers(&self) -> HeaderMap {
+    /// Sets the `OpenAI-Organization` header sent with every request.
+    pub fn with_org_id(mut self, org_id: impl Into<String>) -> Self {
+        self.org_id = Some(org_id.into());
+        self
+    }
+
+    /// Sets the `OpenAI-Project` header sent with every request.
+    pub fn with_project_id(mut self, project_id: impl Into<String>) -> Self {
+        self.project_id = Some(project_id.into());
+        self
+    }
+
+    /// Overrides the API base URL. Used by tests to point at a mock server;
+    /// also usable for Azure OpenAI-compatible or proxy endpoints.
+    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.base_url = base_url.into();
+        self
+    }
+
+    fn headers(&self) -> Result<HeaderMap, OpenAIError> {
         let mut headers = HeaderMap::new();
 
         if let Some(org_id) = &self.org_id {
-            headers.insert(ORGANIZATION_HEADER, org_id.parse().unwrap());
+            headers.insert(
+                ORGANIZATION_HEADER,
+                HeaderValue::from_str(org_id)
+                    .map_err(|e| OpenAIError::InvalidHeaderValue(e.to_string()))?,
+            );
         }
 
-        headers
+        if let Some(project_id) = &self.project_id {
+            headers.insert(
+                PROJECT_HEADER,
+                HeaderValue::from_str(project_id)
+                    .map_err(|e| OpenAIError::InvalidHeaderValue(e.to_string()))?,
+            );
+        }
+
+        Ok(headers)
     }
 
-    fn openai_request<F>(&self, method: Method, route: &str, builder: F) -> RequestBuilder
-    where
-        F: FnOnce(RequestBuilder) -> RequestBuilder,
-    {
-        let client = Client::new();
-
-        let mut request = client
-            .request(method, API_BASE.to_string() + route)
-            .headers(self.headers())
-            .bearer_auth(&self.api_key);
-
-        request = builder(request);
-        request
+    /// Builds a request on the retried, connection-pooled client.
+    fn openai_request(
+        &self,
+        method: Method,
+        route: &str,
+    ) -> Result<reqwest_middleware::RequestBuilder, OpenAIError> {
+        Ok(self
+            .http
+            .request(method, format!("{}{route}", self.base_url))
+            .headers(self.headers()?)
+            .bearer_auth(&self.api_key))
     }
 
-    async fn resolve_response<T>(request: RequestBuilder) -> OpenAIResponse<T>
+    /// Builds a request on the plain client. Used only by `post_stream`.
+    fn raw_request(
+        &self,
+        method: Method,
+        route: &str,
+    ) -> Result<reqwest::RequestBuilder, OpenAIError> {
+        Ok(self
+            .raw
+            .request(method, format!("{}{route}", self.base_url))
+            .headers(self.headers()?)
+            .bearer_auth(&self.api_key))
+    }
+
+    async fn resolve_response<T>(request: reqwest_middleware::RequestBuilder) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
     {
@@ -76,7 +144,9 @@ impl OpenAI {
         Ok(data)
     }
 
-    async fn resolve_text_response(request: RequestBuilder) -> OpenAIResponse<String> {
+    async fn resolve_text_response(
+        request: reqwest_middleware::RequestBuilder,
+    ) -> OpenAIResponse<String> {
         let response = request.send().await?;
         let status = response.status();
         let text = response.text().await?;
@@ -91,7 +161,10 @@ impl OpenAI {
         Ok(text)
     }
 
-    async fn resolve_file_response(request: RequestBuilder, filename: &str) -> OpenAIResponse<()> {
+    async fn resolve_file_response(
+        request: reqwest_middleware::RequestBuilder,
+        filename: &str,
+    ) -> OpenAIResponse<()> {
         let response = request.send().await?;
         let status = response.status();
         let text = response.text().await?;
@@ -103,8 +176,8 @@ impl OpenAI {
             return Err(OpenAIError::ApiError(api_error));
         }
 
-        let mut file = File::create(filename).expect("failed to create file");
-        io::copy(&mut text.as_bytes(), &mut file).expect("failed to copy content");
+        let mut file = File::create(filename)?;
+        io::copy(&mut text.as_bytes(), &mut file)?;
 
         Ok(())
     }
@@ -114,32 +187,16 @@ impl OpenAI {
         T: DeserializeOwned + Debug,
         F: Serialize,
     {
-        let request = self.openai_request(Method::GET, route, |request| request.query(query));
+        let request = self.openai_request(Method::GET, route)?.query(query);
         Self::resolve_response(request).await
     }
-
-    // pub(crate) async fn get_stream<T, F>(
-    //     &self,
-    //     route: &str,
-    //     query: &F,
-    // ) -> Pin<Box<dyn Stream<Item = OpenAIResponse<T>> + Send>>
-    // where
-    //     T: DeserializeOwned + Debug + Send + 'static,
-    //     F: Serialize,
-    // {
-    //     let event_source = self
-    //         .openai_request(Method::GET, route, |request| request.query(query))
-    //         .eventsource()
-    //         .unwrap();
-    //     Self::stream_sse(event_source).await
-    // }
 
     pub(crate) async fn post<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
         F: Serialize,
     {
-        let request = self.openai_request(Method::POST, route, |request| request.json(json));
+        let request = self.openai_request(Method::POST, route)?.json(json);
         Self::resolve_response(request).await
     }
 
@@ -147,8 +204,9 @@ impl OpenAI {
     where
         T: DeserializeOwned + Debug,
     {
-        let request =
-            self.openai_request(Method::POST, route, |request| request.multipart(form_data));
+        let request = self
+            .openai_request(Method::POST, route)?
+            .multipart(form_data);
         Self::resolve_response(request).await
     }
 
@@ -157,8 +215,9 @@ impl OpenAI {
         route: &str,
         form_data: Form,
     ) -> OpenAIResponse<String> {
-        let request =
-            self.openai_request(Method::POST, route, |request| request.multipart(form_data));
+        let request = self
+            .openai_request(Method::POST, route)?
+            .multipart(form_data);
         Self::resolve_text_response(request).await
     }
 
@@ -171,7 +230,7 @@ impl OpenAI {
     where
         T: Serialize,
     {
-        let request = self.openai_request(Method::POST, route, |request| request.json(json));
+        let request = self.openai_request(Method::POST, route)?.json(json);
         Self::resolve_file_response(request, filename).await
     }
 
@@ -179,16 +238,16 @@ impl OpenAI {
         &self,
         route: &str,
         json: &F,
-    ) -> Pin<Box<dyn Stream<Item = OpenAIResponse<T>> + Send>>
+    ) -> OpenAIResponse<Pin<Box<dyn Stream<Item = OpenAIResponse<T>> + Send>>>
     where
         T: DeserializeOwned + Debug + Send + 'static,
         F: Serialize,
     {
-        let event_source = self
-            .openai_request(Method::POST, route, |request| request.json(json))
+        let request = self.raw_request(Method::POST, route)?.json(json);
+        let event_source = request
             .eventsource()
-            .unwrap();
-        OpenAI::stream_sse(event_source).await
+            .map_err(|e| OpenAIError::StreamError(e.to_string()))?;
+        Ok(OpenAI::stream_sse(event_source).await)
     }
 
     pub(crate) async fn delete<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
@@ -196,7 +255,7 @@ impl OpenAI {
         T: DeserializeOwned + Debug,
         F: Serialize,
     {
-        let request = self.openai_request(Method::DELETE, route, |request| request.json(json));
+        let request = self.openai_request(Method::DELETE, route)?.json(json);
         Self::resolve_response(request).await
     }
 
@@ -245,8 +304,16 @@ impl OpenAI {
         Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx))
     }
 
+    pub fn assistants(&self) -> assistants::Assistants {
+        assistants::Assistants::new(self)
+    }
+
     pub fn audio(&self) -> audio::Audio {
         audio::Audio::new(self)
+    }
+
+    pub fn batch(&self) -> batch::Batch {
+        batch::Batch::new(self)
     }
 
     pub fn chat(&self) -> chat::Chat {
@@ -281,11 +348,106 @@ impl OpenAI {
         images::Images::new(self)
     }
 
+    pub fn messages(&self) -> messages::Messages {
+        messages::Messages::new(self)
+    }
+
     pub fn models(&self) -> models::Models {
         models::Models::new(self)
     }
 
     pub fn moderations(&self) -> moderations::Moderations {
         moderations::Moderations::new(self)
+    }
+
+    pub fn runs(&self) -> runs::Runs {
+        runs::Runs::new(self)
+    }
+
+    pub fn threads(&self) -> threads::Threads {
+        threads::Threads::new(self)
+    }
+
+    pub fn upload(&self) -> uploads::Upload {
+        uploads::Upload::new(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[test]
+    fn new_sets_api_key_and_no_org_or_project() {
+        let client = OpenAI::new("sk-test");
+        assert_eq!(client.api_key, "sk-test");
+        assert!(client.org_id.is_none());
+        assert!(client.project_id.is_none());
+    }
+
+    #[test]
+    fn with_org_and_project_populate_headers() {
+        let client = OpenAI::new("sk-test")
+            .with_org_id("org-123")
+            .with_project_id("proj-456");
+        let headers = client.headers().unwrap();
+        assert_eq!(headers.get(ORGANIZATION_HEADER).unwrap(), "org-123");
+        assert_eq!(headers.get(PROJECT_HEADER).unwrap(), "proj-456");
+    }
+
+    #[tokio::test]
+    async fn retries_transient_server_error_then_succeeds() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/models"))
+            .respond_with(ResponseTemplate::new(503))
+            .up_to_n_times(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/models"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "object": "list", "data": [] })),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let res: OpenAIResponse<serde_json::Value> = client.get("/models", &()).await;
+
+        assert!(res.is_ok(), "expected the retry to succeed: {res:?}");
+    }
+
+    #[tokio::test]
+    async fn maps_non_success_status_to_api_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/models"))
+            .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "Incorrect API key provided",
+                    "type": "invalid_request_error",
+                    "param": null,
+                    "code": null
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let res: OpenAIResponse<serde_json::Value> = client.get("/models", &()).await;
+
+        match res {
+            Err(OpenAIError::ApiError(e)) => {
+                assert_eq!(e.error.message, "Incorrect API key provided");
+            }
+            other => panic!("expected ApiError, got {other:?}"),
+        }
     }
 }
