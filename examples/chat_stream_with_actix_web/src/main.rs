@@ -5,7 +5,7 @@ use dotenvy::dotenv;
 use futures::StreamExt;
 use rs_openai::{
     OpenAI,
-    chat::{ChatCompletionMessageRequestBuilder, CreateChatRequestBuilder, Role},
+    chat::{ChatCompletionMessage, CreateChatRequest, Role},
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -28,19 +28,17 @@ async fn create_chat(req: HttpRequest) -> impl Responder {
     let api_key = var("OPENAI_API_KEY").unwrap();
     let client = OpenAI::new(api_key);
 
-    let req = CreateChatRequestBuilder::default()
+    let req = CreateChatRequest::builder()
         .model("gpt-3.5-turbo")
         .messages(vec![
-            ChatCompletionMessageRequestBuilder::default()
+            ChatCompletionMessage::builder()
                 .role(Role::User)
                 .content(&params.q)
-                .build()
-                .unwrap(),
+                .build(),
         ])
         .stream(true)
         .user(&params.user_id)
-        .build()
-        .unwrap();
+        .build();
 
     let mut count = 0;
     let mut stream = client.chat().create_with_stream(&req).await.unwrap();

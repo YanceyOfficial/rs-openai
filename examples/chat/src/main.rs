@@ -2,7 +2,7 @@ use dotenvy::dotenv;
 use futures::StreamExt;
 use rs_openai::{
     OpenAI,
-    chat::{ChatCompletionMessageRequestBuilder, CreateChatRequestBuilder, Role},
+    chat::{ChatCompletionMessage, CreateChatRequest, Role},
 };
 use std::env::var;
 use std::io::{Write, stdout};
@@ -14,30 +14,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = OpenAI::new(api_key);
 
-    let req = CreateChatRequestBuilder::default()
+    let req = CreateChatRequest::builder()
         .model("gpt-3.5-turbo")
         .messages(vec![
-            ChatCompletionMessageRequestBuilder::default()
+            ChatCompletionMessage::builder()
                 .role(Role::User)
                 .content("To Solve LeetCode's problem 81 in Rust.")
-                .build()?,
+                .build(),
         ])
-        .build()?;
+        .build();
 
     let res = client.chat().create(&req).await?;
     println!("{:?}", res);
 
     // stream mode
-    let req = CreateChatRequestBuilder::default()
+    let req = CreateChatRequest::builder()
         .model("gpt-3.5-turbo")
         .messages(vec![
-            ChatCompletionMessageRequestBuilder::default()
+            ChatCompletionMessage::builder()
                 .role(Role::User)
                 .content("To Solve LeetCode's problem 81 in Rust.")
-                .build()?,
+                .build(),
         ])
         .stream(true)
-        .build()?;
+        .build();
 
     let mut stream = client.chat().create_with_stream(&req).await?;
 
