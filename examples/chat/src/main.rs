@@ -1,11 +1,11 @@
 use dotenvy::dotenv;
 use futures::StreamExt;
 use rs_openai::{
-    chat::{ChatCompletionMessageRequestBuilder, CreateChatRequestBuilder, Role},
     OpenAI,
+    chat::{ChatCompletionMessageRequestBuilder, CreateChatRequestBuilder, Role},
 };
 use std::env::var;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,10 +19,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let req = CreateChatRequestBuilder::default()
         .model("gpt-3.5-turbo")
-        .messages(vec![ChatCompletionMessageRequestBuilder::default()
-            .role(Role::User)
-            .content("To Solve LeetCode's problem 81 in Rust.")
-            .build()?])
+        .messages(vec![
+            ChatCompletionMessageRequestBuilder::default()
+                .role(Role::User)
+                .content("To Solve LeetCode's problem 81 in Rust.")
+                .build()?,
+        ])
         .build()?;
 
     let res = client.chat().create(&req).await?;
@@ -31,10 +33,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // stream mode
     let req = CreateChatRequestBuilder::default()
         .model("gpt-3.5-turbo")
-        .messages(vec![ChatCompletionMessageRequestBuilder::default()
-            .role(Role::User)
-            .content("To Solve LeetCode's problem 81 in Rust.")
-            .build()?])
+        .messages(vec![
+            ChatCompletionMessageRequestBuilder::default()
+                .role(Role::User)
+                .content("To Solve LeetCode's problem 81 in Rust.")
+                .build()?,
+        ])
         .stream(true)
         .build()?;
 

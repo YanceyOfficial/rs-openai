@@ -1,11 +1,11 @@
 use dotenvy::dotenv;
 use rs_openai::{
+    OpenAI,
     audio::{
-        CreateTranscriptionRequestBuilder, CreateTranslationRequestBuilder, Language,
-        SttModel, SttResponseFormat,
+        CreateTranscriptionRequestBuilder, CreateTranslationRequestBuilder, Language, SttModel,
+        SttResponseFormat,
     },
     shared::types::File,
-    OpenAI,
 };
 use std::io::prelude::*;
 use std::{env::var, fs::File as StdFile};

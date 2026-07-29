@@ -3,10 +3,10 @@ use crate::apis::{
     moderations,
 };
 use crate::shared::response_wrapper::{ApiErrorResponse, OpenAIError, OpenAIResponse};
-use futures::{stream::StreamExt, Stream};
-use reqwest::{header::HeaderMap, multipart::Form, Client, Method, RequestBuilder};
+use futures::{Stream, stream::StreamExt};
+use reqwest::{Client, Method, RequestBuilder, header::HeaderMap, multipart::Form};
 use reqwest_eventsource::{Event, EventSource, RequestBuilderExt};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::fs::File;
 use std::io::{self};
 use std::{fmt::Debug, pin::Pin};

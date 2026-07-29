@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use rs_openai::{embeddings::CreateEmbeddingRequestBuilder, OpenAI};
+use rs_openai::{OpenAI, embeddings::CreateEmbeddingRequestBuilder};
 use std::env::var;
 
 #[tokio::main]

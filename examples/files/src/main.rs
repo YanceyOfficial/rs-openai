@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use rs_openai::{files::UploadFileRequestBuilder, shared::types::File, OpenAI};
+use rs_openai::{OpenAI, files::UploadFileRequestBuilder, shared::types::File};
 use std::io::prelude::*;
 use std::{env::var, fs::File as StdFile};
 

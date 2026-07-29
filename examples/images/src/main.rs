@@ -1,11 +1,11 @@
 use dotenvy::dotenv;
 use rs_openai::{
+    OpenAI,
     images::{
         CreateImageEditRequestBuilder, CreateImageRequestBuilder,
         CreateImageVariationRequestBuilder, ImageSize, ResponseFormat,
     },
     shared::types::File,
-    OpenAI,
 };
 use std::io::prelude::*;
 use std::{env::var, fs::File as StdFile};

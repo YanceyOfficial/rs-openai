@@ -1,11 +1,11 @@
 use dotenvy::dotenv;
 use futures::StreamExt;
 use rs_openai::{
-    fine_tuning::{CreateFineTuningRequestBuilder, ListFineTuningRequestBuilder},
     OpenAI,
+    fine_tuning::{CreateFineTuningRequestBuilder, ListFineTuningRequestBuilder},
 };
 use std::env::var;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -33,17 +33,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", res);
 
     // list events
-    let res = client
-        .fine_tuning()
-        .list_events("", &list_req)
-        .await?;
+    let res = client.fine_tuning().list_events("", &list_req).await?;
     println!("{:?}", res);
 
     // list checkpoints
-    let res = client
-        .fine_tuning()
-        .list_checkpoints("", &list_req)
-        .await?;
+    let res = client.fine_tuning().list_checkpoints("", &list_req).await?;
     println!("{:?}", res);
 
     // retrieve

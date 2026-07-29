@@ -1,8 +1,8 @@
 use dotenvy::dotenv;
 use futures::StreamExt;
-use rs_openai::{completions::CreateCompletionRequestBuilder, OpenAI};
+use rs_openai::{OpenAI, completions::CreateCompletionRequestBuilder};
 use std::env::var;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

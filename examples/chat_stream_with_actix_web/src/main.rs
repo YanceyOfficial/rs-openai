@@ -1,11 +1,11 @@
 use actix_cors::Cors;
-use actix_web::{get, http::header, middleware, web, App, HttpRequest, HttpServer, Responder};
+use actix_web::{App, HttpRequest, HttpServer, Responder, get, http::header, middleware, web};
 use actix_web_lab::sse;
 use dotenvy::dotenv;
 use futures::StreamExt;
 use rs_openai::{
-    chat::{ChatCompletionMessageRequestBuilder, CreateChatRequestBuilder, Role},
     OpenAI,
+    chat::{ChatCompletionMessageRequestBuilder, CreateChatRequestBuilder, Role},
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -33,11 +33,13 @@ async fn create_chat(req: HttpRequest) -> impl Responder {
 
     let req = CreateChatRequestBuilder::default()
         .model("gpt-3.5-turbo")
-        .messages(vec![ChatCompletionMessageRequestBuilder::default()
-            .role(Role::User)
-            .content(&params.q)
-            .build()
-            .unwrap()])
+        .messages(vec![
+            ChatCompletionMessageRequestBuilder::default()
+                .role(Role::User)
+                .content(&params.q)
+                .build()
+                .unwrap(),
+        ])
         .stream(true)
         .user(&params.user_id)
         .build()

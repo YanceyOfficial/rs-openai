@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use rs_openai::{edits::CreateEditRequestBuilder, OpenAI};
+use rs_openai::{OpenAI, edits::CreateEditRequestBuilder};
 use std::env::var;
 
 #[tokio::main]

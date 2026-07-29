@@ -1,8 +1,5 @@
 use dotenvy::dotenv;
-use rs_openai::{
-    moderations::CreateModerationRequestBuilder,
-    OpenAI,
-};
+use rs_openai::{OpenAI, moderations::CreateModerationRequestBuilder};
 use std::env::var;
 
 #[tokio::main]

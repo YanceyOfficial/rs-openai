@@ -1,4 +1,4 @@
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{Rng, distributions::Alphanumeric};
 
 pub fn is_stream(stream: Option<bool>) -> bool {
     if stream.is_some() && stream.unwrap() {
