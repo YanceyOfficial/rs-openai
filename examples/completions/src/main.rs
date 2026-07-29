@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use futures::StreamExt;
-use rs_openai::{OpenAI, completions::CreateCompletionRequestBuilder};
+use rs_openai::{OpenAI, completions::CreateCompletionRequest};
 use std::env::var;
 use std::io::{Write, stdout};
 
@@ -12,22 +12,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = OpenAI::new(api_key);
 
     // create
-    let req = CreateCompletionRequestBuilder::default()
+    let req = CreateCompletionRequest::builder()
         .model("text-davinci-003")
         .prompt("What's your name?")
         .max_tokens(40_u16)
-        .build()?;
+        .build();
 
     let res = client.completions().create(&req).await?;
     println!("{:?}", res);
 
     // create_with_stream
-    let req = CreateCompletionRequestBuilder::default()
+    let req = CreateCompletionRequest::builder()
         .model("text-davinci-003")
         .prompt("What's your name?")
         .max_tokens(40_u16)
         .stream(true)
-        .build()?;
+        .build();
 
     let mut stream = client.completions().create_with_stream(&req).await?;
 
