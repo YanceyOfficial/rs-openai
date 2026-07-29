@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use rs_openai::{OpenAI, embeddings::CreateEmbeddingRequestBuilder};
+use rs_openai::{OpenAI, embeddings::CreateEmbeddingRequest};
 use std::env::var;
 
 #[tokio::main]
@@ -9,15 +9,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = OpenAI::new(api_key);
 
-    let req = CreateEmbeddingRequestBuilder::default()
+    let req = CreateEmbeddingRequest::builder()
         .model("text-embedding-ada-002")
         .input([
-            "Some say love it is a river, That drowns the tender reed",
-            "Some say love it is a razor, That leaves your soul to bleed",
-            "Some say love it is a hunger, An endless aching need",
-            "I say love it is a flower, And you it's only seed",
+            "The quick brown fox jumps over the lazy dog.",
+            "Rust is a systems programming language.",
+            "OpenAI provides a REST API for language models.",
+            "This is a short paragraph used purely as embedding input.",
         ])
-        .build()?;
+        .build();
 
     let res = client.embeddings().create(&req).await?;
     println!("{:?}", res);
