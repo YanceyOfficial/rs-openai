@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use rs_openai::{OpenAI, edits::CreateEditRequestBuilder};
+use rs_openai::{OpenAI, edits::CreateEditRequest};
 use std::env::var;
 
 #[tokio::main]
@@ -9,11 +9,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = OpenAI::new(api_key);
 
-    let req = CreateEditRequestBuilder::default()
+    let req = CreateEditRequest::builder()
         .model("text-davinci-edit-001")
         .input("Today is Monkey.")
         .instruction("Fix the grammar mistakes.")
-        .build()?;
+        .build();
 
     let res = client.edits().create(&req).await?;
     println!("{:?}", res);

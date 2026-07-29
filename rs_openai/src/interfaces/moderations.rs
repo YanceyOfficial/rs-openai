@@ -1,15 +1,10 @@
-use crate::shared::response_wrapper::OpenAIError;
-use derive_builder::Builder;
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 
-#[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateModerationRequestBuilder")]
-#[builder(pattern = "mutable")]
-#[builder(setter(into, strip_option), default)]
-#[builder(derive(Debug))]
-#[builder(build_fn(error = "OpenAIError"))]
+#[derive(Builder, Clone, Debug, Serialize)]
 pub struct CreateModerationRequest {
     /// Input (or inputs) to classify. Can be a single string, an array of strings, or an array of multi-modal input objects similar to other models.
+    #[builder(into)]
     pub input: ModerationInput,
 
     /// The content moderation model you would like to use. Learn more in [the moderation guide](https://platform.openai.com/docs/guides/moderation), and learn about available models [here](https://platform.openai.com/docs/models/moderation).

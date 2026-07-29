@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use rs_openai::{OpenAI, moderations::CreateModerationRequestBuilder};
+use rs_openai::{OpenAI, moderations::CreateModerationRequest};
 use std::env::var;
 
 #[tokio::main]
@@ -9,10 +9,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = OpenAI::new(api_key);
 
-    // create
-    let req = CreateModerationRequestBuilder::default()
-        .input(["Do you want to build a snowman?", "I will kill you."])
-        .build()?;
+    let req = CreateModerationRequest::builder()
+        .input(["Hello, how are you today?", "This is a plain test message."])
+        .build();
 
     let res = client.moderations().create(&req).await?;
     println!("{:?}", res);

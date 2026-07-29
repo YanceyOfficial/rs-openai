@@ -30,6 +30,7 @@ thiserror = "2"
 tokio = { workspace = true }
 tokio-stream = "0.1.12"
 rand = "0.8.5"
+bon = "3.9.3"
 
 [dev-dependencies]
 wiremock = "0.6.5"
