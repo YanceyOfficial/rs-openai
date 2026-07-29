@@ -11,3 +11,6 @@ Cargo.lock
 
 # Env files
 .env
+
+# Scratch state for superpowers subagent-driven-development
+.superpowers/
