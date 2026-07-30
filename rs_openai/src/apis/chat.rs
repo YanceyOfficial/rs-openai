@@ -65,7 +65,7 @@ mod tests {
             .and(path("/chat/completions"))
             .and(body_json(serde_json::json!({
                 "model": "gpt-4o-mini",
-                "messages": [{"role": "user", "content": "hi"}]
+                "messages": [{"role": "user", "content": "hi", "name": null}]
             })))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "chatcmpl-123",

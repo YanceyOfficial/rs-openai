@@ -28,7 +28,6 @@ pub struct ChatCompletionMessage {
 
     /// The name of the author of this message. May contain a-z, A-Z, 0-9, and underscores, with a maximum length of 64 characters.
     #[builder(into)]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
 
