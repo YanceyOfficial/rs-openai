@@ -93,7 +93,7 @@ impl<'a> Audio<'a> {
         let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
             .file_name(req.file.filename.clone())
             .mime_str("application/octet-stream")
-            .unwrap();
+            .expect("\"application/octet-stream\" is always a valid mime type");
 
         let mut form = Form::new()
             .part("file", file_part)
@@ -112,7 +112,7 @@ impl<'a> Audio<'a> {
         }
 
         if let Some(language) = req.language.clone() {
-            form = form.text("laguage", language.to_string());
+            form = form.text("language", language.to_string());
         }
 
         if let Some(timestamp_granularities) = req.timestamp_granularities.clone() {
@@ -131,7 +131,7 @@ impl<'a> Audio<'a> {
         let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
             .file_name(req.file.filename.clone())
             .mime_str("application/octet-stream")
-            .unwrap();
+            .expect("\"application/octet-stream\" is always a valid mime type");
 
         let mut form = Form::new()
             .part("file", file_part)
@@ -165,5 +165,49 @@ impl<'a> Audio<'a> {
         }
 
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::client::OpenAI;
+    use crate::interfaces::audio::{CreateTranscriptionRequest, Language, SttModel};
+    use crate::shared::types::File;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, Request, ResponseTemplate};
+
+    struct ContainsInBody(&'static str);
+
+    impl wiremock::Match for ContainsInBody {
+        fn matches(&self, request: &Request) -> bool {
+            String::from_utf8_lossy(&request.body).contains(self.0)
+        }
+    }
+
+    #[tokio::test]
+    async fn create_transcription_sends_correctly_spelled_language_field() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/audio/transcriptions"))
+            .and(ContainsInBody("name=\"language\""))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "text": "hello"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateTranscriptionRequest::builder()
+            .file(File {
+                buffer: vec![1, 2, 3],
+                filename: "audio.mp4".into(),
+            })
+            .model(SttModel::Whisper1)
+            .language(Language::Japanese)
+            .build();
+
+        let res = client.audio().create_transcription(&req).await.unwrap();
+        assert_eq!(res.text, "hello");
     }
 }

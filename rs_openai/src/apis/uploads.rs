@@ -34,7 +34,7 @@ impl<'a> Upload<'a> {
         let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
             .file_name(req.file.filename.clone())
             .mime_str("application/octet-stream")
-            .unwrap();
+            .expect("\"application/octet-stream\" is always a valid mime type");
 
         let form = Form::new()
             .part("file", file_part)
@@ -56,7 +56,7 @@ impl<'a> Upload<'a> {
         let file_part = reqwest::multipart::Part::stream(req.data.buffer.clone())
             .file_name(req.data.filename.clone())
             .mime_str("application/octet-stream")
-            .unwrap();
+            .expect("\"application/octet-stream\" is always a valid mime type");
         let form = Form::new().part("data", file_part);
 
         self.openai
@@ -89,5 +89,77 @@ impl<'a> Upload<'a> {
         self.openai
             .post(&format!("/uploads/{upload_id}/cancel"), &())
             .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::client::OpenAI;
+    use crate::interfaces::uploads::{CompleteUploadRequest, UploadFileRequest};
+    use crate::shared::response_wrapper::OpenAIError;
+    use crate::shared::types::File;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn upload_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/uploads"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "upload_123", "object": "upload", "bytes": 1024,
+                "created_at": 1700000000_i64, "filename": "data.jsonl",
+                "purpose": "fine-tune", "status": "pending", "expires_at": 1700003600_i64
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = UploadFileRequest::builder()
+            .file(File {
+                buffer: vec![1, 2, 3],
+                filename: "data.jsonl".into(),
+            })
+            .purpose("fine-tune")
+            .build();
+
+        let res = client.upload().upload(&req).await.unwrap();
+        assert_eq!(res.id, "upload_123");
+    }
+
+    #[tokio::test]
+    async fn complete_upload_maps_api_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/uploads/upload_123/complete"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "byte count mismatch",
+                    "type": "invalid_request_error",
+                    "param": "part_ids",
+                    "code": null
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CompleteUploadRequest::builder()
+            .part_ids(vec!["part_1".to_string()])
+            .build();
+
+        let err = client
+            .upload()
+            .complete_upload("upload_123", &req)
+            .await
+            .unwrap_err();
+        match err {
+            OpenAIError::ApiError(e) => {
+                assert_eq!(e.error.param, Some(serde_json::json!("part_ids")))
+            }
+            other => panic!("expected ApiError, got {other:?}"),
+        }
     }
 }

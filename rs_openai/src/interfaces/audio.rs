@@ -1,6 +1,5 @@
-use crate::shared::response_wrapper::OpenAIError;
 use crate::shared::types::File;
-use derive_builder::Builder;
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
@@ -271,98 +270,77 @@ pub enum TtsModel {
     Whisper1Hd,
 }
 
-#[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateSpeechRequestBuilder")]
-#[builder(pattern = "mutable")]
-#[builder(setter(into, strip_option), default)]
-#[builder(derive(Debug))]
-#[builder(build_fn(error = "OpenAIError"))]
+#[derive(Builder, Clone, Debug, Serialize)]
 pub struct CreateSpeechRequest {
     /// One of the available [TTS models](https://platform.openai.com/docs/models/tts): `tts-1` or `tts-1-hd`
     pub model: TtsModel,
 
     /// The text to generate audio for. The maximum length is 4096 characters.
+    #[builder(into)]
     pub input: String,
 
-    /// The voice to use when generating the audio. Supported voices are `alloy`, `echo`, `fable`, `onyx`, `nova`, and `shimmer`.
-    /// Previews of the voices are available in the [Text to speech guide](https://platform.openai.com/docs/guides/text-to-speech/voice-options).
+    /// The voice to use when generating the audio.
     pub voice: Voice,
 
-    /// The format to audio in. Supported formats are `mp3`, `opus`, `aac`, `flac`, `wav`, and `pcm`.
-    /// #[serde(skip_serializing_if = "Option::is_none")]
+    /// The format to audio in.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<TtsResponseFormat>, // default: mp3
 
     /// The speed of the generated audio. Select a value from `0.25` to `4.0`. `1.0` is the default.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub speed: Option<f32>, // min: 0.25, max: 4.0, default: 1.0
+    pub speed: Option<f32>,
 }
 
-#[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateTranscriptionRequestBuilder")]
-#[builder(pattern = "mutable")]
-#[builder(setter(into, strip_option), default)]
-#[builder(derive(Debug))]
-#[builder(build_fn(error = "OpenAIError"))]
+#[derive(Builder, Clone, Debug, Serialize)]
 pub struct CreateTranscriptionRequest {
-    /// The audio file object (not file name) to transcribe, in one of these formats: flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
+    /// The audio file object (not file name) to transcribe.
     pub file: File,
 
-    /// ID of the model to use. Only `whisper-1` (which is powered by our open source Whisper V2 model) is currently available.
+    /// ID of the model to use. Only `whisper-1` is currently available.
     pub model: SttModel,
 
-    /// The language of the input audio. Supplying the input language in [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) format will improve accuracy and latency.
+    /// The language of the input audio, in ISO-639-1 format.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub language: Option<Language>,
 
     /// An optional text to guide the model's style or continue a previous audio segment.
-    /// The [prompt](https://platform.openai.com/docs/guides/speech-to-text/prompting) should match the audio language.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
 
-    /// The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
+    /// The format of the transcript output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<SttResponseFormat>, // default: "json"
 
-    /// The sampling temperature, between 0 and 1. Higher values like 0.8 will make the output more random,
-    /// while lower values like 0.2 will make it more focused and deterministic.
-    /// If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit.
+    /// The sampling temperature, between 0 and 1.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub temperature: Option<f32>, // min: 0, max: 1, default: 0
+    pub temperature: Option<f32>,
 
     /// The timestamp granularities to populate for this transcription.
-    /// `response_format` must be set `verbose_json` to use timestamp granularities.
-    /// Either or both of these options are supported: `word`, or `segment`. Note: There is no additional latency for segment timestamps, but generating word timestamps incurs additional latency.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp_granularities: Option<Vec<TimestampGranularity>>, // Defaults to segment
+    pub timestamp_granularities: Option<Vec<TimestampGranularity>>,
 }
 
-#[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateTranslationRequestBuilder")]
-#[builder(pattern = "mutable")]
-#[builder(setter(into, strip_option), default)]
-#[builder(derive(Debug))]
-#[builder(build_fn(error = "OpenAIError"))]
+#[derive(Builder, Clone, Debug, Serialize)]
 pub struct CreateTranslationRequest {
-    /// The audio file object (not file name) to transcribe, in one of these formats: flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm.
+    /// The audio file object (not file name) to transcribe.
     pub file: File,
 
-    /// ID of the model to use. Only `whisper-1` (which is powered by our open source Whisper V2 model) is currently available.
+    /// ID of the model to use. Only `whisper-1` is currently available.
     pub model: SttModel,
 
-    /// An optional text to guide the model's style or continue a previous audio segment.
-    /// The [prompt](https://platform.openai.com/docs/guides/speech-to-text/prompting) should be in English.
+    /// An optional text to guide the model's style or continue a previous audio segment, in English.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
 
-    /// The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
+    /// The format of the transcript output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<SttResponseFormat>, // Defaults to json
 
     /// The sampling temperature, between 0 and 1.
-    /// Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
-    /// If set to 0, the model will use [log probability](https://en.wikipedia.org/wiki/Log_probability) to automatically increase the temperature until certain thresholds are hit.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub temperature: Option<f32>, // Defaults to 0
+    pub temperature: Option<f32>,
 }
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
