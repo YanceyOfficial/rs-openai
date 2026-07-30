@@ -40,7 +40,7 @@ impl<'a> Images<'a> {
             .text("prompt", req.prompt.to_string());
 
         if let Some(mask) = req.mask.clone() {
-            let file_part = reqwest::multipart::Part::stream(req.image.buffer.clone())
+            let file_part = reqwest::multipart::Part::stream(mask.buffer.clone())
                 .file_name(mask.filename)
                 .mime_str("application/octet-stream")
                 .expect("\"application/octet-stream\" is always a valid mime type");
@@ -102,10 +102,24 @@ impl<'a> Images<'a> {
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
-    use crate::interfaces::images::{CreateImageRequest, ImageSize, ResponseFormat};
+    use crate::interfaces::images::{
+        CreateImageEditRequest, CreateImageRequest, ImageSize, ResponseFormat,
+    };
     use crate::shared::response_wrapper::OpenAIError;
+    use crate::shared::types::File;
     use wiremock::matchers::{body_json, method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
+    use wiremock::{Mock, MockServer, Request, ResponseTemplate};
+
+    struct ContainsInBody(&'static [u8]);
+
+    impl wiremock::Match for ContainsInBody {
+        fn matches(&self, request: &Request) -> bool {
+            request
+                .body
+                .windows(self.0.len())
+                .any(|window| window == self.0)
+        }
+    }
 
     #[tokio::test]
     async fn create_serializes_1024_size_correctly() {
@@ -163,5 +177,43 @@ mod tests {
             }
             other => panic!("expected ApiError, got {other:?}"),
         }
+    }
+
+    /// Regression test for a bug where the "mask" multipart part streamed the main image's
+    /// bytes (`req.image.buffer`) instead of the mask's own bytes (`mask.buffer`), silently
+    /// uploading the image twice instead of image+mask. Uses distinct byte contents for the
+    /// image and the mask so the assertion can tell them apart in the raw multipart body.
+    #[tokio::test]
+    async fn create_edit_sends_masks_own_bytes_not_the_images() {
+        let mock_server = MockServer::start().await;
+
+        let image_bytes: &[u8] = &[1, 2, 3];
+        let mask_bytes: &[u8] = &[4, 5, 6];
+
+        Mock::given(method("POST"))
+            .and(path("/images/edits"))
+            .and(ContainsInBody(mask_bytes))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "created": 1700000000_i64,
+                "data": [{"url": "https://example.com/image.png"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateImageEditRequest::builder()
+            .image(File {
+                buffer: image_bytes.to_vec(),
+                filename: "image.png".into(),
+            })
+            .mask(File {
+                buffer: mask_bytes.to_vec(),
+                filename: "mask.png".into(),
+            })
+            .prompt("add a hat")
+            .build();
+
+        let res = client.images().create_edit(&req).await.unwrap();
+        assert_eq!(res.data.len(), 1);
     }
 }
