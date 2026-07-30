@@ -54,6 +54,7 @@ mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::chat::{ChatCompletionMessage, CreateChatRequest, Role};
     use crate::shared::response_wrapper::OpenAIError;
+    use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -166,5 +167,96 @@ mod tests {
             }
             other => panic!("expected ApiError, got {other:?}"),
         }
+    }
+
+    /// End-to-end coverage of the SSE streaming happy path: mounts a `text/event-stream`
+    /// response with several `data: {...}` chunks followed by `data: [DONE]`, drives the
+    /// stream returned by `create_with_stream` to completion with `StreamExt::next`, and
+    /// asserts the deltas and item count match, and that the stream ends cleanly (no
+    /// trailing item, no error) right after `[DONE]`.
+    #[tokio::test]
+    async fn create_with_stream_yields_deltas_and_terminates_after_done() {
+        let mock_server = MockServer::start().await;
+
+        let chunk1 = serde_json::json!({
+            "id": "chatcmpl-123",
+            "object": "chat.completion.chunk",
+            "model": "gpt-4o-mini",
+            "created": 1700000000_u32,
+            "choices": [{
+                "delta": {"content": "Hello"},
+                "finish_reason": null,
+                "index": 0
+            }]
+        });
+        let chunk2 = serde_json::json!({
+            "id": "chatcmpl-123",
+            "object": "chat.completion.chunk",
+            "model": "gpt-4o-mini",
+            "created": 1700000000_u32,
+            "choices": [{
+                "delta": {"content": " world"},
+                "finish_reason": null,
+                "index": 0
+            }]
+        });
+        let chunk3 = serde_json::json!({
+            "id": "chatcmpl-123",
+            "object": "chat.completion.chunk",
+            "model": "gpt-4o-mini",
+            "created": 1700000000_u32,
+            "choices": [{
+                "delta": {"content": null},
+                "finish_reason": "stop",
+                "index": 0
+            }]
+        });
+
+        let sse_body =
+            format!("data: {chunk1}\n\ndata: {chunk2}\n\ndata: {chunk3}\n\ndata: [DONE]\n\n",);
+
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(sse_body.into_bytes(), "text/event-stream"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateChatRequest::builder()
+            .model("gpt-4o-mini")
+            .messages(vec![
+                ChatCompletionMessage::builder()
+                    .role(Role::User)
+                    .content("hi")
+                    .build(),
+            ])
+            .stream(true)
+            .build();
+
+        let mut stream = client.chat().create_with_stream(&req).await.unwrap();
+
+        let mut received = Vec::new();
+        while let Some(item) = stream.next().await {
+            received.push(item.unwrap());
+        }
+
+        assert_eq!(received.len(), 3, "expected exactly 3 items before [DONE]");
+        assert_eq!(
+            received[0].choices[0].delta.content.as_deref(),
+            Some("Hello")
+        );
+        assert_eq!(
+            received[1].choices[0].delta.content.as_deref(),
+            Some(" world")
+        );
+        assert_eq!(
+            received[2].choices[0].finish_reason.as_deref(),
+            Some("stop")
+        );
+
+        // The stream must be exhausted (no trailing item after [DONE]).
+        assert!(stream.next().await.is_none());
     }
 }
