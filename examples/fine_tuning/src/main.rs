@@ -1,7 +1,7 @@
 use dotenvy::dotenv;
 use rs_openai::{
     OpenAI,
-    fine_tuning::{CreateFineTuningRequestBuilder, ListFineTuningRequestBuilder},
+    fine_tuning::{CreateFineTuningRequest, ListFineTuningRequest},
 };
 use std::env::var;
 
@@ -13,15 +13,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = OpenAI::new(api_key);
 
     // create
-    let req = CreateFineTuningRequestBuilder::default()
+    let req = CreateFineTuningRequest::builder()
         .training_file("YOUR_FINE_TUNE_FILE")
         .model("davinci")
-        .build()?;
+        .build();
 
     let res = client.fine_tuning().create(&req).await?;
     println!("{:?}", res);
 
-    let list_req = ListFineTuningRequestBuilder::default().build()?;
+    let list_req = ListFineTuningRequest::builder().build();
 
     // list
     let res = client.fine_tuning().list(&list_req).await?;

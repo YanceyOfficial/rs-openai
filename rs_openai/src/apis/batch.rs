@@ -44,3 +44,87 @@ impl<'a> Batch<'a> {
         self.openai.get("/batches", req).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::client::OpenAI;
+    use crate::interfaces::batch::CreateBatchRequest;
+    use crate::shared::response_wrapper::OpenAIError;
+    use wiremock::matchers::{body_json, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn batch_response_json(id: &str, status: &str) -> serde_json::Value {
+        serde_json::json!({
+            "id": id, "object": "batch", "endpoint": "/v1/chat/completions", "errors": null,
+            "input_file_id": "file-abc", "completion_window": "24h", "status": status,
+            "output_file_id": null, "error_file_id": null, "created_at": 1700000000_i64,
+            "in_progress_at": null, "expires_at": null, "finalizing_at": null,
+            "completed_at": null, "failed_at": null, "expired_at": null,
+            "cancelling_at": null, "cancelled_at": null,
+            "request_counts": {"total": 0, "completed": 0, "failed": 0},
+            "metadata": {}
+        })
+    }
+
+    #[tokio::test]
+    async fn create_serializes_request_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/batches"))
+            .and(body_json(serde_json::json!({
+                "input_file_id": "file-abc",
+                "endpoint": "/v1/chat/completions",
+                "completion_window": "24h"
+            })))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(batch_response_json("batch_123", "validating")),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateBatchRequest::builder()
+            .input_file_id("file-abc")
+            .endpoint("/v1/chat/completions")
+            .completion_window("24h")
+            .build();
+
+        let res = client.batch().create(&req).await.unwrap();
+        assert_eq!(res.id, "batch_123");
+    }
+
+    #[tokio::test]
+    async fn create_maps_api_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/batches"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "input_file_id is required",
+                    "type": "invalid_request_error",
+                    "param": "input_file_id",
+                    "code": null
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateBatchRequest::builder()
+            .input_file_id("")
+            .endpoint("/v1/chat/completions")
+            .completion_window("24h")
+            .build();
+
+        let err = client.batch().create(&req).await.unwrap_err();
+        match err {
+            OpenAIError::ApiError(e) => {
+                assert_eq!(e.error.param, Some(serde_json::json!("input_file_id")));
+            }
+            other => panic!("expected ApiError, got {other:?}"),
+        }
+    }
+}

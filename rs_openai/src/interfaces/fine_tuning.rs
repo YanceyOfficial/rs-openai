@@ -1,26 +1,14 @@
-use crate::shared::response_wrapper::OpenAIError;
-use derive_builder::Builder;
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 
-#[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateFineTuningRequestBuilder")]
-#[builder(pattern = "mutable")]
-#[builder(setter(into, strip_option), default)]
-#[builder(derive(Debug))]
-#[builder(build_fn(error = "OpenAIError"))]
+#[derive(Builder, Clone, Debug, Serialize)]
 pub struct CreateFineTuningRequest {
     /// The name of the model to fine-tune. You can select one of the [supported models](https://platform.openai.com/docs/guides/fine-tuning/which-models-can-be-fine-tuned).
+    #[builder(into)]
     pub model: String,
 
     /// The ID of an uploaded file that contains training data.
-    ///
-    /// See [upload file](https://platform.openai.com/docs/api-reference/files/create) for how to upload a file.
-    ///
-    /// Your dataset must be formatted as a JSONL file. Additionally, you must upload your file with the purpose `fine-tune`.
-    ///
-    /// The contents of the file should differ depending on if the model uses the [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input) or [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input) format.
-    ///
-    /// See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning) for more details.
+    #[builder(into)]
     pub training_file: String,
 
     /// The hyperparameters used for the fine-tuning job.
@@ -28,21 +16,12 @@ pub struct CreateFineTuningRequest {
     pub hyperparameters: Option<Hyperparameters>,
 
     /// A string of up to 40 characters that will be added to your fine-tuned model name.
-    ///
-    /// For example, a `suffix` of "custom-model-name" would produce a model name like `ada:ft-your-org:custom-model-name-2022-02-15-04-21-04`.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    suffix: Option<String>, // Defaults to null
+    pub suffix: Option<String>, // Defaults to null
 
     /// The ID of an uploaded file that contains validation data.
-    ///
-    /// If you provide this file, the data is used to generate validation metrics periodically during fine-tuning.
-    /// These metrics can be viewed in the [fine-tuning results file](https://platform.openai.com/docs/guides/fine-tuning/analyzing-your-fine-tuned-model).
-    /// Your train and validation data should be mutually exclusive.
-    ///
-    /// Your dataset must be formatted as a JSONL file, where each validation example is a JSON object with the keys "prompt" and "completion".
-    /// Additionally, you must upload your file with the purpose `fine-tune`.
-    ///
-    /// See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning/creating-training-data) for more details.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub validation_file: Option<String>,
 
@@ -50,9 +29,7 @@ pub struct CreateFineTuningRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub integrations: Option<Vec<Integration>>,
 
-    /// The seed controls the reproducibility of the job.
-    /// Passing in the same seed and job parameters should produce the same results, but may differ in rare cases.
-    /// If a seed is not specified, one will be generated for you.
+    /// The seed controls the reproducibility of the job. If not specified, one will be generated for you.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<f32>,
 }
@@ -74,6 +51,7 @@ pub struct Hyperparameters {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(untagged)]
 pub enum AutoOrInteger {
     Auto(String),
     Integer(f32),
@@ -148,14 +126,10 @@ pub struct FineTuningResponse {
     pub estimated_finish: Option<i32>,
 }
 
-#[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "ListFineTuningRequestBuilder")]
-#[builder(pattern = "mutable")]
-#[builder(setter(into, strip_option), default)]
-#[builder(derive(Debug))]
-#[builder(build_fn(error = "OpenAIError"))]
+#[derive(Builder, Clone, Debug, Serialize)]
 pub struct ListFineTuningRequest {
     /// Identifier for the last job from the previous pagination request.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
     /// Number of fine-tuning jobs to retrieve.

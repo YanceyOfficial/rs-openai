@@ -92,3 +92,85 @@ impl<'a> FineTuning<'a> {
             .await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::client::OpenAI;
+    use crate::interfaces::fine_tuning::CreateFineTuningRequest;
+    use crate::shared::response_wrapper::OpenAIError;
+    use wiremock::matchers::{body_json, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn create_serializes_request_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/fine-tuning/jobs"))
+            .and(body_json(serde_json::json!({
+                "model": "davinci",
+                "training_file": "file-abc"
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "fine_tuning.job",
+                "id": "ftjob-123",
+                "model": "davinci",
+                "created_at": 1700000000_u64,
+                "finished_at": null,
+                "fine_tuned_model": null,
+                "organization_id": "org-123",
+                "result_files": [],
+                "status": "queued",
+                "validation_file": null,
+                "training_file": "file-abc",
+                "trained_tokens": null,
+                "hyperparameters": {"batch_size": "auto", "learning_rate_multiplier": "auto", "n_epochs": "auto"},
+                "integrations": null,
+                "seed": 42,
+                "estimated_finish": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateFineTuningRequest::builder()
+            .model("davinci")
+            .training_file("file-abc")
+            .build();
+
+        let res = client.fine_tuning().create(&req).await.unwrap();
+        assert_eq!(res.id, "ftjob-123");
+    }
+
+    #[tokio::test]
+    async fn create_maps_api_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/fine-tuning/jobs"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "training_file is required",
+                    "type": "invalid_request_error",
+                    "param": "training_file",
+                    "code": null
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateFineTuningRequest::builder()
+            .model("davinci")
+            .training_file("")
+            .build();
+
+        let err = client.fine_tuning().create(&req).await.unwrap_err();
+        match err {
+            OpenAIError::ApiError(e) => {
+                assert_eq!(e.error.param, Some(serde_json::json!("training_file")));
+            }
+            other => panic!("expected ApiError, got {other:?}"),
+        }
+    }
+}
