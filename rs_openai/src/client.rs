@@ -149,9 +149,33 @@ impl OpenAI {
         Ok(data)
     }
 
-    async fn resolve_text_response(
-        request: reqwest_middleware::RequestBuilder,
-    ) -> OpenAIResponse<String> {
+    /// Same as `resolve_response`, but for requests built on the plain (non-retried) client —
+    /// see `post_form`'s doc comment for why multipart uploads need this instead.
+    async fn resolve_raw_response<T>(request: reqwest::RequestBuilder) -> OpenAIResponse<T>
+    where
+        T: DeserializeOwned + Debug,
+    {
+        let response = request.send().await?;
+        let status = response.status();
+        let bytes = response.bytes().await?;
+
+        if !status.is_success() {
+            let api_error: ApiErrorResponse =
+                serde_json::from_slice(bytes.as_ref()).map_err(OpenAIError::JSONDeserialize)?;
+
+            return Err(OpenAIError::ApiError(api_error));
+        }
+
+        let data: T =
+            serde_json::from_slice(bytes.as_ref()).map_err(OpenAIError::JSONDeserialize)?;
+
+        Ok(data)
+    }
+
+    /// Same shape as `resolve_raw_response`, but returns the raw response body as text instead
+    /// of deserializing it — see `post_form`'s doc comment for why multipart uploads need to
+    /// build their request on the plain (non-retried) client.
+    async fn resolve_raw_text_response(request: reqwest::RequestBuilder) -> OpenAIResponse<String> {
         let response = request.send().await?;
         let status = response.status();
         let text = response.text().await?;
@@ -205,25 +229,33 @@ impl OpenAI {
         Self::resolve_response(request).await
     }
 
+    /// Builds a request on the plain (non-retried) client. `reqwest::multipart::Form` always
+    /// encodes its parts into a single interleaved byte stream (`Body::stream`, an
+    /// `Inner::Streaming` body) regardless of whether individual `Part`s were built with
+    /// `Part::bytes` or `Part::stream` — so multipart request bodies are never cloneable.
+    /// `RetryTransientMiddleware` calls `req.try_clone()` unconditionally on every attempt,
+    /// including the first, and errors immediately if that returns `None`. That means a
+    /// multipart request sent through the retried `http` client fails 100% of the time, before
+    /// any network I/O, against both a mock server and the real API — this is a hard limitation
+    /// of `reqwest`/`reqwest-middleware`, not something configurable away. So, like
+    /// `post_stream`, multipart uploads intentionally bypass the retried client.
     pub(crate) async fn post_form<T>(&self, route: &str, form_data: Form) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
     {
-        let request = self
-            .openai_request(Method::POST, route)?
-            .multipart(form_data);
-        Self::resolve_response(request).await
+        let request = self.raw_request(Method::POST, route)?.multipart(form_data);
+        Self::resolve_raw_response(request).await
     }
 
+    /// See `post_form`'s doc comment: multipart bodies can't be retried, so this also uses the
+    /// plain (non-retried) client.
     pub(crate) async fn post_form_with_text_response(
         &self,
         route: &str,
         form_data: Form,
     ) -> OpenAIResponse<String> {
-        let request = self
-            .openai_request(Method::POST, route)?
-            .multipart(form_data);
-        Self::resolve_text_response(request).await
+        let request = self.raw_request(Method::POST, route)?.multipart(form_data);
+        Self::resolve_raw_text_response(request).await
     }
 
     pub(crate) async fn post_with_file_response<T>(

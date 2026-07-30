@@ -33,7 +33,7 @@ impl<'a> Images<'a> {
         let file_part = reqwest::multipart::Part::stream(req.image.buffer.clone())
             .file_name(req.image.filename.clone())
             .mime_str("application/octet-stream")
-            .unwrap();
+            .expect("\"application/octet-stream\" is always a valid mime type");
 
         let mut form = Form::new()
             .part("image", file_part)
@@ -43,7 +43,7 @@ impl<'a> Images<'a> {
             let file_part = reqwest::multipart::Part::stream(req.image.buffer.clone())
                 .file_name(mask.filename)
                 .mime_str("application/octet-stream")
-                .unwrap();
+                .expect("\"application/octet-stream\" is always a valid mime type");
 
             form = form.part("mask", file_part);
         }
@@ -75,7 +75,7 @@ impl<'a> Images<'a> {
         let file_part = reqwest::multipart::Part::stream(req.image.buffer.clone())
             .file_name(req.image.filename.clone())
             .mime_str("application/octet-stream")
-            .unwrap();
+            .expect("\"application/octet-stream\" is always a valid mime type");
 
         let mut form = Form::new().part("image", file_part);
 
@@ -84,7 +84,7 @@ impl<'a> Images<'a> {
         }
 
         if let Some(size) = req.size.clone() {
-            form = form.text("size", size);
+            form = form.text("size", size.to_string());
         }
 
         if let Some(response_format) = req.response_format.clone() {
@@ -96,5 +96,72 @@ impl<'a> Images<'a> {
         }
 
         self.openai.post_form("/images/variations", form).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::client::OpenAI;
+    use crate::interfaces::images::{CreateImageRequest, ImageSize, ResponseFormat};
+    use crate::shared::response_wrapper::OpenAIError;
+    use wiremock::matchers::{body_json, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn create_serializes_1024_size_correctly() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/images/generations"))
+            .and(body_json(serde_json::json!({
+                "prompt": "a red bicycle",
+                "size": "1024x1024",
+                "response_format": "url"
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "created": 1700000000_i64,
+                "data": [{"url": "https://example.com/image.png"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateImageRequest::builder()
+            .prompt("a red bicycle")
+            .size(ImageSize::S1024x1024)
+            .response_format(ResponseFormat::Url)
+            .build();
+
+        let res = client.images().create(&req).await.unwrap();
+        assert_eq!(res.data.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn create_maps_api_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/images/generations"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "prompt is required",
+                    "type": "invalid_request_error",
+                    "param": "prompt",
+                    "code": null
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateImageRequest::builder().prompt("").build();
+
+        let err = client.images().create(&req).await.unwrap_err();
+        match err {
+            OpenAIError::ApiError(e) => {
+                assert_eq!(e.error.param, Some(serde_json::json!("prompt")))
+            }
+            other => panic!("expected ApiError, got {other:?}"),
+        }
     }
 }

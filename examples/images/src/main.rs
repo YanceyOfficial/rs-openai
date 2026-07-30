@@ -2,8 +2,8 @@ use dotenvy::dotenv;
 use rs_openai::{
     OpenAI,
     images::{
-        CreateImageEditRequestBuilder, CreateImageRequestBuilder,
-        CreateImageVariationRequestBuilder, ImageSize, ResponseFormat,
+        CreateImageEditRequest, CreateImageRequest, CreateImageVariationRequest, ImageSize,
+        ResponseFormat,
     },
     shared::types::File,
 };
@@ -37,12 +37,12 @@ async fn read_image(path: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 
 #[tokio::main]
 async fn create(client: &OpenAI) -> Result<(), Box<dyn std::error::Error>> {
-    let req = CreateImageRequestBuilder::default()
-        .prompt("hypperealistic portrait photo of (beautiful japanese girl:1.3) with (black curly hair:0.9) standing in a street (night time shinjuku city street tokyo japan:1.3) harajuku girl (neon colors:0.8) (futuristic:1.3)")
+    let req = CreateImageRequest::builder()
+        .prompt("a hyperrealistic portrait photo of a city street at night")
         .response_format(ResponseFormat::Url)
         .size(ImageSize::S512x512)
         .n(10)
-        .build()?;
+        .build();
 
     let res = client.images().create(&req).await?;
     println!("{:?}", res);
@@ -56,7 +56,7 @@ async fn create_edit(
     origin_buffer: Vec<u8>,
     transparent_buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let req = CreateImageEditRequestBuilder::default()
+    let req = CreateImageEditRequest::builder()
         .image(File {
             buffer: origin_buffer,
             filename: "worldcup.png".into(),
@@ -67,7 +67,7 @@ async fn create_edit(
         })
         .prompt("celebration ribbon")
         .n(2)
-        .build()?;
+        .build();
 
     let res = client.images().create_edit(&req).await?;
     println!("{:?}", res);
@@ -80,13 +80,13 @@ async fn create_variations(
     client: &OpenAI,
     buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let req = CreateImageVariationRequestBuilder::default()
+    let req = CreateImageVariationRequest::builder()
         .image(File {
             buffer,
             filename: "worldcup.png".into(),
         })
         .n(2)
-        .build()?;
+        .build();
 
     let res = client.images().create_variations(&req).await?;
     println!("{:?}", res);

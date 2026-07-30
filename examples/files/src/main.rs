@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use rs_openai::{OpenAI, files::UploadFileRequestBuilder, shared::types::File};
+use rs_openai::{OpenAI, files::UploadFileRequest, shared::types::File};
 use std::io::prelude::*;
 use std::{env::var, fs::File as StdFile};
 
@@ -19,13 +19,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
 
-    let req = UploadFileRequestBuilder::default()
+    let req = UploadFileRequest::builder()
         .file(File {
             filename: "books_training_file.jsonl".into(),
             buffer,
         })
         .purpose("fine-tune".to_string())
-        .build()?;
+        .build();
 
     let res = client.files().upload(&req).await?;
     println!("{:?}", res);
