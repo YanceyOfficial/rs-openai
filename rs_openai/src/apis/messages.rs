@@ -95,3 +95,59 @@ impl<'a> Messages<'a> {
             .await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::client::OpenAI;
+    use crate::interfaces::messages::{Content, CreateMessageRequest};
+    use crate::shared::response_wrapper::OpenAIError;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn create_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/threads/thread_123/messages"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "msg_123", "object": "thread.message", "created_at": 1700000000_u64,
+                "thread_id": "thread_123", "status": "completed", "incomplete_details": null,
+                "completed_at": 1700000001_u64, "incomplete_at": 0, "role": "user",
+                "content": "hello", "assistant_id": null, "run_id": null,
+                "attachments": null, "metadata": {}
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateMessageRequest::builder()
+            .role("user")
+            .content(Content::TextContent("hello".to_string()))
+            .build();
+
+        let res = client.messages().create("thread_123", &req).await.unwrap();
+        assert_eq!(res.id, "msg_123");
+    }
+
+    #[tokio::test]
+    async fn delete_maps_api_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/threads/thread_123/messages/msg_missing"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                "error": {"message": "No message found", "type": "invalid_request_error", "param": null, "code": null}
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let err = client
+            .messages()
+            .delete("thread_123", "msg_missing")
+            .await
+            .unwrap_err();
+        assert!(matches!(err, OpenAIError::ApiError(_)));
+    }
+}

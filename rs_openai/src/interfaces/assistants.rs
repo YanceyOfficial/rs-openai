@@ -1,73 +1,50 @@
 use std::collections::HashMap;
 
-use crate::shared::response_wrapper::OpenAIError;
-use derive_builder::Builder;
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 
-#[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "CreateAssistantRequestBuilder")]
-#[builder(pattern = "mutable")]
-#[builder(setter(into, strip_option), default)]
-#[builder(derive(Debug))]
-#[builder(build_fn(error = "OpenAIError"))]
+#[derive(Builder, Clone, Debug, Serialize)]
 pub struct AssistantRequest {
-    /// ID of the model to use. You can use the [List models](https://platform.openai.com/docs/api-reference/models/list) API to see all of your available models,
-    /// or see our [Model overview](https://platform.openai.com/docs/models/overview) for descriptions of them.
+    /// ID of the model to use.
+    #[builder(into)]
     pub model: String,
 
     /// The name of the assistant. The maximum length is 256 characters.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 
     /// The description of the assistant. The maximum length is 512 characters.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
     /// The system instructions that the assistant uses. The maximum length is 256,000 characters.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
 
-    /// A list of tool enabled on the assistant. There can be a maximum of 128 tools per assistant.
-    /// Tools can be of types `code_interpreter`, `file_search`, or `function`.
+    /// A list of tools enabled on the assistant. There can be a maximum of 128 tools per assistant.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<Tools>>,
 
-    /// A set of resources that are used by the assistant's tools. The resources are specific to the type of tool.
-    /// For example, the code_interpreter tool requires a list of file IDs, while the `file_search` tool requires a list of vector store IDs.
+    /// A set of resources that are used by the assistant's tools.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_resources: Option<ToolResources>,
 
     /// Set of 16 key-value pairs that can be attached to an object.
-    /// This can be useful for storing additional information about the object in a structured format.
-    /// Keys can be a maximum of 64 characters long and values can be a maximum of 512 characters long.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, serde_json::Value>>,
 
     /// What sampling temperature to use, between 0 and 2.
-    /// Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>, // Defaults to 1
 
-    /// An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass.
-    /// So 0.1 means only the tokens comprising the top 10% probability mass are considered.
-    ///
-    /// We generally recommend altering this or temperature but not both.
+    /// An alternative to sampling with temperature, called nucleus sampling.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>, // Defaults to 1
 
     /// Specifies the format that the model must output.
-    /// Compatible with [GPT-4o](https://platform.openai.com/docs/models/gpt-4o), [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4), and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
-    ///
-    /// Setting to `{ "type": "json_schema", "json_schema": {...} }`
-    /// enables Structured Outputs which ensures the model will match your supplied JSON schema.
-    /// Learn more in the [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
-    ///
-    /// Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the message the model generates is valid JSON.
-    ///
-    /// **Important:** when using JSON mode, you must also instruct the model to produce JSON yourself via a system or user message.
-    /// Without this, the model may generate an unending stream of whitespace until the generation reaches the token limit, resulting in a long-running and seemingly "stuck" request.
-    /// Also note that the message content may be partially cut off if `finish_reason="length"`,
-    /// which indicates the generation exceeded `max_tokens` or the conversation exceeded the max context length.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<ResponseType>,
 }
@@ -226,6 +203,7 @@ pub struct Static {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(untagged)]
 pub enum ResponseType {
     /// `auto` is the default value
     #[strum(serialize = "auto")]
@@ -278,7 +256,7 @@ pub struct JsonSchema {
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct AssistantResponse {
     /// The identifier, which can be referenced in API endpoints.
-    id: String,
+    pub id: String,
     /// The object type, which is always `assistant`.
     object: String,
     /// The Unix timestamp (in seconds) for when the assistant was created.
@@ -320,30 +298,25 @@ pub struct AssistantResponse {
     response_format: ResponseType, // "auto" or object
 }
 
-#[derive(Builder, Clone, Debug, Default, Serialize)]
-#[builder(name = "ListAssistantRequestBuilder")]
-#[builder(pattern = "mutable")]
-#[builder(setter(into, strip_option), default)]
-#[builder(derive(Debug))]
-#[builder(build_fn(error = "OpenAIError"))]
+#[derive(Builder, Clone, Debug, Serialize)]
 pub struct ListAssistantRequest {
     /// A limit on the number of objects to be returned. Limit can range between 1 and 100, and the default is 20.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub limit: Option<String>, // Defaults to 20
+    pub limit: Option<String>,
 
-    /// Sort order by the `created_at` timestamp of the objects. `asc` for ascending order and `desc` for descending order.
+    /// Sort order by the `created_at` timestamp of the objects. `asc` or `desc`.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub order: Option<String>, // Defaults to desc
+    pub order: Option<String>,
 
-    /// A cursor for use in pagination. `after` is an object ID that defines your place in the list.
-    /// For instance, if you make a list request and receive 100 objects, ending with obj_foo,
-    /// your subsequent call can include after=obj_foo in order to fetch the next page of the list.
+    /// A cursor for use in pagination.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
 
-    /// A cursor for use in pagination. `before` is an object ID that defines your place in the list.
-    /// For instance, if you make a list request and receive 100 objects, ending with obj_foo,
-    /// your subsequent call can include before=obj_foo in order to fetch the previous page of the list.
+    /// A cursor for use in pagination.
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
 }
