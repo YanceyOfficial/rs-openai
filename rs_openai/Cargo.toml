@@ -15,7 +15,6 @@ readme = "../README.md"
 workspace = true
 
 [dependencies]
-derive_builder = "0.20.2"
 futures = { workspace = true }
 reqwest = { workspace = true }
 reqwest-eventsource = "0.6.0"

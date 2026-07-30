@@ -4,16 +4,13 @@
 //!
 //! ```ignore
 //! use dotenvy::dotenv;
-//! use rs_openai::{OpenAI};
+//! use rs_openai::OpenAI;
 //! use std::env::var;
 //!
 //! dotenv().ok();
 //! let api_key = var("OPENAI_API_KEY").unwrap();
 //!
-//! let client = OpenAI::new(&OpenAI {
-//!     api_key,
-//!     org_id: None,
-//! });
+//! let client = OpenAI::new(api_key);
 //! ```
 //!
 //! ## Making requests
@@ -21,7 +18,7 @@
 //!```ignore
 //! use dotenvy::dotenv;
 //! use rs_openai::{
-//!     chat::{ChatCompletionMessageRequestBuilder, CreateChatRequestBuilder, Role},
+//!     chat::{ChatCompletionMessage, CreateChatRequest, Role},
 //!     OpenAI,
 //! };
 //! use std::env::var;
@@ -31,18 +28,15 @@
 //!     dotenv().ok();
 //!     let api_key = var("OPENAI_API_KEY").unwrap();
 //!
-//!     let client = OpenAI::new(&OpenAI {
-//!         api_key,
-//!         org_id: None,
-//!     });
+//!     let client = OpenAI::new(api_key);
 //!
-//!     let req = CreateChatRequestBuilder::default()
+//!     let req = CreateChatRequest::builder()
 //!         .model("gpt-3.5-turbo")
-//!         .messages(vec![ChatCompletionMessageRequestBuilder::default()
+//!         .messages(vec![ChatCompletionMessage::builder()
 //!             .role(Role::User)
 //!             .content("To Solve LeetCode's problem 81 in Rust.")
-//!             .build()?])
-//!         .build()?;
+//!             .build()])
+//!         .build();
 //!
 //!     let res = client.chat().create(&req).await?;
 //!     println!("{:?}", res);

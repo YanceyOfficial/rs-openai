@@ -13,7 +13,7 @@ The OpenAI Rust library provides convenient access to the OpenAI API from Rust a
 
 ```toml
 [dependencies]
-rs_openai = { version = "0.5.0" }
+rs_openai = { version = "0.6.0" }
 ```
 
 ## Features
@@ -29,7 +29,7 @@ rs_openai = { version = "0.5.0" }
 - [x] Images
 - [x] Models
 - [x] Moderations
-- [ ] Enhances backoff
+- [x] Enhances backoff
 - [ ] Supports Microsoft Azure Endpoints
 
 ## Usage
@@ -47,7 +47,7 @@ Here's an example of initializing the library with the API key loaded from an en
 ```rust
 use dotenvy::dotenv;
 use rs_openai::{
-    chat::{ChatCompletionMessageRequestBuilder, CreateChatRequestBuilder, Role},
+    chat::{ChatCompletionMessage, CreateChatRequest, Role},
     OpenAI,
 };
 use std::env::var;
@@ -57,18 +57,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
-    let client = OpenAI::new(&OpenAI {
-        api_key,
-        org_id: None,
-    });
+    let client = OpenAI::new(api_key);
 
-    let req = CreateChatRequestBuilder::default()
+    let req = CreateChatRequest::builder()
         .model("gpt-3.5-turbo")
-        .messages(vec![ChatCompletionMessageRequestBuilder::default()
+        .messages(vec![ChatCompletionMessage::builder()
             .role(Role::User)
             .content("To Solve LeetCode's problem 81 in Rust.")
-            .build()?])
-        .build()?;
+            .build()])
+        .build();
 
     let res = client.chat().create(&req).await?;
     println!("{:?}", res);
@@ -85,7 +82,7 @@ Like ChatGPT, we support `stream` mode for **Create chat completion**, **Create 
 use dotenvy::dotenv;
 use futures::StreamExt;
 use rs_openai::{
-    chat::{ChatCompletionMessageRequestBuilder, CreateChatRequestBuilder, Role},
+    chat::{ChatCompletionMessage, CreateChatRequest, Role},
     OpenAI,
 };
 use std::env::var;
@@ -96,21 +93,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let api_key = var("OPENAI_API_KEY").unwrap();
 
-    let client = OpenAI::new(&OpenAI {
-        api_key,
-        org_id: None,
-    });
-
+    let client = OpenAI::new(api_key);
 
     // stream mode
-    let req = CreateChatRequestBuilder::default()
+    let req = CreateChatRequest::builder()
         .model("gpt-3.5-turbo")
-        .messages(vec![ChatCompletionMessageRequestBuilder::default()
+        .messages(vec![ChatCompletionMessage::builder()
             .role(Role::User)
             .content("To Solve LeetCode's problem 81 in Rust.")
-            .build()?])
+            .build()])
         .stream(true)
-        .build()?;
+        .build();
 
     let mut stream = client.chat().create_with_stream(&req).await?;
 
