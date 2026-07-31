@@ -1,7 +1,7 @@
 use crate::apis::{
-    assistants, audio, batch, chat, chatkit, completions, containers, embeddings, evals, files,
-    fine_tuning, graders, images, messages, models, moderations, runs, threads, uploads,
-    vector_stores,
+    assistants, audio, batch, chat, chatkit, completions, containers, conversations, embeddings,
+    evals, files, fine_tuning, graders, images, messages, models, moderations, responses, runs,
+    threads, uploads, vector_stores, videos, webhooks,
 };
 use crate::shared::response_wrapper::{ApiErrorResponse, OpenAIError, OpenAIResponse};
 use futures::{Stream, stream::StreamExt};
@@ -374,6 +374,14 @@ impl OpenAI {
         containers::Container::new(self, id.into())
     }
 
+    pub fn conversations(&self) -> conversations::Conversations<'_> {
+        conversations::Conversations::new(self)
+    }
+
+    pub fn conversation(&self, id: impl Into<String>) -> conversations::Conversation<'_> {
+        conversations::Conversation::new(self, id.into())
+    }
+
     pub fn embeddings(&self) -> embeddings::Embeddings<'_> {
         embeddings::Embeddings::new(self)
     }
@@ -414,6 +422,14 @@ impl OpenAI {
         moderations::Moderations::new(self)
     }
 
+    pub fn responses(&self) -> responses::Responses<'_> {
+        responses::Responses::new(self)
+    }
+
+    pub fn response(&self, id: impl Into<String>) -> responses::Response<'_> {
+        responses::Response::new(self, id.into())
+    }
+
     pub fn runs(&self) -> runs::Runs<'_> {
         runs::Runs::new(self)
     }
@@ -432,6 +448,18 @@ impl OpenAI {
 
     pub fn vector_store(&self, id: impl Into<String>) -> vector_stores::VectorStore<'_> {
         vector_stores::VectorStore::new(self, id.into())
+    }
+
+    pub fn videos(&self) -> videos::Videos<'_> {
+        videos::Videos::new(self)
+    }
+
+    pub fn video(&self, id: impl Into<String>) -> videos::Video<'_> {
+        videos::Video::new(self, id.into())
+    }
+
+    pub fn webhooks(&self) -> webhooks::Webhooks<'_> {
+        webhooks::Webhooks::new(self)
     }
 }
 
