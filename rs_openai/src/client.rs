@@ -1,7 +1,7 @@
 use crate::apis::{
     assistants, audio, batch, chat, chatkit, completions, containers, conversations, embeddings,
-    evals, files, fine_tuning, graders, images, messages, models, moderations, responses, runs,
-    threads, uploads, vector_stores, videos, webhooks,
+    evals, files, fine_tuning, graders, images, messages, models, moderations, organization,
+    responses, runs, threads, uploads, vector_stores, videos, webhooks,
 };
 use crate::shared::response_wrapper::{ApiErrorResponse, OpenAIError, OpenAIResponse};
 use futures::{Stream, stream::StreamExt};
@@ -420,6 +420,10 @@ impl OpenAI {
 
     pub fn moderations(&self) -> moderations::Moderations<'_> {
         moderations::Moderations::new(self)
+    }
+
+    pub fn organization(&self) -> organization::Organization<'_> {
+        organization::Organization::new(self)
     }
 
     pub fn responses(&self) -> responses::Responses<'_> {

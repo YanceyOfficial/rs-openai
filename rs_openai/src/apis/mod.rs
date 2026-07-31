@@ -15,6 +15,7 @@ pub mod images;
 pub mod messages;
 pub mod models;
 pub mod moderations;
+pub mod organization;
 pub mod responses;
 pub mod runs;
 pub mod threads;
