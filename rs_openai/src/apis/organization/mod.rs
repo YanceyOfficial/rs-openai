@@ -7,6 +7,7 @@ pub mod admin_api_keys;
 pub mod audit_logs;
 pub mod groups;
 pub mod invites;
+pub mod projects;
 pub mod roles;
 pub mod usage;
 pub mod users;
@@ -63,6 +64,16 @@ impl<'a> Organization<'a> {
     /// Scoped accessor for a specific organization invite. Not yet implemented.
     pub fn invite(&self, id: impl Into<String>) -> invites::OrganizationInvite<'a> {
         invites::OrganizationInvite::new(self.openai, id.into())
+    }
+
+    /// Scoped accessor for organization projects. Not yet implemented.
+    pub fn projects(&self) -> projects::OrganizationProjects<'a> {
+        projects::OrganizationProjects::new(self.openai)
+    }
+
+    /// Scoped accessor for a specific organization project. Not yet implemented.
+    pub fn project(&self, id: impl Into<String>) -> projects::OrganizationProject<'a> {
+        projects::OrganizationProject::new(self.openai, id.into())
     }
 
     /// Scoped accessor for organization roles. Not yet implemented.
