@@ -7,6 +7,10 @@ use crate::interfaces::assistants;
 pub use crate::interfaces::assistants::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
+/// The Assistants API is deprecated and sunsets **2026-08-26**. New integrations should use
+/// the Responses API (`client.responses()`) combined with the Conversations API
+/// (`client.conversations()`) instead — see OpenAI's Assistants migration guide. This module
+/// is kept in its current flat structure and receives no further feature work.
 pub struct Assistants<'a> {
     openai: &'a OpenAI,
 }

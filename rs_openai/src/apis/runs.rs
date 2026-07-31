@@ -7,6 +7,13 @@ use crate::interfaces::runs;
 pub use crate::interfaces::runs::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
+/// The Assistants API is deprecated and sunsets **2026-08-26**. New integrations should use
+/// the Responses API (`client.responses()`) combined with the Conversations API
+/// (`client.conversations()`) instead — see OpenAI's Assistants migration guide. This module
+/// is kept in its current flat structure and receives no further feature work. Also note:
+/// this module is missing "Submit Tool Outputs" and "Run Steps" (see
+/// `docs/superpowers/research/2026-07-31-field-diff-assistants-cluster.md`) and will not gain
+/// them, given the sunset.
 pub struct Runs<'a> {
     openai: &'a OpenAI,
 }
