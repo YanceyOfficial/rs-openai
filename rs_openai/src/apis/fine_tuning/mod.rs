@@ -1,5 +1,7 @@
 //! Manage fine-tuning jobs to tailor a model to your specific training data. Related guide: [Fine-tune models](https://platform.openai.com/docs/guides/fine-tuning)
 
+pub mod checkpoints;
+
 use crate::client::OpenAI;
 use crate::interfaces::fine_tuning;
 pub use crate::interfaces::fine_tuning::*;
@@ -90,6 +92,13 @@ impl<'a> FineTuning<'a> {
         self.openai
             .post(&format!("/fine-tuning/jobs/{fine_tune_job_id}/cancel"), &())
             .await
+    }
+
+    /// Scoped accessor for a specific fine-tuning checkpoint's operations (e.g. sharing
+    /// permissions). Not yet implemented — see
+    /// docs/superpowers/research/2026-07-31-field-diff-images-audio-files-fine-tuning.md.
+    pub fn checkpoint(&self, id: impl Into<String>) -> checkpoints::FineTuningCheckpoint<'a> {
+        checkpoints::FineTuningCheckpoint::new(self.openai, id.into())
     }
 }
 

@@ -1,5 +1,8 @@
 //! Learn how to turn audio into text or text into audio. Related guide: [Speech to text](https://platform.openai.com/docs/guides/speech-to-text)
 
+pub mod voice_consents;
+pub mod voices;
+
 use crate::client::OpenAI;
 use crate::interfaces::audio;
 pub use crate::interfaces::audio::*;
@@ -87,6 +90,22 @@ impl<'a> Audio<'a> {
         self.openai
             .post_form_with_text_response("/audio/translations", form)
             .await
+    }
+
+    /// Scoped accessor for voice-cloning consent records. Not yet implemented — see
+    /// docs/superpowers/research/2026-07-31-field-diff-images-audio-files-fine-tuning.md.
+    pub fn voice_consents(&self) -> voice_consents::AudioVoiceConsents<'a> {
+        voice_consents::AudioVoiceConsents::new(self.openai)
+    }
+
+    /// Scoped accessor for a specific voice-cloning consent record. Not yet implemented.
+    pub fn voice_consent(&self, id: impl Into<String>) -> voice_consents::AudioVoiceConsent<'a> {
+        voice_consents::AudioVoiceConsent::new(self.openai, id.into())
+    }
+
+    /// Scoped accessor for custom voice registration. Not yet implemented.
+    pub fn voices(&self) -> voices::AudioVoices<'a> {
+        voices::AudioVoices::new(self.openai)
     }
 
     fn create_transcription_form(&self, req: &audio::CreateTranscriptionRequest) -> Form {
