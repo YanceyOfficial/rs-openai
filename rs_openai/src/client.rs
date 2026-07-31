@@ -1,6 +1,7 @@
 use crate::apis::{
-    assistants, audio, batch, chat, completions, embeddings, files, fine_tuning, images, messages,
-    models, moderations, runs, threads, uploads,
+    assistants, audio, batch, chat, chatkit, completions, containers, embeddings, evals, files,
+    fine_tuning, graders, images, messages, models, moderations, runs, threads, uploads,
+    vector_stores,
 };
 use crate::shared::response_wrapper::{ApiErrorResponse, OpenAIError, OpenAIResponse};
 use futures::{Stream, stream::StreamExt};
@@ -357,12 +358,32 @@ impl OpenAI {
         chat::Chat::new(self)
     }
 
+    pub fn chatkit(&self) -> chatkit::ChatKit<'_> {
+        chatkit::ChatKit::new(self)
+    }
+
     pub fn completions(&self) -> completions::Completions<'_> {
         completions::Completions::new(self)
     }
 
+    pub fn containers(&self) -> containers::Containers<'_> {
+        containers::Containers::new(self)
+    }
+
+    pub fn container(&self, id: impl Into<String>) -> containers::Container<'_> {
+        containers::Container::new(self, id.into())
+    }
+
     pub fn embeddings(&self) -> embeddings::Embeddings<'_> {
         embeddings::Embeddings::new(self)
+    }
+
+    pub fn evals(&self) -> evals::Evals<'_> {
+        evals::Evals::new(self)
+    }
+
+    pub fn eval(&self, id: impl Into<String>) -> evals::Eval<'_> {
+        evals::Eval::new(self, id.into())
     }
 
     pub fn files(&self) -> files::Files<'_> {
@@ -371,6 +392,10 @@ impl OpenAI {
 
     pub fn fine_tuning(&self) -> fine_tuning::FineTuning<'_> {
         fine_tuning::FineTuning::new(self)
+    }
+
+    pub fn graders(&self) -> graders::Graders<'_> {
+        graders::Graders::new(self)
     }
 
     pub fn images(&self) -> images::Images<'_> {
@@ -399,6 +424,14 @@ impl OpenAI {
 
     pub fn upload(&self) -> uploads::Upload<'_> {
         uploads::Upload::new(self)
+    }
+
+    pub fn vector_stores(&self) -> vector_stores::VectorStores<'_> {
+        vector_stores::VectorStores::new(self)
+    }
+
+    pub fn vector_store(&self, id: impl Into<String>) -> vector_stores::VectorStore<'_> {
+        vector_stores::VectorStore::new(self, id.into())
     }
 }
 
