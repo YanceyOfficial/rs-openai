@@ -17,7 +17,7 @@ pub struct CreateBatchRequest {
 
     /// Optional custom metadata for the batch.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta: Option<serde_json::Value>,
+    pub metadata: Option<serde_json::Value>,
 }
 
 #[derive(Builder, Clone, Debug, Serialize)]

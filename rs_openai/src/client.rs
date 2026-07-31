@@ -1,6 +1,6 @@
 use crate::apis::{
-    assistants, audio, batch, chat, completions, edits, embeddings, engines, files, fine_tuning,
-    images, messages, models, moderations, runs, threads, uploads,
+    assistants, audio, batch, chat, completions, embeddings, files, fine_tuning, images, messages,
+    models, moderations, runs, threads, uploads,
 };
 use crate::shared::response_wrapper::{ApiErrorResponse, OpenAIError, OpenAIResponse};
 use futures::{Stream, stream::StreamExt};
@@ -361,16 +361,8 @@ impl OpenAI {
         completions::Completions::new(self)
     }
 
-    pub fn edits(&self) -> edits::Edits<'_> {
-        edits::Edits::new(self)
-    }
-
     pub fn embeddings(&self) -> embeddings::Embeddings<'_> {
         embeddings::Embeddings::new(self)
-    }
-
-    pub fn engines(&self) -> engines::Engines<'_> {
-        engines::Engines::new(self)
     }
 
     pub fn files(&self) -> files::Files<'_> {

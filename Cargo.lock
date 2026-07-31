@@ -731,15 +731,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
-name = "edits"
-version = "0.1.0"
-dependencies = [
- "dotenvy",
- "rs_openai",
- "tokio",
-]
-
-[[package]]
 name = "either"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -761,15 +752,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75030f3c4f45dafd7586dd6780965a8c7e8e285a5ecb86713e63a79c5b2766f3"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "engines"
-version = "0.1.0"
-dependencies = [
- "dotenvy",
- "rs_openai",
- "tokio",
 ]
 
 [[package]]
