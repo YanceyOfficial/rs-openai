@@ -18,17 +18,43 @@ rs_openai = { version = "0.7.0" }
 
 ## Features
 
+### Implemented
+
 - [x] Audio (including Text and Json response value)
+- [x] Batches
 - [x] Chat (including SSE streaming)
 - [x] Completions (including SSE streaming)
 - [x] Embeddings
 - [x] Files
-- [x] Fine-Tunes (including SSE streaming)
+- [x] Fine-Tuning (including SSE streaming)
 - [x] Images
 - [x] Models
 - [x] Moderations
-- [x] Enhances backoff
-- [ ] Supports Microsoft Azure Endpoints
+- [x] Uploads
+- [x] Automatic retries with exponential backoff
+
+### Deprecated (sunsets 2026-08-26, per OpenAI)
+
+- [x] Assistants, Threads, Messages, Runs — still functional, but OpenAI recommends migrating to the Responses + Conversations APIs below
+
+### Scaffolded, not yet implemented
+
+Module wired in with accessor structs, but no request/response types or endpoint logic yet:
+
+- [ ] Responses — OpenAI's now-recommended primary API
+- [ ] Conversations
+- [ ] Vector Stores
+- [ ] ChatKit (Beta)
+- [ ] Containers
+- [ ] Evals + Graders
+- [ ] Videos
+- [ ] Webhooks
+- [ ] Organization / admin tier (audit logs, admin API keys, usage, groups, invites, roles, users, projects)
+
+### Not planned
+
+- [ ] Realtime API
+- [ ] Microsoft Azure Endpoints
 
 ## Usage
 
