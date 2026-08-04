@@ -414,4 +414,78 @@ mod tests {
         assert_eq!(tool_calls[0].function.name, "get_weather");
         assert_eq!(tool_calls[0].function.arguments, r#"{"location":"NYC"}"#);
     }
+
+    #[tokio::test]
+    async fn create_with_stream_yields_tool_call_deltas() {
+        let mock_server = MockServer::start().await;
+
+        let chunk1 = serde_json::json!({
+            "id": "chatcmpl-789",
+            "object": "chat.completion.chunk",
+            "model": "gpt-4o-mini",
+            "created": 1700000000_u32,
+            "choices": [{
+                "delta": {
+                    "content": null,
+                    "tool_calls": [{
+                        "id": "call_stream_1",
+                        "type": "function",
+                        "function": {"name": "get_weather", "arguments": "{\"location\":"}
+                    }]
+                },
+                "finish_reason": null,
+                "index": 0
+            }]
+        });
+        let chunk2 = serde_json::json!({
+            "id": "chatcmpl-789",
+            "object": "chat.completion.chunk",
+            "model": "gpt-4o-mini",
+            "created": 1700000000_u32,
+            "choices": [{
+                "delta": {"content": null, "tool_calls": null},
+                "finish_reason": "tool_calls",
+                "index": 0
+            }]
+        });
+
+        let sse_body = format!("data: {chunk1}\n\ndata: {chunk2}\n\ndata: [DONE]\n\n",);
+
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(sse_body.into_bytes(), "text/event-stream"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateChatRequest::builder()
+            .model("gpt-4o-mini")
+            .messages(vec![
+                ChatCompletionMessage::builder()
+                    .role(Role::User)
+                    .content("weather?")
+                    .build(),
+            ])
+            .stream(true)
+            .build();
+
+        let mut stream = client.chat().create_with_stream(&req).await.unwrap();
+
+        let mut received = Vec::new();
+        while let Some(item) = stream.next().await {
+            received.push(item.unwrap());
+        }
+
+        assert_eq!(received.len(), 2);
+        let tool_calls = received[0].choices[0]
+            .delta
+            .tool_calls
+            .as_ref()
+            .expect("expected tool_calls in first chunk");
+        assert_eq!(tool_calls[0].id, "call_stream_1");
+        assert_eq!(tool_calls[0].function.arguments, "{\"location\":");
+        assert!(received[1].choices[0].delta.tool_calls.is_none());
+    }
 }

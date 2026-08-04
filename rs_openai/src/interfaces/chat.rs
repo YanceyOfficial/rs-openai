@@ -220,6 +220,7 @@ pub struct ChatResponse {
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Delta {
     pub content: Option<String>,
+    pub tool_calls: Option<Vec<ToolCall>>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
