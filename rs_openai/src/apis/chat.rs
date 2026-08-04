@@ -52,7 +52,10 @@ impl<'a> Chat<'a> {
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
-    use crate::interfaces::chat::{ChatCompletionMessage, CreateChatRequest, Role};
+    use crate::interfaces::chat::{
+        ChatCompletionMessage, ChatCompletionTool, CreateChatRequest, FunctionCall,
+        FunctionDefinition, Role, ToolCall, ToolChoice, ToolChoiceMode,
+    };
     use crate::shared::response_wrapper::OpenAIError;
     use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path};
@@ -66,7 +69,7 @@ mod tests {
             .and(path("/chat/completions"))
             .and(body_json(serde_json::json!({
                 "model": "gpt-4o-mini",
-                "messages": [{"role": "user", "content": "hi", "name": null}]
+                "messages": [{"role": "user", "content": "hi", "name": null, "tool_calls": null, "tool_call_id": null}]
             })))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "chatcmpl-123",
@@ -94,7 +97,7 @@ mod tests {
             .build();
 
         let res = client.chat().create(&req).await.unwrap();
-        assert_eq!(res.choices[0].message.content, "Hello!");
+        assert_eq!(res.choices[0].message.content.as_deref(), Some("Hello!"));
     }
 
     #[tokio::test]
@@ -258,5 +261,157 @@ mod tests {
 
         // The stream must be exhausted (no trailing item after [DONE]).
         assert!(stream.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn create_serializes_tools_and_tool_result_message() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {"role": "user", "content": "What's the weather in Boston?", "name": null, "tool_calls": null, "tool_call_id": null},
+                    {
+                        "role": "assistant",
+                        "content": null,
+                        "name": null,
+                        "tool_calls": [{
+                            "id": "call_abc123",
+                            "type": "function",
+                            "function": {"name": "get_weather", "arguments": "{\"location\":\"Boston\"}"}
+                        }],
+                        "tool_call_id": null
+                    },
+                    {"role": "tool", "content": "72F and sunny", "name": null, "tool_calls": null, "tool_call_id": "call_abc123"}
+                ],
+                "tools": [{
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "description": "Get the current weather for a location",
+                        "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}
+                    }
+                }],
+                "tool_choice": "auto",
+                "parallel_tool_calls": false
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "chatcmpl-123",
+                "object": "chat.completion",
+                "created": 1700000000_u32,
+                "choices": [{
+                    "message": {"role": "assistant", "content": "It's 72F and sunny in Boston.", "name": null, "tool_calls": null, "tool_call_id": null},
+                    "finish_reason": "stop",
+                    "index": 0
+                }],
+                "usage": {"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30}
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+
+        let tool = ChatCompletionTool::builder()
+            .function(
+                FunctionDefinition::builder()
+                    .name("get_weather")
+                    .description("Get the current weather for a location")
+                    .parameters(serde_json::json!({
+                        "type": "object",
+                        "properties": {"location": {"type": "string"}},
+                        "required": ["location"]
+                    }))
+                    .build(),
+            )
+            .build();
+
+        let req = CreateChatRequest::builder()
+            .model("gpt-4o-mini")
+            .messages(vec![
+                ChatCompletionMessage::builder()
+                    .role(Role::User)
+                    .content("What's the weather in Boston?")
+                    .build(),
+                ChatCompletionMessage::builder()
+                    .role(Role::Assistant)
+                    .tool_calls(vec![ToolCall {
+                        id: "call_abc123".to_string(),
+                        kind: "function".to_string(),
+                        function: FunctionCall {
+                            name: "get_weather".to_string(),
+                            arguments: r#"{"location":"Boston"}"#.to_string(),
+                        },
+                    }])
+                    .build(),
+                ChatCompletionMessage::builder()
+                    .role(Role::Tool)
+                    .content("72F and sunny")
+                    .tool_call_id("call_abc123")
+                    .build(),
+            ])
+            .tools(vec![tool])
+            .tool_choice(ToolChoice::Mode(ToolChoiceMode::Auto))
+            .parallel_tool_calls(false)
+            .build();
+
+        let res = client.chat().create(&req).await.unwrap();
+        assert_eq!(
+            res.choices[0].message.content.as_deref(),
+            Some("It's 72F and sunny in Boston.")
+        );
+    }
+
+    #[tokio::test]
+    async fn create_deserializes_response_with_null_content_and_tool_calls() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "chatcmpl-456",
+                "object": "chat.completion",
+                "created": 1700000000_u32,
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": null,
+                        "tool_calls": [{
+                            "id": "call_xyz",
+                            "type": "function",
+                            "function": {"name": "get_weather", "arguments": "{\"location\":\"NYC\"}"}
+                        }]
+                    },
+                    "finish_reason": "tool_calls",
+                    "index": 0
+                }],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20}
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateChatRequest::builder()
+            .model("gpt-4o-mini")
+            .messages(vec![
+                ChatCompletionMessage::builder()
+                    .role(Role::User)
+                    .content("What's the weather in NYC?")
+                    .build(),
+            ])
+            .build();
+
+        let res = client.chat().create(&req).await.unwrap();
+        let message = &res.choices[0].message;
+        assert_eq!(message.content, None);
+        let tool_calls = message
+            .tool_calls
+            .as_ref()
+            .expect("expected tool_calls to be present");
+        assert_eq!(tool_calls.len(), 1);
+        assert_eq!(tool_calls[0].id, "call_xyz");
+        assert_eq!(tool_calls[0].function.name, "get_weather");
+        assert_eq!(tool_calls[0].function.arguments, r#"{"location":"NYC"}"#);
     }
 }

@@ -15,20 +15,111 @@ pub enum Role {
     User,
     #[strum(serialize = "assistant")]
     Assistant,
+    #[strum(serialize = "tool")]
+    Tool,
 }
 
 #[derive(Builder, Debug, Clone, Deserialize, Serialize)]
 pub struct ChatCompletionMessage {
-    /// The role of the author of this message. One of `system`, `user`, or `assistant`.
+    /// The role of the author of this message. One of `system`, `user`, `assistant`, or `tool`.
     pub role: Role,
 
-    /// The contents of the message.
+    /// The contents of the message. `None` (serializes as `null`) when an assistant message
+    /// contains only tool calls — real OpenAI responses do this.
     #[builder(into)]
-    pub content: String,
+    pub content: Option<String>,
 
     /// The name of the author of this message. May contain a-z, A-Z, 0-9, and underscores, with a maximum length of 64 characters.
     #[builder(into)]
     pub name: Option<String>,
+
+    /// Populated on assistant messages that call one or more tools instead of (or alongside)
+    /// producing text.
+    pub tool_calls: Option<Vec<ToolCall>>,
+
+    /// Set on `role: Tool` messages to link this message's `content` (the tool's result) back
+    /// to the `ToolCall.id` it answers.
+    #[builder(into)]
+    pub tool_call_id: Option<String>,
+}
+
+/// A single function call requested by the model, as part of an assistant message's
+/// `tool_calls`.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FunctionCall {
+    pub name: String,
+
+    /// Raw JSON-encoded arguments, deliberately left unparsed — decide how (and whether) to
+    /// validate/deserialize this against your own tool's parameter schema.
+    pub arguments: String,
+}
+
+/// One tool call the model made, inside an assistant message's `tool_calls` array.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ToolCall {
+    pub id: String,
+
+    /// Always `"function"` as of this writing; OpenAI has never shipped a second tool-call type.
+    #[serde(rename = "type")]
+    pub kind: String,
+
+    pub function: FunctionCall,
+}
+
+/// A function's definition, as advertised to the model via `CreateChatRequest.tools`.
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct FunctionDefinition {
+    #[builder(into)]
+    pub name: String,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    /// A JSON Schema object describing the function's parameters.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<serde_json::Value>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strict: Option<bool>,
+}
+
+/// A tool the model may call, as an entry in `CreateChatRequest.tools`.
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ChatCompletionTool {
+    /// Always `"function"` as of this writing.
+    #[serde(rename = "type")]
+    #[builder(default = "function".to_string())]
+    pub kind: String,
+
+    pub function: FunctionDefinition,
+}
+
+/// The plain string modes `tool_choice` can take.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum ToolChoiceMode {
+    None,
+    Auto,
+    Required,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ToolChoiceFunctionName {
+    pub name: String,
+}
+
+/// Controls which (if any) tool the model calls. Either a plain mode string
+/// (`"none"`/`"auto"`/`"required"`) or an object forcing one specific function.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum ToolChoice {
+    Mode(ToolChoiceMode),
+    Specific {
+        #[serde(rename = "type")]
+        kind: String,
+        function: ToolChoiceFunctionName,
+    },
 }
 
 #[derive(Builder, Clone, Debug, Serialize)]
@@ -83,6 +174,18 @@ pub struct CreateChatRequest {
     #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
+
+    /// A list of tools the model may call.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<ChatCompletionTool>>,
+
+    /// Controls which (if any) tool is called by the model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<ToolChoice>,
+
+    /// Whether to enable parallel function calling during tool use.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parallel_tool_calls: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
