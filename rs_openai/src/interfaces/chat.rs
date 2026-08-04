@@ -66,6 +66,29 @@ pub struct ToolCall {
     pub function: FunctionCall,
 }
 
+/// A single, possibly-partial function-call fragment from a streaming delta. Unlike the
+/// non-streaming `FunctionCall`, `name` is optional and `arguments` defaults to empty —
+/// OpenAI only sends `name` on the first chunk for a given tool call, and streams
+/// `arguments` token-by-token across many chunks.
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct FunctionCallChunk {
+    pub name: Option<String>,
+    #[serde(default)]
+    pub arguments: String,
+}
+
+/// One partial tool-call fragment inside a streaming `Delta`. `index` correlates fragments
+/// across chunks when multiple tool calls stream in parallel (always present). `id`/`kind`
+/// are only present on the first chunk for a given `index`.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ToolCallChunk {
+    pub index: u32,
+    pub id: Option<String>,
+    #[serde(rename = "type")]
+    pub kind: Option<String>,
+    pub function: Option<FunctionCallChunk>,
+}
+
 /// A function's definition, as advertised to the model via `CreateChatRequest.tools`.
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
 pub struct FunctionDefinition {
@@ -220,7 +243,7 @@ pub struct ChatResponse {
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Delta {
     pub content: Option<String>,
-    pub tool_calls: Option<Vec<ToolCall>>,
+    pub tool_calls: Option<Vec<ToolCallChunk>>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
