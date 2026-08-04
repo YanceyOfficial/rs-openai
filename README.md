@@ -13,7 +13,7 @@ The OpenAI Rust library provides convenient access to the OpenAI API from Rust a
 
 ```toml
 [dependencies]
-rs_openai = { version = "0.6.0" }
+rs_openai = { version = "0.7.0" }
 ```
 
 ## Features
@@ -21,9 +21,7 @@ rs_openai = { version = "0.6.0" }
 - [x] Audio (including Text and Json response value)
 - [x] Chat (including SSE streaming)
 - [x] Completions (including SSE streaming)
-- [x] Edits
 - [x] Embeddings
-- [x] Engines (Already deprecated)
 - [x] Files
 - [x] Fine-Tunes (including SSE streaming)
 - [x] Images
