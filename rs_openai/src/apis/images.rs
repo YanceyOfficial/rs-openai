@@ -103,7 +103,8 @@ impl<'a> Images<'a> {
 mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::images::{
-        CreateImageEditRequest, CreateImageRequest, ImageSize, ResponseFormat,
+        Background, CreateImageEditRequest, CreateImageRequest, ImageSize, OutputFormat, Quality,
+        ResponseFormat,
     };
     use crate::shared::response_wrapper::OpenAIError;
     use crate::shared::types::File;
@@ -177,6 +178,94 @@ mod tests {
             }
             other => panic!("expected ApiError, got {other:?}"),
         }
+    }
+
+    /// Regression test for a real bug: `ImageData` used to be a two-variant enum
+    /// (`Url(String) | B64Json(String)`) that only coincidentally deserialized today's
+    /// single-field mock responses (Rust's default externally-tagged newtype-variant JSON
+    /// happens to look like `{"url": "..."}"`) — it could never represent a real dall-e-3
+    /// response, which has `url` AND `revised_prompt` together on the same item.
+    #[tokio::test]
+    async fn create_deserializes_dalle3_response_with_url_and_revised_prompt() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/images/generations"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "created": 1700000000_i64,
+                "data": [{
+                    "url": "https://example.com/image.png",
+                    "revised_prompt": "A vivid red bicycle leaning against a brick wall"
+                }]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateImageRequest::builder()
+            .prompt("a red bicycle")
+            .build();
+
+        let res = client.images().create(&req).await.unwrap();
+        assert_eq!(
+            res.data[0].url.as_deref(),
+            Some("https://example.com/image.png")
+        );
+        assert_eq!(
+            res.data[0].revised_prompt.as_deref(),
+            Some("A vivid red bicycle leaning against a brick wall")
+        );
+        assert_eq!(res.data[0].b64_json, None);
+    }
+
+    #[tokio::test]
+    async fn create_deserializes_response_level_fields_including_usage() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/images/generations"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "created": 1700000000_i64,
+                "background": "transparent",
+                "output_format": "png",
+                "quality": "high",
+                "size": "1024x1024",
+                "usage": {
+                    "input_tokens": 50,
+                    "input_tokens_details": {"image_tokens": 30, "text_tokens": 20},
+                    "output_tokens": 1200,
+                    "total_tokens": 1250,
+                    "output_tokens_details": {"image_tokens": 1200, "text_tokens": 0}
+                },
+                "data": [{"b64_json": "aGVsbG8="}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateImageRequest::builder()
+            .prompt("a transparent PNG icon")
+            .model("gpt-image-1")
+            .build();
+
+        let res = client.images().create(&req).await.unwrap();
+        assert_eq!(res.background, Some(Background::Transparent));
+        assert_eq!(res.output_format, Some(OutputFormat::Png));
+        assert_eq!(res.quality, Some(Quality::High));
+        assert_eq!(res.size, Some(ImageSize::S1024x1024));
+
+        let usage = res.usage.as_ref().expect("expected usage to be present");
+        assert_eq!(usage.input_tokens, 50);
+        assert_eq!(usage.input_tokens_details.image_tokens, 30);
+        assert_eq!(usage.input_tokens_details.text_tokens, 20);
+        assert_eq!(usage.output_tokens, 1200);
+        assert_eq!(usage.total_tokens, 1250);
+        let output_details = usage
+            .output_tokens_details
+            .as_ref()
+            .expect("expected output_tokens_details to be present");
+        assert_eq!(output_details.image_tokens, 1200);
+        assert_eq!(output_details.text_tokens, 0);
     }
 
     /// Regression test for a bug where the "mask" multipart part streamed the main image's

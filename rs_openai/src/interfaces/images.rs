@@ -18,7 +18,84 @@ pub enum ResponseFormat {
     B64Json,
 }
 
-#[derive(Default, Debug, Serialize, Clone, strum::Display)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum Quality {
+    #[strum(serialize = "standard")]
+    Standard, // dall-e-3
+    #[strum(serialize = "hd")]
+    Hd, // dall-e-3
+    #[strum(serialize = "low")]
+    Low, // gpt-image
+    #[strum(serialize = "medium")]
+    Medium, // gpt-image
+    #[strum(serialize = "high")]
+    High, // gpt-image
+    #[strum(serialize = "auto")]
+    Auto, // gpt-image
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum Background {
+    #[strum(serialize = "transparent")]
+    Transparent,
+    #[strum(serialize = "opaque")]
+    Opaque,
+    #[strum(serialize = "auto")]
+    Auto,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputFormat {
+    #[strum(serialize = "png")]
+    Png,
+    #[strum(serialize = "jpeg")]
+    Jpeg,
+    #[strum(serialize = "webp")]
+    Webp,
+}
+
+/// Content-moderation strictness for gpt-image models. Request-only — OpenAI does not echo
+/// this back on the response, unlike `Quality`/`Background`/`OutputFormat`.
+#[derive(Debug, Serialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum Moderation {
+    #[strum(serialize = "low")]
+    Low,
+    #[strum(serialize = "auto")]
+    Auto,
+}
+
+/// `dall-e-3`-only: nudges the model toward a more natural, less hyper-real/dramatic look.
+/// Request-only.
+#[derive(Debug, Serialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum Style {
+    #[strum(serialize = "vivid")]
+    Vivid,
+    #[strum(serialize = "natural")]
+    Natural,
+}
+
+/// Edit-only, gpt-image models: how closely the edited output should match the input
+/// image's fine details. Request-only.
+#[derive(Debug, Serialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum InputFidelity {
+    #[strum(serialize = "high")]
+    High,
+    #[strum(serialize = "low")]
+    Low,
+}
+
+/// The size of the generated/edited image(s). Valid values differ per endpoint:
+/// - `create` (generate): all 8 values below.
+/// - `create_edit`: `Auto`, `S1024x1024`, `S1536x1024`, `S1024x1536` only.
+/// - `create_variations`: `S1024x1024`, `S1536x1024`, `S1024x1536` only (no `256x256`/
+///   `512x512`/`Auto` — dall-e-2 only).
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, strum::Display)]
 pub enum ImageSize {
     #[strum(serialize = "256x256")]
     #[serde(rename = "256x256")]
@@ -28,10 +105,30 @@ pub enum ImageSize {
     #[serde(rename = "512x512")]
     S512x512,
 
-    #[default]
     #[strum(serialize = "1024x1024")]
     #[serde(rename = "1024x1024")]
     S1024x1024,
+
+    #[strum(serialize = "1536x1024")]
+    #[serde(rename = "1536x1024")]
+    S1536x1024,
+
+    #[strum(serialize = "1024x1536")]
+    #[serde(rename = "1024x1536")]
+    S1024x1536,
+
+    #[strum(serialize = "1792x1024")]
+    #[serde(rename = "1792x1024")]
+    S1792x1024,
+
+    #[strum(serialize = "1024x1792")]
+    #[serde(rename = "1024x1792")]
+    S1024x1792,
+
+    #[default]
+    #[strum(serialize = "auto")]
+    #[serde(rename = "auto")]
+    Auto,
 }
 
 #[derive(Builder, Clone, Debug, Serialize)]
@@ -56,6 +153,12 @@ pub struct CreateImageRequest {
     #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
+
+    /// ID of the model to use (e.g. `"gpt-image-1.5"`, `"gpt-image-1"`, `"gpt-image-1-mini"`,
+    /// `"dall-e-2"` (default), `"dall-e-3"`).
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 
 #[derive(Builder, Clone, Debug, Serialize)]
@@ -114,16 +217,37 @@ pub struct CreateImageVariationRequest {
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ImageData {
-    Url(String),
-
-    #[serde(rename = "b64_json")]
-    B64Json(String),
+pub struct ImageData {
+    pub url: Option<String>,
+    pub b64_json: Option<String>,
+    /// Only present for `dall-e-3` generations — the prompt actually used, which may differ
+    /// from the requested prompt due to automatic revision.
+    pub revised_prompt: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ImageResponse {
     pub created: i64,
     pub data: Vec<ImageData>,
+    pub background: Option<Background>,
+    pub output_format: Option<OutputFormat>,
+    pub quality: Option<Quality>,
+    pub size: Option<ImageSize>,
+    /// Token accounting for gpt-image-model generations/edits. `None` for dall-e models.
+    pub usage: Option<ImageUsage>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ImageUsage {
+    pub input_tokens: u32,
+    pub input_tokens_details: ImageUsageTokenDetails,
+    pub output_tokens: u32,
+    pub total_tokens: u32,
+    pub output_tokens_details: Option<ImageUsageTokenDetails>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ImageUsageTokenDetails {
+    pub image_tokens: u32,
+    pub text_tokens: u32,
 }
