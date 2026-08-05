@@ -84,6 +84,12 @@ pub struct CreateCompletionRequest {
     #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<i64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_options: Option<crate::shared::types::StreamOptions>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -94,6 +100,7 @@ pub struct CompletionResponse {
     pub model: String,
     pub choices: Vec<CompletionChoice>,
     pub usage: Usage,
+    pub system_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]

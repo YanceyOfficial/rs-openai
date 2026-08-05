@@ -54,6 +54,7 @@ mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::completions::CreateCompletionRequest;
     use crate::shared::response_wrapper::OpenAIError;
+    use crate::shared::types::StreamOptions;
     use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -88,6 +89,42 @@ mod tests {
 
         let res = client.completions().create(&req).await.unwrap();
         assert_eq!(res.choices[0].text, "I'm a language model.");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_seed_and_stream_options_deserializes_system_fingerprint() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/completions"))
+            .and(body_json(serde_json::json!({
+                "model": "text-davinci-003",
+                "prompt": "hi",
+                "seed": 42,
+                "stream_options": {"include_usage": true}
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "cmpl-456",
+                "object": "text_completion",
+                "created": 1700000000_u32,
+                "model": "text-davinci-003",
+                "system_fingerprint": "fp_abc123",
+                "choices": [{"text": "hello", "index": 0, "logprobs": null, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateCompletionRequest::builder()
+            .model("text-davinci-003")
+            .prompt("hi")
+            .seed(42_i64)
+            .stream_options(StreamOptions::builder().include_usage(true).build())
+            .build();
+
+        let res = client.completions().create(&req).await.unwrap();
+        assert_eq!(res.system_fingerprint.as_deref(), Some("fp_abc123"));
     }
 
     #[tokio::test]
