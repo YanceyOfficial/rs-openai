@@ -31,16 +31,7 @@ impl<'a> Upload<'a> {
         &self,
         req: &uploads::UploadFileRequest,
     ) -> OpenAIResponse<uploads::UploadFileResponse> {
-        let file_part = reqwest::multipart::Part::stream(req.file.buffer.clone())
-            .file_name(req.file.filename.clone())
-            .mime_str("application/octet-stream")
-            .expect("\"application/octet-stream\" is always a valid mime type");
-
-        let form = Form::new()
-            .part("file", file_part)
-            .text("purpose", req.purpose.to_string());
-
-        self.openai.post_form("/uploads", form).await
+        self.openai.post("/uploads", req).await
     }
 
     /// Adds a [Part](https://platform.openai.com/docs/api-reference/uploads/part-object) to an [Upload](https://platform.openai.com/docs/api-reference/uploads/object) object. A Part represents a chunk of bytes from the file you are trying to upload.
@@ -95,18 +86,30 @@ impl<'a> Upload<'a> {
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
-    use crate::interfaces::uploads::{CompleteUploadRequest, UploadFileRequest};
+    use crate::interfaces::uploads::{CompleteUploadRequest, UploadFileRequest, UploadStatus};
     use crate::shared::response_wrapper::OpenAIError;
-    use crate::shared::types::File;
-    use wiremock::matchers::{method, path};
+    use crate::shared::types::FilePurpose;
+    use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
+    /// Regression test for a real bug: `upload()` used to send a multipart file to
+    /// `POST /uploads`, but that endpoint is JSON-only — it takes upload *metadata* to open a
+    /// session, not a file (actual bytes go through the separate, already-correct
+    /// `add_upload_part`). This asserts the request body is JSON with exactly the four
+    /// metadata fields, proving the fix rather than just exercising a happy path that would
+    /// have passed under the old, broken implementation too.
     #[tokio::test]
-    async fn upload_deserializes_response() {
+    async fn upload_sends_json_metadata_not_multipart() {
         let mock_server = MockServer::start().await;
 
         Mock::given(method("POST"))
             .and(path("/uploads"))
+            .and(body_json(serde_json::json!({
+                "bytes": 1024,
+                "filename": "data.jsonl",
+                "mime_type": "application/jsonl",
+                "purpose": "fine-tune"
+            })))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "upload_123", "object": "upload", "bytes": 1024,
                 "created_at": 1700000000_i64, "filename": "data.jsonl",
@@ -117,15 +120,15 @@ mod tests {
 
         let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
         let req = UploadFileRequest::builder()
-            .file(File {
-                buffer: vec![1, 2, 3],
-                filename: "data.jsonl".into(),
-            })
-            .purpose("fine-tune")
+            .bytes(1024_u64)
+            .filename("data.jsonl")
+            .mime_type("application/jsonl")
+            .purpose(FilePurpose::FineTune)
             .build();
 
         let res = client.upload().upload(&req).await.unwrap();
         assert_eq!(res.id, "upload_123");
+        assert_eq!(res.status, UploadStatus::Pending);
     }
 
     #[tokio::test]
