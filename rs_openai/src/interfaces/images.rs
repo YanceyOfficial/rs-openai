@@ -141,9 +141,9 @@ pub struct CreateImageRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub n: Option<u8>, // default: 1, min: 1, max: 10
 
-    /// The size of the generated images. Must be one of `256x256`, `512x512`, or `1024x1024`.
+    /// All 8 `ImageSize` values are valid for generate — see the type's own doc comment.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<ImageSize>, // default: "1024x1024"
+    pub size: Option<ImageSize>,
 
     /// The format in which the generated images are returned. Must be one of `url` or `b64_json`.
     /// Only meaningful for `dall-e-2`/`dall-e-3` — gpt-image models always return base64 and
@@ -253,9 +253,10 @@ pub struct CreateImageVariationRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub n: Option<u8>, // default: 1, min: 1, max: 10
 
-    /// The size of the generated images. Must be one of `256x256`, `512x512`, or `1024x1024`.
+    /// Only `S1024x1024`, `S1536x1024`, `S1024x1536` are valid for variation — dall-e-2 only,
+    /// no `256x256`/`512x512`/`Auto`. See `ImageSize`'s own doc comment.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<ImageSize>, // default: "1024x1024"
+    pub size: Option<ImageSize>,
 
     /// The format in which the generated images are returned. Must be one of `url` or `b64_json`.
     #[serde(skip_serializing_if = "Option::is_none")]
