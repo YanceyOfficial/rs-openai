@@ -48,7 +48,7 @@ impl<'a> Batch<'a> {
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
-    use crate::interfaces::batch::CreateBatchRequest;
+    use crate::interfaces::batch::{BatchEndpoint, CreateBatchRequest};
     use crate::shared::response_wrapper::OpenAIError;
     use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -87,7 +87,7 @@ mod tests {
         let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
         let req = CreateBatchRequest::builder()
             .input_file_id("file-abc")
-            .endpoint("/v1/chat/completions")
+            .endpoint(BatchEndpoint::ChatCompletions)
             .completion_window("24h")
             .build();
 
@@ -115,7 +115,7 @@ mod tests {
         let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
         let req = CreateBatchRequest::builder()
             .input_file_id("")
-            .endpoint("/v1/chat/completions")
+            .endpoint(BatchEndpoint::ChatCompletions)
             .completion_window("24h")
             .build();
 
@@ -126,5 +126,41 @@ mod tests {
             }
             other => panic!("expected ApiError, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn create_serializes_videos_endpoint_and_output_expires_after() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/batches"))
+            .and(body_json(serde_json::json!({
+                "input_file_id": "file-vid",
+                "endpoint": "/v1/videos",
+                "completion_window": "24h",
+                "output_expires_after": {"anchor": "created_at", "seconds": 7200}
+            })))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(batch_response_json("batch_456", "validating")),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateBatchRequest::builder()
+            .input_file_id("file-vid")
+            .endpoint(BatchEndpoint::Videos)
+            .completion_window("24h")
+            .output_expires_after(
+                crate::shared::types::ExpiresAfter::builder()
+                    .anchor(crate::shared::types::ExpiresAfterAnchor::CreatedAt)
+                    .seconds(7200)
+                    .build(),
+            )
+            .build();
+
+        let res = client.batch().create(&req).await.unwrap();
+        assert_eq!(res.id, "batch_456");
     }
 }
