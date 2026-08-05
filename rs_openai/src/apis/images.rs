@@ -25,19 +25,21 @@ impl<'a> Images<'a> {
         self.openai.post("/images/generations", req).await
     }
 
-    /// Creates an edited or extended image given an original image and a prompt.
+    /// Creates an edited or extended image given one or more original images and a prompt.
     pub async fn create_edit(
         &self,
         req: &images::CreateImageEditRequest,
     ) -> OpenAIResponse<images::ImageResponse> {
-        let file_part = reqwest::multipart::Part::stream(req.image.buffer.clone())
-            .file_name(req.image.filename.clone())
-            .mime_str("application/octet-stream")
-            .expect("\"application/octet-stream\" is always a valid mime type");
+        let mut form = Form::new().text("prompt", req.prompt.to_string());
 
-        let mut form = Form::new()
-            .part("image", file_part)
-            .text("prompt", req.prompt.to_string());
+        for image in &req.images {
+            let file_part = reqwest::multipart::Part::stream(image.buffer.clone())
+                .file_name(image.filename.clone())
+                .mime_str("application/octet-stream")
+                .expect("\"application/octet-stream\" is always a valid mime type");
+
+            form = form.part("image[]", file_part);
+        }
 
         if let Some(mask) = req.mask.clone() {
             let file_part = reqwest::multipart::Part::stream(mask.buffer.clone())
@@ -48,16 +50,40 @@ impl<'a> Images<'a> {
             form = form.part("mask", file_part);
         }
 
-        if let Some(n) = req.n {
-            form = form.text("n", n.to_string());
+        if let Some(model) = req.model.clone() {
+            form = form.text("model", model);
+        }
+
+        if let Some(quality) = req.quality.clone() {
+            form = form.text("quality", quality.to_string());
         }
 
         if let Some(size) = req.size.clone() {
             form = form.text("size", size.to_string());
         }
 
-        if let Some(response_format) = req.response_format.clone() {
-            form = form.text("response_format", response_format.to_string());
+        if let Some(background) = req.background.clone() {
+            form = form.text("background", background.to_string());
+        }
+
+        if let Some(output_format) = req.output_format.clone() {
+            form = form.text("output_format", output_format.to_string());
+        }
+
+        if let Some(output_compression) = req.output_compression {
+            form = form.text("output_compression", output_compression.to_string());
+        }
+
+        if let Some(moderation) = req.moderation.clone() {
+            form = form.text("moderation", moderation.to_string());
+        }
+
+        if let Some(input_fidelity) = req.input_fidelity.clone() {
+            form = form.text("input_fidelity", input_fidelity.to_string());
+        }
+
+        if let Some(n) = req.n {
+            form = form.text("n", n.to_string());
         }
 
         if let Some(user) = req.user.clone() {
@@ -103,8 +129,8 @@ impl<'a> Images<'a> {
 mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::images::{
-        Background, CreateImageEditRequest, CreateImageRequest, ImageSize, Moderation,
-        OutputFormat, Quality, ResponseFormat, Style,
+        Background, CreateImageEditRequest, CreateImageRequest, ImageSize, InputFidelity,
+        Moderation, OutputFormat, Quality, ResponseFormat, Style,
     };
     use crate::shared::response_wrapper::OpenAIError;
     use crate::shared::types::File;
@@ -119,6 +145,26 @@ mod tests {
                 .body
                 .windows(self.0.len())
                 .any(|window| window == self.0)
+        }
+    }
+
+    /// Counts non-overlapping occurrences of `needle` in the raw request body and matches if
+    /// the count is at least `min_count`. Used to prove multiple `image[]` multipart parts
+    /// were actually sent, not just that some bytes appear once.
+    struct ContainsAtLeastNInBody(&'static [u8], usize);
+
+    impl wiremock::Match for ContainsAtLeastNInBody {
+        fn matches(&self, request: &Request) -> bool {
+            let mut count = 0;
+            let mut start = 0;
+            while let Some(pos) = request.body[start..]
+                .windows(self.0.len())
+                .position(|window| window == self.0)
+            {
+                count += 1;
+                start += pos + self.0.len();
+            }
+            count >= self.1
         }
     }
 
@@ -330,15 +376,60 @@ mod tests {
 
         let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
         let req = CreateImageEditRequest::builder()
-            .image(File {
+            .images(vec![File {
                 buffer: image_bytes.to_vec(),
                 filename: "image.png".into(),
-            })
+            }])
             .mask(File {
                 buffer: mask_bytes.to_vec(),
                 filename: "mask.png".into(),
             })
             .prompt("add a hat")
+            .build();
+
+        let res = client.images().create_edit(&req).await.unwrap();
+        assert_eq!(res.data.len(), 1);
+    }
+
+    /// Proves multiple images are sent as repeated `image[]` multipart parts (the real
+    /// OpenAI edit endpoint's wire field name — confirmed via live docs, see
+    /// docs/superpowers/specs/2026-08-04-images-model-field-design.md), each with its own
+    /// distinct bytes, not collapsed into a single part or dropped.
+    #[tokio::test]
+    async fn create_edit_sends_multiple_images_as_repeated_image_bracket_parts() {
+        let mock_server = MockServer::start().await;
+
+        let first_image_bytes: &[u8] = &[10, 20, 30];
+        let second_image_bytes: &[u8] = &[40, 50, 60];
+
+        Mock::given(method("POST"))
+            .and(path("/images/edits"))
+            .and(ContainsInBody(first_image_bytes))
+            .and(ContainsInBody(second_image_bytes))
+            .and(ContainsAtLeastNInBody(br#"name="image[]""#, 2))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "created": 1700000000_i64,
+                "data": [{"b64_json": "aGVsbG8="}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateImageEditRequest::builder()
+            .images(vec![
+                File {
+                    buffer: first_image_bytes.to_vec(),
+                    filename: "first.png".into(),
+                },
+                File {
+                    buffer: second_image_bytes.to_vec(),
+                    filename: "second.png".into(),
+                },
+            ])
+            .prompt("combine these into one scene")
+            .model("gpt-image-1")
+            .quality(Quality::High)
+            .input_fidelity(InputFidelity::High)
             .build();
 
         let res = client.images().create_edit(&req).await.unwrap();

@@ -57,10 +57,10 @@ async fn create_edit(
     transparent_buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let req = CreateImageEditRequest::builder()
-        .image(File {
+        .images(vec![File {
             buffer: origin_buffer,
             filename: "worldcup.png".into(),
-        })
+        }])
         .mask(File {
             buffer: transparent_buffer,
             filename: "worldcup-transparent.png".into(),

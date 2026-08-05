@@ -189,29 +189,54 @@ pub struct CreateImageRequest {
 
 #[derive(Builder, Clone, Debug, Serialize)]
 pub struct CreateImageEditRequest {
-    /// The image to edit. Must be a valid PNG file, less than 4MB, and square.
-    /// If mask is not provided, image must have transparency, which will be used as the mask.
-    pub image: File,
+    /// The image(s) to edit. Sent as repeated `image[]` multipart parts (up to 16 for
+    /// gpt-image models). Each entry must be a valid PNG, WebP, or JPG file, less than 25MB.
+    /// If no `mask` is provided, an image with transparency will have that transparency used
+    /// as the mask.
+    pub images: Vec<File>,
 
-    /// A text description of the desired image(s). The maximum length is 1000 characters.
+    /// A text description of the desired edit. The maximum length is 1000 characters.
     #[builder(into)]
     pub prompt: String,
 
-    /// An additional image whose fully transparent areas indicate where `image` should be edited.
+    /// An additional image whose fully transparent areas indicate where the input image(s)
+    /// should be edited. Sent as a single `mask` part.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mask: Option<File>,
 
+    /// ID of the model to use. Edit is gpt-image-only — no `dall-e-2`/`dall-e-3` support
+    /// (e.g. `"gpt-image-1.5"`, `"gpt-image-1"`, `"gpt-image-1-mini"`, `"chatgpt-image-latest"`).
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quality: Option<Quality>,
+
+    /// Only `Auto`, `S1024x1024`, `S1536x1024`, `S1024x1536` are valid for edit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<ImageSize>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<Background>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_format: Option<OutputFormat>,
+
+    /// Compression level 0-100 (percentage). `output_format` must be `jpeg` or `webp`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_compression: Option<u8>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub moderation: Option<Moderation>,
+
+    /// How closely the edited output should match the input image's fine details.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_fidelity: Option<InputFidelity>,
+
     /// The number of images to generate. Must be between 1 and 10.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub n: Option<u8>, // default: 1, min: 1, max: 10
-
-    /// The size of the generated images. Must be one of `256x256`, `512x512`, or `1024x1024`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<ImageSize>, // default: "1024x1024"
-
-    /// The format in which the generated images are returned. Must be one of `url` or `b64_json`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<ResponseFormat>, // default: "url"
+    pub n: Option<u8>,
 
     /// A unique identifier representing your end-user.
     #[builder(into)]
