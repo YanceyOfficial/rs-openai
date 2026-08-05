@@ -31,9 +31,15 @@ impl<'a> Files<'a> {
             .mime_str("application/octet-stream")
             .expect("\"application/octet-stream\" is always a valid mime type");
 
-        let form = Form::new()
+        let mut form = Form::new()
             .part("file", file_part)
             .text("purpose", req.purpose.to_string());
+
+        if let Some(expires_after) = req.expires_after.clone() {
+            form = form
+                .text("expires_after[anchor]", expires_after.anchor.to_string())
+                .text("expires_after[seconds]", expires_after.seconds.to_string());
+        }
 
         self.openai.post_form("/files", form).await
     }
@@ -76,6 +82,7 @@ mod tests {
     use crate::interfaces::files::UploadFileRequest;
     use crate::shared::response_wrapper::OpenAIError;
     use crate::shared::types::File;
+    use crate::shared::types::FilePurpose;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -102,11 +109,60 @@ mod tests {
                 buffer: vec![1, 2, 3],
                 filename: "data.jsonl".into(),
             })
-            .purpose("fine-tune")
+            .purpose(FilePurpose::FineTune)
             .build();
 
         let res = client.files().upload(&req).await.unwrap();
         assert_eq!(res.id, "file-123");
+    }
+
+    #[tokio::test]
+    async fn upload_serializes_expires_after_and_deserializes_expires_at() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/files"))
+            .and(ContainsInBody(br#"name="expires_after[anchor]""#))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "file-456",
+                "object": "file",
+                "bytes": 42,
+                "created_at": 1700000000_u32,
+                "filename": "data.jsonl",
+                "purpose": "fine-tune",
+                "expires_at": 1700003600_i64
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = UploadFileRequest::builder()
+            .file(File {
+                buffer: vec![1, 2, 3],
+                filename: "data.jsonl".into(),
+            })
+            .purpose(FilePurpose::FineTune)
+            .expires_after(
+                crate::shared::types::ExpiresAfter::builder()
+                    .anchor(crate::shared::types::ExpiresAfterAnchor::CreatedAt)
+                    .seconds(3600)
+                    .build(),
+            )
+            .build();
+
+        let res = client.files().upload(&req).await.unwrap();
+        assert_eq!(res.expires_at, Some(1700003600));
+    }
+
+    struct ContainsInBody(&'static [u8]);
+
+    impl wiremock::Match for ContainsInBody {
+        fn matches(&self, request: &wiremock::Request) -> bool {
+            request
+                .body
+                .windows(self.0.len())
+                .any(|window| window == self.0)
+        }
     }
 
     #[tokio::test]

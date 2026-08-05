@@ -7,9 +7,12 @@ pub struct UploadFileRequest {
     /// Name of the [JSON Lines](https://jsonlines.readthedocs.io/en/latest/) file to be uploaded.
     pub file: File,
 
-    /// The intended purpose of the uploaded documents. Use "fine-tune" for [Fine-tuning](https://platform.openai.com/docs/api-reference/fine-tuning).
-    #[builder(into)]
-    pub purpose: String,
+    /// The intended purpose of the uploaded documents.
+    pub purpose: crate::shared::types::FilePurpose,
+
+    /// When this file should expire. If not set, the file has no expiration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_after: Option<crate::shared::types::ExpiresAfter>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -20,6 +23,7 @@ pub struct FileResponse {
     pub created_at: u32,
     pub filename: String,
     pub purpose: String,
+    pub expires_at: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
