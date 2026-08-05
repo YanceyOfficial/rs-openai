@@ -143,6 +143,31 @@ impl<'a> Audio<'a> {
             }
         }
 
+        if let Some(include) = req.include.clone() {
+            for (index, value) in include.iter().enumerate() {
+                form = form.text(format!("include[{}]", index), value.to_string());
+            }
+        }
+
+        if let Some(chunking_strategy) = req.chunking_strategy.clone() {
+            form = form.text("chunking_strategy", chunking_strategy);
+        }
+
+        if let Some(known_speaker_names) = req.known_speaker_names.clone() {
+            for (index, value) in known_speaker_names.iter().enumerate() {
+                form = form.text(format!("known_speaker_names[{}]", index), value.clone());
+            }
+        }
+
+        if let Some(known_speaker_references) = req.known_speaker_references.clone() {
+            for (index, value) in known_speaker_references.iter().enumerate() {
+                form = form.text(
+                    format!("known_speaker_references[{}]", index),
+                    value.clone(),
+                );
+            }
+        }
+
         form
     }
 
@@ -190,9 +215,12 @@ impl<'a> Audio<'a> {
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
-    use crate::interfaces::audio::{CreateTranscriptionRequest, Language, SttModel};
+    use crate::interfaces::audio::{
+        AudioStreamFormat, CreateSpeechRequest, CreateTranscriptionRequest, Language, SttModel,
+        TranscriptionInclude, TtsModel, Voice,
+    };
     use crate::shared::types::File;
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
     struct ContainsInBody(&'static str);
@@ -224,6 +252,65 @@ mod tests {
             })
             .model(SttModel::Whisper1)
             .language(Language::Japanese)
+            .build();
+
+        let res = client.audio().create_transcription(&req).await.unwrap();
+        assert_eq!(res.text, "hello");
+    }
+
+    #[tokio::test]
+    async fn create_speech_sends_new_tts_model_and_instructions_and_stream_format() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/audio/speech"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-4o-mini-tts",
+                "input": "hello",
+                "voice": "cedar",
+                "instructions": "Speak cheerfully",
+                "stream_format": "sse"
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"fake-audio-bytes".to_vec()))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateSpeechRequest::builder()
+            .model(TtsModel::Gpt4oMiniTts)
+            .input("hello")
+            .voice(Voice::Cedar)
+            .instructions("Speak cheerfully")
+            .stream_format(AudioStreamFormat::Sse)
+            .build();
+
+        client.audio().create_speech(&req).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn create_transcription_sends_include_and_known_speaker_fields() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/audio/transcriptions"))
+            .and(ContainsInBody("name=\"include[0]\""))
+            .and(ContainsInBody("name=\"known_speaker_names[0]\""))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "text": "hello"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateTranscriptionRequest::builder()
+            .file(File {
+                buffer: vec![1, 2, 3],
+                filename: "audio.mp4".into(),
+            })
+            .model(SttModel::Gpt4oTranscribe)
+            .include(vec![TranscriptionInclude::Logprobs])
+            .known_speaker_names(vec!["Alice".to_string()])
+            .known_speaker_references(vec!["base64-audio-data".to_string()])
             .build();
 
         let res = client.audio().create_transcription(&req).await.unwrap();

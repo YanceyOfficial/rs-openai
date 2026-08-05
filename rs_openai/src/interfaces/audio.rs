@@ -15,6 +15,8 @@ pub enum SttResponseFormat {
     VerboseJson,
     #[strum(serialize = "vtt")]
     Vtt,
+    #[strum(serialize = "diarized_json")]
+    DiarizedJson,
 }
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
@@ -238,10 +240,17 @@ pub enum Language {
 }
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
 pub enum Voice {
     #[default]
     #[strum(serialize = "alloy")]
     Alloy,
+    #[strum(serialize = "ash")]
+    Ash,
+    #[strum(serialize = "ballad")]
+    Ballad,
+    #[strum(serialize = "coral")]
+    Coral,
     #[strum(serialize = "echo")]
     Echo,
     #[strum(serialize = "fable")]
@@ -250,8 +259,16 @@ pub enum Voice {
     Onyx,
     #[strum(serialize = "nova")]
     Nova,
+    #[strum(serialize = "sage")]
+    Sage,
     #[strum(serialize = "shimmer")]
     Shimmer,
+    #[strum(serialize = "verse")]
+    Verse,
+    #[strum(serialize = "marin")]
+    Marin,
+    #[strum(serialize = "cedar")]
+    Cedar,
 }
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
@@ -259,20 +276,46 @@ pub enum SttModel {
     #[default]
     #[strum(serialize = "whisper-1")]
     Whisper1,
+    #[strum(serialize = "gpt-4o-transcribe")]
+    Gpt4oTranscribe,
+    #[strum(serialize = "gpt-4o-mini-transcribe")]
+    Gpt4oMiniTranscribe,
+    #[strum(serialize = "gpt-4o-transcribe-diarize")]
+    Gpt4oTranscribeDiarize,
 }
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
 pub enum TtsModel {
     #[default]
     #[strum(serialize = "tts-1")]
-    Whisper1,
+    #[serde(rename = "tts-1")]
+    Tts1,
     #[strum(serialize = "tts-1-hd")]
-    Whisper1Hd,
+    #[serde(rename = "tts-1-hd")]
+    Tts1Hd,
+    #[strum(serialize = "gpt-4o-mini-tts")]
+    #[serde(rename = "gpt-4o-mini-tts")]
+    Gpt4oMiniTts,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioStreamFormat {
+    #[default]
+    Sse,
+    Audio,
+}
+
+#[derive(Debug, Serialize, Default, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum TranscriptionInclude {
+    #[default]
+    Logprobs,
 }
 
 #[derive(Builder, Clone, Debug, Serialize)]
 pub struct CreateSpeechRequest {
-    /// One of the available [TTS models](https://platform.openai.com/docs/models/tts): `tts-1` or `tts-1-hd`
+    /// One of the available TTS models: `tts-1`, `tts-1-hd`, or `gpt-4o-mini-tts`.
     pub model: TtsModel,
 
     /// The text to generate audio for. The maximum length is 4096 characters.
@@ -289,6 +332,15 @@ pub struct CreateSpeechRequest {
     /// The speed of the generated audio. Select a value from `0.25` to `4.0`. `1.0` is the default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub speed: Option<f32>,
+
+    /// Control the voice's style. Does not work with `tts-1`/`tts-1-hd`.
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+
+    /// Not supported for `tts-1`/`tts-1-hd`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_format: Option<AudioStreamFormat>,
 }
 
 #[derive(Builder, Clone, Debug, Serialize)]
@@ -296,7 +348,7 @@ pub struct CreateTranscriptionRequest {
     /// The audio file object (not file name) to transcribe.
     pub file: File,
 
-    /// ID of the model to use. Only `whisper-1` is currently available.
+    /// ID of the model to use.
     pub model: SttModel,
 
     /// The language of the input audio, in ISO-639-1 format.
@@ -319,6 +371,23 @@ pub struct CreateTranscriptionRequest {
     /// The timestamp granularities to populate for this transcription.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_granularities: Option<Vec<TimestampGranularity>>,
+
+    /// Additional information to include in the transcription response.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<Vec<TranscriptionInclude>>,
+
+    /// How the audio is cut into chunks before transcribing.
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunking_strategy: Option<String>,
+
+    /// Names for speakers you already know in the recording, for diarization.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub known_speaker_names: Option<Vec<String>>,
+
+    /// Base64-encoded audio references for the speakers in `known_speaker_names`, in the same order.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub known_speaker_references: Option<Vec<String>>,
 }
 
 #[derive(Builder, Clone, Debug, Serialize)]
