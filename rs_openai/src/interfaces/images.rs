@@ -146,6 +146,8 @@ pub struct CreateImageRequest {
     pub size: Option<ImageSize>, // default: "1024x1024"
 
     /// The format in which the generated images are returned. Must be one of `url` or `b64_json`.
+    /// Only meaningful for `dall-e-2`/`dall-e-3` — gpt-image models always return base64 and
+    /// ignore this field.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<ResponseFormat>, // default: "url"
 
@@ -159,6 +161,30 @@ pub struct CreateImageRequest {
     #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quality: Option<Quality>,
+
+    /// gpt-image models only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<Background>,
+
+    /// gpt-image models only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_format: Option<OutputFormat>,
+
+    /// Compression level 0-100 (percentage). `output_format` must be `jpeg` or `webp`.
+    /// gpt-image models only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_compression: Option<u8>,
+
+    /// gpt-image models only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub moderation: Option<Moderation>,
+
+    /// `dall-e-3` only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style: Option<Style>,
 }
 
 #[derive(Builder, Clone, Debug, Serialize)]

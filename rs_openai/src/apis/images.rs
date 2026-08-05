@@ -103,8 +103,8 @@ impl<'a> Images<'a> {
 mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::images::{
-        Background, CreateImageEditRequest, CreateImageRequest, ImageSize, OutputFormat, Quality,
-        ResponseFormat,
+        Background, CreateImageEditRequest, CreateImageRequest, ImageSize, Moderation,
+        OutputFormat, Quality, ResponseFormat, Style,
     };
     use crate::shared::response_wrapper::OpenAIError;
     use crate::shared::types::File;
@@ -266,6 +266,45 @@ mod tests {
             .expect("expected output_tokens_details to be present");
         assert_eq!(output_details.image_tokens, 1200);
         assert_eq!(output_details.text_tokens, 0);
+    }
+
+    #[tokio::test]
+    async fn create_serializes_gpt_image_capability_fields() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/images/generations"))
+            .and(body_json(serde_json::json!({
+                "prompt": "a vivid sunset over mountains",
+                "model": "gpt-image-1",
+                "quality": "high",
+                "background": "opaque",
+                "output_format": "png",
+                "output_compression": 80,
+                "moderation": "low",
+                "style": "vivid"
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "created": 1700000000_i64,
+                "data": [{"b64_json": "aGVsbG8="}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateImageRequest::builder()
+            .prompt("a vivid sunset over mountains")
+            .model("gpt-image-1")
+            .quality(Quality::High)
+            .background(Background::Opaque)
+            .output_format(OutputFormat::Png)
+            .output_compression(80)
+            .moderation(Moderation::Low)
+            .style(Style::Vivid)
+            .build();
+
+        let res = client.images().create(&req).await.unwrap();
+        assert_eq!(res.data.len(), 1);
     }
 
     /// Regression test for a bug where the "mask" multipart part streamed the main image's
