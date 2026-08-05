@@ -14,6 +14,13 @@ pub enum EmbeddingInput {
     ArrayOfTokenArrays(Vec<Vec<u16>>),
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum EncodingFormat {
+    Float,
+    Base64,
+}
+
 #[derive(Builder, Clone, Debug, Serialize)]
 pub struct CreateEmbeddingRequest {
     /// ID of the model to use.
@@ -29,6 +36,14 @@ pub struct CreateEmbeddingRequest {
     /// A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](https://platform.openai.com/docs/guides/safety-best-practices/end-user-ids).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
+
+    /// The number of dimensions the resulting output embeddings should have. Only supported
+    /// on `text-embedding-3` and later models.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dimensions: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encoding_format: Option<EncodingFormat>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

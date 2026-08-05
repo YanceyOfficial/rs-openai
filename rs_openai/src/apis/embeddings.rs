@@ -28,7 +28,7 @@ impl<'a> Embeddings<'a> {
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
-    use crate::interfaces::embeddings::CreateEmbeddingRequest;
+    use crate::interfaces::embeddings::{CreateEmbeddingRequest, EncodingFormat};
     use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -63,6 +63,39 @@ mod tests {
         let res = client.embeddings().create(&req).await.unwrap();
         assert_eq!(res.data.len(), 2);
         assert_eq!(res.data[1].embedding, vec![0.4, 0.5, 0.6]);
+    }
+
+    #[tokio::test]
+    async fn create_serializes_dimensions_and_encoding_format() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/embeddings"))
+            .and(body_json(serde_json::json!({
+                "model": "text-embedding-3-small",
+                "input": "hello",
+                "dimensions": 256,
+                "encoding_format": "base64"
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [{"object": "embedding", "embedding": [0.1], "index": 0}],
+                "model": "text-embedding-3-small",
+                "usage": {"prompt_tokens": 1, "total_tokens": 1}
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateEmbeddingRequest::builder()
+            .model("text-embedding-3-small")
+            .input("hello")
+            .dimensions(256_u32)
+            .encoding_format(EncodingFormat::Base64)
+            .build();
+
+        let res = client.embeddings().create(&req).await.unwrap();
+        assert_eq!(res.data.len(), 1);
     }
 
     #[tokio::test]
