@@ -47,6 +47,32 @@ impl<'a> Chat<'a> {
 
         self.openai.post_stream("/chat/completions", req).await
     }
+
+    /// Retrieves a stored chat completion. Only completions created with `store: true`
+    /// are retrievable.
+    pub async fn retrieve(&self, completion_id: &str) -> OpenAIResponse<chat::ChatResponse> {
+        self.openai
+            .get(&format!("/chat/completions/{completion_id}"), &())
+            .await
+    }
+
+    /// Lists stored chat completions.
+    pub async fn list(
+        &self,
+        req: &chat::ListChatCompletionsRequest,
+    ) -> OpenAIResponse<chat::ListChatCompletionsResponse> {
+        self.openai.get("/chat/completions", req).await
+    }
+
+    /// Deletes a stored chat completion.
+    pub async fn delete(
+        &self,
+        completion_id: &str,
+    ) -> OpenAIResponse<chat::DeleteChatCompletionResponse> {
+        self.openai
+            .delete(&format!("/chat/completions/{completion_id}"), &())
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -54,8 +80,9 @@ mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::chat::{
         ChatCompletionMessage, ChatCompletionTool, ChatReasoningEffort, ChatResponseFormat,
-        CreateChatRequest, FunctionCall, FunctionDefinition, JsonSchemaFormat, Role, ServiceTier,
-        ToolCall, ToolChoice, ToolChoiceMode,
+        CreateChatRequest, FunctionCall, FunctionDefinition, JsonSchemaFormat,
+        ListChatCompletionsRequest, Role, ServiceTier, SortOrder, ToolCall, ToolChoice,
+        ToolChoiceMode,
     };
     use crate::shared::response_wrapper::OpenAIError;
     use crate::shared::types::StreamOptions;
@@ -697,5 +724,77 @@ mod tests {
             .as_ref()
             .expect("expected prompt_tokens_details");
         assert_eq!(prompt_details.cached_tokens, 8);
+    }
+
+    #[tokio::test]
+    async fn retrieve_deserializes_stored_completion() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/chat/completions/chatcmpl-stored"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "chatcmpl-stored",
+                "object": "chat.completion",
+                "created": 1700000000_u32,
+                "choices": [{
+                    "message": {"role": "assistant", "content": "hi", "name": null, "tool_calls": null, "tool_call_id": null, "refusal": null},
+                    "finish_reason": "stop",
+                    "index": 0
+                }],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let res = client.chat().retrieve("chatcmpl-stored").await.unwrap();
+        assert_eq!(res.id, "chatcmpl-stored");
+    }
+
+    #[tokio::test]
+    async fn list_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [],
+                "first_id": null,
+                "last_id": null,
+                "has_more": false
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = ListChatCompletionsRequest::builder()
+            .limit(10_u32)
+            .order(SortOrder::Desc)
+            .build();
+        let res = client.chat().list(&req).await.unwrap();
+        assert!(!res.has_more);
+    }
+
+    #[tokio::test]
+    async fn delete_maps_api_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/chat/completions/does-not-exist"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "No completion found",
+                    "type": "invalid_request_error",
+                    "param": null,
+                    "code": "not_found"
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let err = client.chat().delete("does-not-exist").await.unwrap_err();
+        assert!(matches!(err, OpenAIError::ApiError(_)));
     }
 }
