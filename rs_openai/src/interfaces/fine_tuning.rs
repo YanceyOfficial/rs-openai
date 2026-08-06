@@ -1,5 +1,6 @@
 use bon::Builder;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Builder, Clone, Debug, Serialize)]
 pub struct CreateFineTuningRequest {
@@ -32,6 +33,16 @@ pub struct CreateFineTuningRequest {
     /// The seed controls the reproducibility of the job. If not specified, one will be generated for you.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<f32>,
+
+    /// The method used for fine-tuning. Supersedes `hyperparameters` — if both are set,
+    /// `method` takes precedence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub method: Option<FineTuningMethod>,
+
+    /// Set of up to 16 key-value pairs for structured metadata storage. Keys up to 64
+    /// characters, values up to 512 characters.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -124,6 +135,11 @@ pub struct FineTuningResponse {
     pub seed: i32,
     /// The Unix timestamp (in seconds) for when the fine-tuning job is estimated to finish. The value will be null if the fine-tuning job is not running.
     pub estimated_finish: Option<i32>,
+    /// The method used for this fine-tuning job.
+    pub method: Option<FineTuningMethod>,
+    pub metadata: Option<HashMap<String, String>>,
+    /// Present when `status` is `"failed"`.
+    pub error: Option<FineTuningError>,
 }
 
 #[derive(Builder, Clone, Debug, Serialize)]
@@ -336,4 +352,101 @@ pub enum Grader {
     ScoreModel(ScoreModelGrader),
     LabelModel(LabelModelGrader),
     Multi(MultiGrader),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FineTuningError {
+    pub code: String,
+    pub message: String,
+    pub param: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum FineTuningMethodType {
+    Supervised,
+    Dpo,
+    Reinforcement,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SupervisedHyperparameters {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub batch_size: Option<AutoOrInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub learning_rate_multiplier: Option<AutoOrInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub n_epochs: Option<AutoOrInteger>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SupervisedMethod {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hyperparameters: Option<SupervisedHyperparameters>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DpoHyperparameters {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub batch_size: Option<AutoOrInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beta: Option<AutoOrInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub learning_rate_multiplier: Option<AutoOrInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub n_epochs: Option<AutoOrInteger>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DpoMethod {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hyperparameters: Option<DpoHyperparameters>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum FineTuningReasoningEffort {
+    Default,
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ReinforcementHyperparameters {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub batch_size: Option<AutoOrInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compute_multiplier: Option<AutoOrInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eval_interval: Option<AutoOrInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eval_samples: Option<AutoOrInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub learning_rate_multiplier: Option<AutoOrInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub n_epochs: Option<AutoOrInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<FineTuningReasoningEffort>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ReinforcementMethod {
+    pub grader: Grader,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hyperparameters: Option<ReinforcementHyperparameters>,
+}
+
+/// A flat struct with three optional sibling objects — mirrors the real wire shape exactly
+/// (`{"type": "dpo", "dpo": {...}}`), not a Rust `enum`, so it needs no custom serde
+/// tag/content handling.
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct FineTuningMethod {
+    pub r#type: FineTuningMethodType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub supervised: Option<SupervisedMethod>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dpo: Option<DpoMethod>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reinforcement: Option<ReinforcementMethod>,
 }

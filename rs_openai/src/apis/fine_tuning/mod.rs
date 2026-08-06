@@ -106,9 +106,10 @@ impl<'a> FineTuning<'a> {
 mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::fine_tuning::{
-        CreateFineTuningRequest, Grader, GraderMessageRole, MultiGrader, PythonGrader,
-        ScoreModelGrader, StringCheckGrader, StringCheckOperation, TextSimilarityGrader,
-        TextSimilarityMetric,
+        CreateFineTuningRequest, DpoHyperparameters, DpoMethod, FineTuningMethod,
+        FineTuningMethodType, Grader, GraderMessageRole, MultiGrader, PythonGrader,
+        ReinforcementMethod, ScoreModelGrader, StringCheckGrader, StringCheckOperation,
+        TextSimilarityGrader, TextSimilarityMetric,
     };
     use crate::shared::response_wrapper::OpenAIError;
     use wiremock::matchers::{body_json, method, path};
@@ -294,5 +295,148 @@ mod tests {
             serde_json::json!("string_check")
         );
         assert_eq!(json["graders"][1]["type"], serde_json::json!("python"));
+    }
+
+    #[tokio::test]
+    async fn create_serializes_dpo_method_and_metadata() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/fine-tuning/jobs"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-4o-mini",
+                "training_file": "file-abc",
+                "method": {
+                    "type": "dpo",
+                    "dpo": {"hyperparameters": {"beta": "auto"}}
+                },
+                "metadata": {"team": "eval"}
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "fine_tuning.job",
+                "id": "ftjob-dpo",
+                "model": "gpt-4o-mini",
+                "created_at": 1700000000_u64,
+                "finished_at": null,
+                "fine_tuned_model": null,
+                "organization_id": "org-123",
+                "result_files": [],
+                "status": "queued",
+                "validation_file": null,
+                "training_file": "file-abc",
+                "trained_tokens": null,
+                "hyperparameters": {"batch_size": "auto", "learning_rate_multiplier": "auto", "n_epochs": "auto"},
+                "integrations": null,
+                "seed": 42,
+                "estimated_finish": null,
+                "method": {"type": "dpo", "dpo": {"hyperparameters": {"beta": "auto"}}},
+                "metadata": {"team": "eval"},
+                "error": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let mut metadata = std::collections::HashMap::new();
+        metadata.insert("team".to_string(), "eval".to_string());
+
+        let req = CreateFineTuningRequest::builder()
+            .model("gpt-4o-mini")
+            .training_file("file-abc")
+            .method(FineTuningMethod {
+                r#type: FineTuningMethodType::Dpo,
+                supervised: None,
+                dpo: Some(DpoMethod {
+                    hyperparameters: Some(DpoHyperparameters {
+                        batch_size: None,
+                        beta: Some(crate::interfaces::fine_tuning::AutoOrInteger::Auto(
+                            "auto".to_string(),
+                        )),
+                        learning_rate_multiplier: None,
+                        n_epochs: None,
+                    }),
+                }),
+                reinforcement: None,
+            })
+            .metadata(metadata)
+            .build();
+
+        let res = client.fine_tuning().create(&req).await.unwrap();
+        assert_eq!(res.id, "ftjob-dpo");
+        assert!(res.error.is_none());
+        assert_eq!(
+            res.metadata.unwrap().get("team").map(String::as_str),
+            Some("eval")
+        );
+    }
+
+    #[tokio::test]
+    async fn create_serializes_reinforcement_method_with_grader() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/fine-tuning/jobs"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-4o-mini",
+                "training_file": "file-abc",
+                "method": {
+                    "type": "reinforcement",
+                    "reinforcement": {
+                        "grader": {
+                            "type": "string_check",
+                            "name": "exact",
+                            "input": "{{sample.output}}",
+                            "reference": "{{item.expected}}",
+                            "operation": "eq"
+                        }
+                    }
+                }
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "fine_tuning.job",
+                "id": "ftjob-rl",
+                "model": "gpt-4o-mini",
+                "created_at": 1700000000_u64,
+                "finished_at": null,
+                "fine_tuned_model": null,
+                "organization_id": "org-123",
+                "result_files": [],
+                "status": "failed",
+                "validation_file": null,
+                "training_file": "file-abc",
+                "trained_tokens": null,
+                "hyperparameters": {"batch_size": "auto", "learning_rate_multiplier": "auto", "n_epochs": "auto"},
+                "integrations": null,
+                "seed": 42,
+                "estimated_finish": null,
+                "error": {"code": "invalid_grader", "message": "grader misconfigured", "param": "method.reinforcement.grader"}
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateFineTuningRequest::builder()
+            .model("gpt-4o-mini")
+            .training_file("file-abc")
+            .method(FineTuningMethod {
+                r#type: FineTuningMethodType::Reinforcement,
+                supervised: None,
+                dpo: None,
+                reinforcement: Some(ReinforcementMethod {
+                    grader: Grader::StringCheck(StringCheckGrader {
+                        name: "exact".to_string(),
+                        input: "{{sample.output}}".to_string(),
+                        reference: "{{item.expected}}".to_string(),
+                        operation: StringCheckOperation::Eq,
+                    }),
+                    hyperparameters: None,
+                }),
+            })
+            .build();
+
+        let res = client.fine_tuning().create(&req).await.unwrap();
+        let error = res.error.expect("expected error to be present");
+        assert_eq!(error.code, "invalid_grader");
+        assert_eq!(error.param.as_deref(), Some("method.reinforcement.grader"));
     }
 }
