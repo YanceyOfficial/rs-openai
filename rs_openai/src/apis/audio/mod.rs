@@ -217,7 +217,7 @@ mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::audio::{
         AudioStreamFormat, CreateSpeechRequest, CreateTranscriptionRequest, Language, SttModel,
-        TranscriptionInclude, TtsModel, Voice,
+        TranscriptionInclude, TtsModel, TtsResponseFormat, Voice,
     };
     use crate::shared::types::File;
     use wiremock::matchers::{body_json, method, path};
@@ -288,12 +288,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_speech_serializes_response_format_lowercase() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/audio/speech"))
+            .and(body_json(serde_json::json!({
+                "model": "tts-1",
+                "input": "hello",
+                "voice": "alloy",
+                "response_format": "opus"
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"fake-audio-bytes".to_vec()))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateSpeechRequest::builder()
+            .model(TtsModel::Tts1)
+            .input("hello")
+            .voice(Voice::Alloy)
+            .response_format(TtsResponseFormat::Opus)
+            .build();
+
+        client.audio().create_speech(&req).await.unwrap();
+    }
+
+    #[tokio::test]
     async fn create_transcription_sends_include_and_known_speaker_fields() {
         let mock_server = MockServer::start().await;
 
         Mock::given(method("POST"))
             .and(path("/audio/transcriptions"))
             .and(ContainsInBody("name=\"include[0]\""))
+            .and(ContainsInBody("logprobs"))
             .and(ContainsInBody("name=\"known_speaker_names[0]\""))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "text": "hello"

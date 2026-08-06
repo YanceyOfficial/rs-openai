@@ -20,6 +20,7 @@ pub enum SttResponseFormat {
 }
 
 #[derive(Debug, Serialize, Default, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
 pub enum TtsResponseFormat {
     #[default]
     #[strum(serialize = "mp3")]
@@ -310,6 +311,7 @@ pub enum AudioStreamFormat {
 #[serde(rename_all = "snake_case")]
 pub enum TranscriptionInclude {
     #[default]
+    #[strum(serialize = "logprobs")]
     Logprobs,
 }
 
