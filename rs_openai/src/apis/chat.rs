@@ -71,7 +71,7 @@ mod tests {
             .and(path("/chat/completions"))
             .and(body_json(serde_json::json!({
                 "model": "gpt-4o-mini",
-                "messages": [{"role": "user", "content": "hi", "name": null, "tool_calls": null, "tool_call_id": null}]
+                "messages": [{"role": "user", "content": "hi", "name": null, "tool_calls": null, "tool_call_id": null, "refusal": null}]
             })))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "chatcmpl-123",
@@ -274,7 +274,7 @@ mod tests {
             .and(body_json(serde_json::json!({
                 "model": "gpt-4o-mini",
                 "messages": [
-                    {"role": "user", "content": "What's the weather in Boston?", "name": null, "tool_calls": null, "tool_call_id": null},
+                    {"role": "user", "content": "What's the weather in Boston?", "name": null, "tool_calls": null, "tool_call_id": null, "refusal": null},
                     {
                         "role": "assistant",
                         "content": null,
@@ -284,9 +284,10 @@ mod tests {
                             "type": "function",
                             "function": {"name": "get_weather", "arguments": "{\"location\":\"Boston\"}"}
                         }],
-                        "tool_call_id": null
+                        "tool_call_id": null,
+                        "refusal": null
                     },
-                    {"role": "tool", "content": "72F and sunny", "name": null, "tool_calls": null, "tool_call_id": "call_abc123"}
+                    {"role": "tool", "content": "72F and sunny", "name": null, "tool_calls": null, "tool_call_id": "call_abc123", "refusal": null}
                 ],
                 "tools": [{
                     "type": "function",
@@ -555,7 +556,7 @@ mod tests {
             .and(path("/chat/completions"))
             .and(body_json(serde_json::json!({
                 "model": "gpt-5-mini",
-                "messages": [{"role": "user", "content": "hi", "name": null, "tool_calls": null, "tool_call_id": null}],
+                "messages": [{"role": "user", "content": "hi", "name": null, "tool_calls": null, "tool_call_id": null, "refusal": null}],
                 "response_format": {
                     "type": "json_schema",
                     "json_schema": {"name": "answer", "schema": {"type": "object"}, "strict": true}
@@ -632,5 +633,69 @@ mod tests {
             serde_json::to_value(ChatResponseFormat::JsonObject).unwrap(),
             serde_json::json!({"type": "json_object"})
         );
+    }
+
+    #[tokio::test]
+    async fn create_deserializes_refusal_and_usage_token_details() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "chatcmpl-refusal",
+                "object": "chat.completion",
+                "created": 1700000000_u32,
+                "choices": [{
+                    "message": {
+                        "role": "assistant", "content": null, "refusal": "I can't help with that.",
+                        "name": null, "tool_calls": null, "tool_call_id": null
+                    },
+                    "finish_reason": "stop",
+                    "index": 0
+                }],
+                "usage": {
+                    "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15,
+                    "completion_tokens_details": {
+                        "reasoning_tokens": 2, "audio_tokens": 0,
+                        "accepted_prediction_tokens": 0, "rejected_prediction_tokens": 0
+                    },
+                    "prompt_tokens_details": {
+                        "audio_tokens": 0, "cached_tokens": 8, "cache_write_tokens": 0
+                    }
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateChatRequest::builder()
+            .model("gpt-4o-mini")
+            .messages(vec![
+                ChatCompletionMessage::builder()
+                    .role(Role::User)
+                    .content("say something you can't")
+                    .build(),
+            ])
+            .build();
+
+        let res = client.chat().create(&req).await.unwrap();
+        assert_eq!(
+            res.choices[0].message.refusal.as_deref(),
+            Some("I can't help with that.")
+        );
+
+        let completion_details = res
+            .usage
+            .completion_tokens_details
+            .as_ref()
+            .expect("expected completion_tokens_details");
+        assert_eq!(completion_details.reasoning_tokens, 2);
+
+        let prompt_details = res
+            .usage
+            .prompt_tokens_details
+            .as_ref()
+            .expect("expected prompt_tokens_details");
+        assert_eq!(prompt_details.cached_tokens, 8);
     }
 }
