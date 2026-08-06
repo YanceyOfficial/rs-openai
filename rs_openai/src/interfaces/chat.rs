@@ -320,17 +320,17 @@ pub struct ChatUsage {
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct CompletionTokensDetails {
-    pub reasoning_tokens: u32,
-    pub audio_tokens: u32,
-    pub accepted_prediction_tokens: u32,
-    pub rejected_prediction_tokens: u32,
+    pub reasoning_tokens: Option<u32>,
+    pub audio_tokens: Option<u32>,
+    pub accepted_prediction_tokens: Option<u32>,
+    pub rejected_prediction_tokens: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct PromptTokensDetails {
-    pub audio_tokens: u32,
-    pub cached_tokens: u32,
-    pub cache_write_tokens: u32,
+    pub audio_tokens: Option<u32>,
+    pub cached_tokens: Option<u32>,
+    pub cache_write_tokens: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]

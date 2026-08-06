@@ -34,6 +34,7 @@ pub struct ExpiresAfter {
 /// module's own doc comments for the exact per-endpoint validity.
 #[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum FilePurpose {
     Assistants,
     AssistantsOutput,
@@ -88,6 +89,31 @@ mod tests {
             serde_json::to_value(FilePurpose::AssistantsOutput).unwrap(),
             serde_json::json!("assistants_output")
         );
+    }
+
+    /// strum's `Display` derive ignores serde's attributes entirely — without the
+    /// container-level `#[strum(serialize_all = "snake_case")]`, every variant lacking an
+    /// explicit `#[strum(serialize = "...")]` override falls back to the literal (PascalCase)
+    /// Rust variant name instead of the snake_case wire value. This exhaustively covers the
+    /// `.to_string()` (strum) path for all 8 variants, which is what `Files::upload` sends
+    /// over the wire via a multipart text field — the JSON/serde path alone wouldn't have
+    /// caught this regression.
+    #[test]
+    fn file_purpose_to_string_matches_wire_value_for_all_variants() {
+        assert_eq!(FilePurpose::Assistants.to_string(), "assistants");
+        assert_eq!(
+            FilePurpose::AssistantsOutput.to_string(),
+            "assistants_output"
+        );
+        assert_eq!(FilePurpose::Batch.to_string(), "batch");
+        assert_eq!(FilePurpose::BatchOutput.to_string(), "batch_output");
+        assert_eq!(FilePurpose::FineTune.to_string(), "fine-tune");
+        assert_eq!(
+            FilePurpose::FineTuneResults.to_string(),
+            "fine-tune-results"
+        );
+        assert_eq!(FilePurpose::Vision.to_string(), "vision");
+        assert_eq!(FilePurpose::UserData.to_string(), "user_data");
     }
 
     #[test]

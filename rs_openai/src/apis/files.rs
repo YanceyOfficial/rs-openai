@@ -154,6 +154,40 @@ mod tests {
         assert_eq!(res.expires_at, Some(1700003600));
     }
 
+    #[tokio::test]
+    async fn upload_sends_lowercase_purpose_for_non_hyphenated_variant() {
+        let mock_server = MockServer::start().await;
+
+        // Deliberately avoid "batch" anywhere in the filename/other fields so this only
+        // matches on the `purpose` form field's value, not an incidental substring elsewhere
+        // in the multipart body.
+        Mock::given(method("POST"))
+            .and(path("/files"))
+            .and(ContainsInBody(b"\r\n\r\nbatch\r\n"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "file-789",
+                "object": "file",
+                "bytes": 10,
+                "created_at": 1700000000_u32,
+                "filename": "data.jsonl",
+                "purpose": "batch"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = UploadFileRequest::builder()
+            .file(File {
+                buffer: vec![1, 2, 3],
+                filename: "data.jsonl".into(),
+            })
+            .purpose(FilePurpose::Batch)
+            .build();
+
+        let res = client.files().upload(&req).await.unwrap();
+        assert_eq!(res.id, "file-789");
+    }
+
     struct ContainsInBody(&'static [u8]);
 
     impl wiremock::Match for ContainsInBody {

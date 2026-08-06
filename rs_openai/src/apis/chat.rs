@@ -716,14 +716,86 @@ mod tests {
             .completion_tokens_details
             .as_ref()
             .expect("expected completion_tokens_details");
-        assert_eq!(completion_details.reasoning_tokens, 2);
+        assert_eq!(completion_details.reasoning_tokens, Some(2));
 
         let prompt_details = res
             .usage
             .prompt_tokens_details
             .as_ref()
             .expect("expected prompt_tokens_details");
-        assert_eq!(prompt_details.cached_tokens, 8);
+        assert_eq!(prompt_details.cached_tokens, Some(8));
+    }
+
+    /// Real OpenAI responses don't always populate every token-detail sub-field. The
+    /// sub-fields on `CompletionTokensDetails`/`PromptTokensDetails` must be `Option<u32>`
+    /// (not bare `u32`) so a response omitting one doesn't fail deserialization of the
+    /// entire `ChatResponse`.
+    #[tokio::test]
+    async fn create_tolerates_missing_token_detail_subfields() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "chatcmpl-partial-usage",
+                "object": "chat.completion",
+                "created": 1700000000_u32,
+                "choices": [{
+                    "message": {
+                        "role": "assistant", "content": "hi", "refusal": null,
+                        "name": null, "tool_calls": null, "tool_call_id": null
+                    },
+                    "finish_reason": "stop",
+                    "index": 0
+                }],
+                "usage": {
+                    "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15,
+                    "completion_tokens_details": {
+                        "reasoning_tokens": 2, "audio_tokens": 0,
+                        "accepted_prediction_tokens": 0
+                        // rejected_prediction_tokens deliberately omitted
+                    },
+                    "prompt_tokens_details": {
+                        "audio_tokens": 0, "cached_tokens": 8
+                        // cache_write_tokens deliberately omitted
+                    }
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateChatRequest::builder()
+            .model("gpt-4o-mini")
+            .messages(vec![
+                ChatCompletionMessage::builder()
+                    .role(Role::User)
+                    .content("hello")
+                    .build(),
+            ])
+            .build();
+
+        let res = client
+            .chat()
+            .create(&req)
+            .await
+            .expect("response with partial token details should still deserialize");
+
+        let completion_details = res
+            .usage
+            .completion_tokens_details
+            .as_ref()
+            .expect("expected completion_tokens_details");
+        assert_eq!(completion_details.reasoning_tokens, Some(2));
+        assert_eq!(completion_details.rejected_prediction_tokens, None);
+
+        let prompt_details = res
+            .usage
+            .prompt_tokens_details
+            .as_ref()
+            .expect("expected prompt_tokens_details");
+        assert_eq!(prompt_details.cached_tokens, Some(8));
+        assert_eq!(prompt_details.cache_write_tokens, None);
     }
 
     #[tokio::test]
