@@ -145,6 +145,52 @@ pub enum ToolChoice {
     },
 }
 
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct JsonSchemaFormat {
+    #[builder(into)]
+    pub name: String,
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub schema: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strict: Option<bool>,
+}
+
+/// Structured-output controls. `Text`/`JsonObject` are unit variants (serialize as
+/// `{"type": "text"}`/`{"type": "json_object"}` — internally-tagged enums support unit
+/// variants this way); `JsonSchema` carries the actual schema.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ChatResponseFormat {
+    Text,
+    JsonObject,
+    JsonSchema { json_schema: JsonSchemaFormat },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum ChatReasoningEffort {
+    None,
+    Minimal,
+    Low,
+    Medium,
+    High,
+    Xhigh,
+    Max,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum ServiceTier {
+    Auto,
+    Default,
+    Flex,
+    Scale,
+    Priority,
+    Fast,
+}
+
 #[derive(Builder, Clone, Debug, Serialize)]
 pub struct CreateChatRequest {
     /// ID of the model to use.
@@ -209,6 +255,49 @@ pub struct CreateChatRequest {
     /// Whether to enable parallel function calling during tool use.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<ChatResponseFormat>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<ChatReasoningEffort>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_tier: Option<ServiceTier>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_options: Option<crate::shared::types::StreamOptions>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<i64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logprobs: Option<bool>,
+
+    /// 0-20. Requires `logprobs: true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_logprobs: Option<u8>,
+
+    /// Persist this completion for later retrieval via `Chat::retrieve`/`list`/`delete`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub store: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<HashMap<String, String>>,
+
+    /// Newer, reasoning-model-compatible replacement for `max_tokens`. `max_tokens` stays
+    /// supported — no removal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_completion_tokens: Option<u32>,
+
+    /// Newer, privacy-friendlier replacement for `user`. `user` stays supported.
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub safety_identifier: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_key: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]

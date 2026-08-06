@@ -53,10 +53,12 @@ impl<'a> Chat<'a> {
 mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::chat::{
-        ChatCompletionMessage, ChatCompletionTool, CreateChatRequest, FunctionCall,
-        FunctionDefinition, Role, ToolCall, ToolChoice, ToolChoiceMode,
+        ChatCompletionMessage, ChatCompletionTool, ChatReasoningEffort, ChatResponseFormat,
+        CreateChatRequest, FunctionCall, FunctionDefinition, JsonSchemaFormat, Role, ServiceTier,
+        ToolCall, ToolChoice, ToolChoiceMode,
     };
     use crate::shared::response_wrapper::OpenAIError;
+    use crate::shared::types::StreamOptions;
     use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -542,6 +544,93 @@ mod tests {
         assert_eq!(
             received[3].choices[0].finish_reason.as_deref(),
             Some("tool_calls")
+        );
+    }
+
+    #[tokio::test]
+    async fn create_serializes_json_schema_response_format_and_reasoning_fields() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "messages": [{"role": "user", "content": "hi", "name": null, "tool_calls": null, "tool_call_id": null}],
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": "answer", "schema": {"type": "object"}, "strict": true}
+                },
+                "reasoning_effort": "low",
+                "service_tier": "flex",
+                "seed": 7,
+                "logprobs": true,
+                "top_logprobs": 3,
+                "store": true,
+                "max_completion_tokens": 100,
+                "metadata": {"team": "eval"},
+                "safety_identifier": "user-hash-123",
+                "prompt_cache_key": "cache-key-abc",
+                "stream_options": {"include_usage": true}
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "chatcmpl-999",
+                "object": "chat.completion",
+                "created": 1700000000_u32,
+                "choices": [{
+                    "message": {"role": "assistant", "content": "{}", "name": null, "tool_calls": null, "tool_call_id": null},
+                    "finish_reason": "stop",
+                    "index": 0
+                }],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7}
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let mut metadata = std::collections::HashMap::new();
+        metadata.insert("team".to_string(), "eval".to_string());
+
+        let req = CreateChatRequest::builder()
+            .model("gpt-5-mini")
+            .messages(vec![
+                ChatCompletionMessage::builder()
+                    .role(Role::User)
+                    .content("hi")
+                    .build(),
+            ])
+            .response_format(ChatResponseFormat::JsonSchema {
+                json_schema: JsonSchemaFormat::builder()
+                    .name("answer")
+                    .schema(serde_json::json!({"type": "object"}))
+                    .strict(true)
+                    .build(),
+            })
+            .reasoning_effort(ChatReasoningEffort::Low)
+            .service_tier(ServiceTier::Flex)
+            .seed(7_i64)
+            .logprobs(true)
+            .top_logprobs(3_u8)
+            .store(true)
+            .max_completion_tokens(100_u32)
+            .metadata(metadata)
+            .safety_identifier("user-hash-123")
+            .prompt_cache_key("cache-key-abc")
+            .stream_options(StreamOptions::builder().include_usage(true).build())
+            .build();
+
+        let res = client.chat().create(&req).await.unwrap();
+        assert_eq!(res.id, "chatcmpl-999");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_text_and_json_object_response_format_variants() {
+        assert_eq!(
+            serde_json::to_value(ChatResponseFormat::Text).unwrap(),
+            serde_json::json!({"type": "text"})
+        );
+        assert_eq!(
+            serde_json::to_value(ChatResponseFormat::JsonObject).unwrap(),
+            serde_json::json!({"type": "json_object"})
         );
     }
 }
