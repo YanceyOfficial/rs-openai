@@ -194,3 +194,146 @@ pub struct FineTuningCheckpointResponse {
     last_id: String,
     has_more: bool,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum StringCheckOperation {
+    Eq,
+    Ne,
+    Like,
+    Ilike,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StringCheckGrader {
+    pub name: String,
+    pub input: String,
+    pub reference: String,
+    pub operation: StringCheckOperation,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum TextSimilarityMetric {
+    Cosine,
+    FuzzyMatch,
+    Bleu,
+    Gleu,
+    Meteor,
+    #[strum(serialize = "rouge_1")]
+    #[serde(rename = "rouge_1")]
+    Rouge1,
+    #[strum(serialize = "rouge_2")]
+    #[serde(rename = "rouge_2")]
+    Rouge2,
+    #[strum(serialize = "rouge_3")]
+    #[serde(rename = "rouge_3")]
+    Rouge3,
+    #[strum(serialize = "rouge_4")]
+    #[serde(rename = "rouge_4")]
+    Rouge4,
+    #[strum(serialize = "rouge_5")]
+    #[serde(rename = "rouge_5")]
+    Rouge5,
+    RougeL,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TextSimilarityGrader {
+    pub name: String,
+    pub input: String,
+    pub reference: String,
+    pub evaluation_metric: TextSimilarityMetric,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PythonGrader {
+    pub name: String,
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_tag: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum GraderMessageRole {
+    User,
+    Assistant,
+    System,
+    Developer,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GraderMessage {
+    pub role: GraderMessageRole,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum GraderReasoningEffort {
+    None,
+    Minimal,
+    Low,
+    Medium,
+    High,
+    Xhigh,
+    Max,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GraderSamplingParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_completions_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<GraderReasoningEffort>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ScoreModelGrader {
+    pub name: String,
+    pub model: String,
+    pub input: Vec<GraderMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range: Option<[f32; 2]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sampling_params: Option<GraderSamplingParams>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LabelModelGrader {
+    pub name: String,
+    pub model: String,
+    pub input: Vec<GraderMessage>,
+    pub labels: Vec<String>,
+    pub passing_labels: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MultiGrader {
+    pub name: String,
+    pub graders: Vec<Grader>,
+    pub calculate_output: String,
+}
+
+/// A grading strategy for reinforcement fine-tuning. Six variants, internally tagged on
+/// `type`. `Multi` recursively holds other graders via `Vec<Grader>` (no `Box` needed — `Vec`
+/// already provides the indirection).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Grader {
+    StringCheck(StringCheckGrader),
+    TextSimilarity(TextSimilarityGrader),
+    Python(PythonGrader),
+    ScoreModel(ScoreModelGrader),
+    LabelModel(LabelModelGrader),
+    Multi(MultiGrader),
+}

@@ -105,7 +105,11 @@ impl<'a> FineTuning<'a> {
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
-    use crate::interfaces::fine_tuning::CreateFineTuningRequest;
+    use crate::interfaces::fine_tuning::{
+        CreateFineTuningRequest, Grader, GraderMessageRole, MultiGrader, PythonGrader,
+        ScoreModelGrader, StringCheckGrader, StringCheckOperation, TextSimilarityGrader,
+        TextSimilarityMetric,
+    };
     use crate::shared::response_wrapper::OpenAIError;
     use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -181,5 +185,114 @@ mod tests {
             }
             other => panic!("expected ApiError, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn grader_string_check_serializes_with_type_tag() {
+        let grader = Grader::StringCheck(StringCheckGrader {
+            name: "exact_match".to_string(),
+            input: "{{sample.output}}".to_string(),
+            reference: "{{item.expected}}".to_string(),
+            operation: StringCheckOperation::Eq,
+        });
+
+        let json = serde_json::to_value(&grader).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "type": "string_check",
+                "name": "exact_match",
+                "input": "{{sample.output}}",
+                "reference": "{{item.expected}}",
+                "operation": "eq"
+            })
+        );
+    }
+
+    #[test]
+    fn grader_text_similarity_serializes_numbered_rouge_variant_correctly() {
+        let grader = Grader::TextSimilarity(TextSimilarityGrader {
+            name: "similarity".to_string(),
+            input: "{{sample.output}}".to_string(),
+            reference: "{{item.expected}}".to_string(),
+            evaluation_metric: TextSimilarityMetric::Rouge1,
+        });
+
+        let json = serde_json::to_value(&grader).unwrap();
+        assert_eq!(json["evaluation_metric"], serde_json::json!("rouge_1"));
+    }
+
+    #[test]
+    fn grader_python_serializes_optional_image_tag_as_absent() {
+        let grader = Grader::Python(PythonGrader {
+            name: "custom".to_string(),
+            source: "def grade(sample, item): return 1.0".to_string(),
+            image_tag: None,
+        });
+
+        let json = serde_json::to_value(&grader).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "type": "python",
+                "name": "custom",
+                "source": "def grade(sample, item): return 1.0"
+            })
+        );
+    }
+
+    #[test]
+    fn grader_score_model_deserializes_with_sampling_params() {
+        let json = serde_json::json!({
+            "type": "score_model",
+            "name": "scorer",
+            "model": "gpt-4o-mini",
+            "input": [{"role": "user", "content": "grade this"}],
+            "sampling_params": {"temperature": 0.0}
+        });
+
+        let grader: Grader = serde_json::from_value(json).unwrap();
+        match grader {
+            Grader::ScoreModel(ScoreModelGrader {
+                model,
+                input,
+                sampling_params,
+                ..
+            }) => {
+                assert_eq!(model, "gpt-4o-mini");
+                assert_eq!(input[0].role, GraderMessageRole::User);
+                assert_eq!(sampling_params.unwrap().temperature, Some(0.0));
+            }
+            other => panic!("expected ScoreModel, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn grader_multi_recursively_holds_other_graders() {
+        let grader = Grader::Multi(MultiGrader {
+            name: "combined".to_string(),
+            graders: vec![
+                Grader::StringCheck(StringCheckGrader {
+                    name: "a".to_string(),
+                    input: "x".to_string(),
+                    reference: "y".to_string(),
+                    operation: StringCheckOperation::Eq,
+                }),
+                Grader::Python(PythonGrader {
+                    name: "b".to_string(),
+                    source: "...".to_string(),
+                    image_tag: None,
+                }),
+            ],
+            calculate_output: "0.5 * a + 0.5 * b".to_string(),
+        });
+
+        let json = serde_json::to_value(&grader).unwrap();
+        assert_eq!(json["graders"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            json["graders"][0]["type"],
+            serde_json::json!("string_check")
+        );
+        assert_eq!(json["graders"][1]["type"], serde_json::json!("python"));
     }
 }
