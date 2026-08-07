@@ -8,7 +8,6 @@ use crate::interfaces::responses;
 pub use crate::interfaces::responses::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
-#[allow(dead_code)]
 pub struct Responses<'a> {
     openai: &'a OpenAI,
 }
@@ -27,7 +26,6 @@ impl<'a> Responses<'a> {
     }
 }
 
-#[allow(dead_code)]
 pub struct Response<'a> {
     openai: &'a OpenAI,
     id: String,
