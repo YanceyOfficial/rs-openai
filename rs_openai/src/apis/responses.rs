@@ -37,6 +37,27 @@ impl<'a> Response<'a> {
     pub(crate) fn new(openai: &'a OpenAI, id: String) -> Self {
         Self { openai, id }
     }
+
+    /// Retrieves a model response by ID.
+    pub async fn retrieve(&self) -> OpenAIResponse<responses::Response> {
+        self.openai
+            .get(&format!("/responses/{}", self.id), &())
+            .await
+    }
+
+    /// Deletes a model response.
+    pub async fn delete(&self) -> OpenAIResponse<responses::DeleteResponseResponse> {
+        self.openai
+            .delete(&format!("/responses/{}", self.id), &())
+            .await
+    }
+
+    /// Cancels a background response. Errors if the response isn't in a cancellable state.
+    pub async fn cancel(&self) -> OpenAIResponse<responses::Response> {
+        self.openai
+            .post(&format!("/responses/{}/cancel", self.id), &())
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -328,5 +349,84 @@ mod tests {
             }
             other => panic!("expected FunctionCall, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn retrieve_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/responses/resp_789"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_789",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let res = client.response("resp_789").retrieve().await.unwrap();
+        assert_eq!(res.id, "resp_789");
+    }
+
+    #[tokio::test]
+    async fn delete_maps_api_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/responses/does-not-exist"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "No response found",
+                    "type": "invalid_request_error",
+                    "param": null,
+                    "code": "not_found"
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let err = client
+            .response("does-not-exist")
+            .delete()
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            crate::shared::response_wrapper::OpenAIError::ApiError(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn cancel_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses/resp_789/cancel"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_789",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "cancelled",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let res = client.response("resp_789").cancel().await.unwrap();
+        assert_eq!(res.status.to_string(), "cancelled");
     }
 }

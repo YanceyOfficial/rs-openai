@@ -251,3 +251,10 @@ pub struct Response {
     pub instructions: Option<String>,
     pub metadata: Option<std::collections::HashMap<String, String>>,
 }
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct DeleteResponseResponse {
+    pub id: String,
+    pub object: String,
+    pub deleted: bool,
+}
