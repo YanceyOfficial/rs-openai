@@ -58,15 +58,26 @@ impl<'a> Response<'a> {
             .post(&format!("/responses/{}/cancel", self.id), &())
             .await
     }
+
+    /// Lists a response's input items.
+    pub async fn list_input_items(
+        &self,
+        req: &responses::ListInputItemsRequest,
+    ) -> OpenAIResponse<responses::ListInputItemsResponse> {
+        self.openai
+            .get(&format!("/responses/{}/input_items", self.id), req)
+            .await
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
+    use crate::interfaces::chat::SortOrder;
     use crate::interfaces::responses::{
-        CreateResponseRequest, ResponseFunctionTool, ResponseInput, ResponseInputItem,
-        ResponseInputRole, ResponseTool, ResponseToolChoice, ResponseToolChoiceFunctionName,
-        ResponseToolChoiceMode,
+        CreateResponseRequest, ListInputItemsRequest, ResponseFunctionTool, ResponseInput,
+        ResponseInputItem, ResponseInputRole, ResponseTool, ResponseToolChoice,
+        ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
     };
     use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -428,5 +439,47 @@ mod tests {
         let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
         let res = client.response("resp_789").cancel().await.unwrap();
         assert_eq!(res.status.to_string(), "cancelled");
+    }
+
+    #[tokio::test]
+    async fn list_input_items_deserializes_function_call_output_item() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/responses/resp_789/input_items"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [{
+                    "type": "function_call_output",
+                    "call_id": "call_abc123",
+                    "output": "72F and sunny"
+                }],
+                "first_id": "item_1",
+                "last_id": "item_1",
+                "has_more": false
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = ListInputItemsRequest::builder()
+            .limit(10_u32)
+            .order(SortOrder::Desc)
+            .build();
+        let res = client
+            .response("resp_789")
+            .list_input_items(&req)
+            .await
+            .unwrap();
+
+        assert_eq!(res.data.len(), 1);
+        match &res.data[0] {
+            ResponseInputItem::FunctionCallOutput { call_id, output } => {
+                assert_eq!(call_id, "call_abc123");
+                assert_eq!(output, "72F and sunny");
+            }
+            other => panic!("expected FunctionCallOutput, got {other:?}"),
+        }
+        assert!(!res.has_more);
     }
 }

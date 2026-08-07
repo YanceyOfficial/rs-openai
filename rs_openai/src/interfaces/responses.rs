@@ -258,3 +258,25 @@ pub struct DeleteResponseResponse {
     pub object: String,
     pub deleted: bool,
 }
+
+#[derive(Builder, Debug, Serialize, Clone)]
+pub struct ListInputItemsRequest {
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<crate::interfaces::chat::SortOrder>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ListInputItemsResponse {
+    pub object: String,
+    pub data: Vec<ResponseInputItem>,
+    pub first_id: Option<String>,
+    pub last_id: Option<String>,
+    pub has_more: bool,
+}
