@@ -6,9 +6,10 @@ pub mod file_batches;
 pub mod files;
 
 use crate::client::OpenAI;
+use crate::interfaces::vector_stores;
 pub use crate::interfaces::vector_stores::*;
+use crate::shared::response_wrapper::OpenAIResponse;
 
-#[allow(dead_code)]
 pub struct VectorStores<'a> {
     openai: &'a OpenAI,
 }
@@ -16,6 +17,22 @@ pub struct VectorStores<'a> {
 impl<'a> VectorStores<'a> {
     pub(crate) fn new(openai: &'a OpenAI) -> Self {
         Self { openai }
+    }
+
+    /// Creates a vector store.
+    pub async fn create(
+        &self,
+        req: &vector_stores::CreateVectorStoreRequest,
+    ) -> OpenAIResponse<vector_stores::VectorStore> {
+        self.openai.post("/vector_stores", req).await
+    }
+
+    /// Lists vector stores.
+    pub async fn list(
+        &self,
+        req: &vector_stores::ListVectorStoresRequest,
+    ) -> OpenAIResponse<vector_stores::ListVectorStoresResponse> {
+        self.openai.get("/vector_stores", req).await
     }
 }
 
@@ -43,7 +60,13 @@ impl<'a> VectorStore<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::interfaces::vector_stores::{ChunkingStrategy, StaticChunkingStrategy};
+    use crate::client::OpenAI;
+    use crate::interfaces::chat::SortOrder;
+    use crate::interfaces::vector_stores::{
+        ChunkingStrategy, CreateVectorStoreRequest, ListVectorStoresRequest, StaticChunkingStrategy,
+    };
+    use wiremock::matchers::{body_json, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[test]
     fn chunking_strategy_auto_serializes_with_type_tag_only() {
@@ -75,5 +98,117 @@ mod tests {
         let value = serde_json::json!({"type": "other"});
         let strategy: ChunkingStrategy = serde_json::from_value(value).unwrap();
         assert!(matches!(strategy, ChunkingStrategy::Other));
+    }
+
+    #[tokio::test]
+    async fn create_serializes_request_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/vector_stores"))
+            .and(body_json(serde_json::json!({
+                "name": "Support docs",
+                "file_ids": ["file-abc123"]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "vs_123",
+                "object": "vector_store",
+                "name": "Support docs",
+                "description": null,
+                "status": "in_progress",
+                "created_at": 1700000000_i64,
+                "last_active_at": null,
+                "expires_at": null,
+                "expires_after": null,
+                "usage_bytes": 0,
+                "file_counts": {
+                    "total": 1, "completed": 0, "in_progress": 1, "failed": 0, "cancelled": 0
+                },
+                "metadata": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateVectorStoreRequest::builder()
+            .name("Support docs")
+            .file_ids(vec!["file-abc123".to_string()])
+            .build();
+
+        let res = client.vector_stores().create(&req).await.unwrap();
+        assert_eq!(res.id, "vs_123");
+        assert_eq!(res.file_counts.in_progress, 1);
+    }
+
+    #[tokio::test]
+    async fn create_maps_api_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/vector_stores"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "name must be a string",
+                    "type": "invalid_request_error",
+                    "param": "name",
+                    "code": null
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateVectorStoreRequest::builder().build();
+
+        let err = client.vector_stores().create(&req).await.unwrap_err();
+        match err {
+            crate::shared::response_wrapper::OpenAIError::ApiError(e) => {
+                assert_eq!(e.error.param, Some(serde_json::json!("name")));
+            }
+            other => panic!("expected ApiError, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn list_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/vector_stores"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [{
+                    "id": "vs_123",
+                    "object": "vector_store",
+                    "name": "Support docs",
+                    "description": null,
+                    "status": "completed",
+                    "created_at": 1700000000_i64,
+                    "last_active_at": 1700000100_i64,
+                    "expires_at": null,
+                    "expires_after": null,
+                    "usage_bytes": 1024,
+                    "file_counts": {
+                        "total": 1, "completed": 1, "in_progress": 0, "failed": 0, "cancelled": 0
+                    },
+                    "metadata": null
+                }],
+                "first_id": "vs_123",
+                "last_id": "vs_123",
+                "has_more": false
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = ListVectorStoresRequest::builder()
+            .limit(10_u32)
+            .order(SortOrder::Desc)
+            .build();
+        let res = client.vector_stores().list(&req).await.unwrap();
+
+        assert_eq!(res.data.len(), 1);
+        assert_eq!(res.data[0].usage_bytes, 1024);
+        assert!(!res.has_more);
     }
 }
