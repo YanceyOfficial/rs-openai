@@ -14,3 +14,4 @@ pub mod responses;
 pub mod runs;
 pub mod threads;
 pub mod uploads;
+pub mod vector_stores;
