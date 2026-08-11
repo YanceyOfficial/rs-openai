@@ -308,6 +308,12 @@ impl OpenAI {
         tokio::spawn(async move {
             while let Some(evt) = event_source.next().await {
                 match evt {
+                    // `reqwest-eventsource` surfaces a normal "no more data" connection close as
+                    // this variant (see its `Poll::Ready(None)` handling), not as `None` from
+                    // `event_source.next()` directly -- some APIs may not send a `[DONE]`
+                    // sentinel, so this must be treated the same as reaching `[DONE]`: break
+                    // without forwarding a spurious error to the consumer.
+                    Err(reqwest_eventsource::Error::StreamEnded) => break,
                     Err(e) => {
                         if tx
                             .send(Err(OpenAIError::StreamError(e.to_string())))

@@ -711,7 +711,6 @@ mod tests {
             .map(|e| format!("data: {e}\n\n"))
             .collect::<Vec<String>>()
             .join("");
-        let sse_body = format!("{}{}", sse_body, "data: [DONE]\n\n");
 
         Mock::given(method("POST"))
             .and(path("/responses"))
@@ -817,7 +816,6 @@ mod tests {
             .map(|e| format!("data: {e}\n\n"))
             .collect::<Vec<String>>()
             .join("");
-        let sse_body = format!("{}{}", sse_body, "data: [DONE]\n\n");
 
         Mock::given(method("POST"))
             .and(path("/responses"))
@@ -937,7 +935,6 @@ mod tests {
             .map(|e| format!("data: {e}\n\n"))
             .collect::<Vec<String>>()
             .join("");
-        let sse_body = format!("{}{}", sse_body, "data: [DONE]\n\n");
 
         Mock::given(method("POST"))
             .and(path("/responses"))
