@@ -6,7 +6,10 @@
 use crate::client::OpenAI;
 use crate::interfaces::responses;
 pub use crate::interfaces::responses::*;
-use crate::shared::response_wrapper::OpenAIResponse;
+use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
+use crate::shared::utils::is_stream;
+use futures::Stream;
+use std::pin::Pin;
 
 pub struct Responses<'a> {
     openai: &'a OpenAI,
@@ -22,7 +25,29 @@ impl<'a> Responses<'a> {
         &self,
         req: &responses::CreateResponseRequest,
     ) -> OpenAIResponse<responses::Response> {
+        if is_stream(req.stream) {
+            return Err(OpenAIError::InvalidArgument(
+                "When stream is true, use Responses::create_with_stream".into(),
+            ));
+        }
+
         self.openai.post("/responses", req).await
+    }
+
+    /// Creates a model response and streams the result as a sequence of `ResponseStreamEvent`s.
+    pub async fn create_with_stream(
+        &self,
+        req: &responses::CreateResponseRequest,
+    ) -> OpenAIResponse<
+        Pin<Box<dyn Stream<Item = OpenAIResponse<responses::ResponseStreamEvent>> + Send>>,
+    > {
+        if !is_stream(req.stream) {
+            return Err(OpenAIError::InvalidArgument(
+                "When stream is false, use Responses::create".into(),
+            ));
+        }
+
+        self.openai.post_stream("/responses", req).await
     }
 }
 
@@ -77,6 +102,7 @@ mod tests {
         ResponseInputItem, ResponseInputRole, ResponseStreamEvent, ResponseTool,
         ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
     };
+    use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -591,5 +617,408 @@ mod tests {
         let req_without_stream = CreateResponseRequest::builder().model("gpt-5-mini").build();
         let json_without_stream = serde_json::to_value(&req_without_stream).unwrap();
         assert!(json_without_stream.get("stream").is_none());
+    }
+
+    #[tokio::test]
+    async fn create_rejects_stream_true() {
+        let client = OpenAI::new("sk-test");
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .stream(true)
+            .build();
+
+        let err = client.responses().create(&req).await.unwrap_err();
+        assert!(matches!(
+            err,
+            crate::shared::response_wrapper::OpenAIError::InvalidArgument(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn create_with_stream_rejects_stream_false() {
+        let client = OpenAI::new("sk-test");
+        let req = CreateResponseRequest::builder().model("gpt-5-mini").build();
+
+        let result = client.responses().create_with_stream(&req).await;
+        assert!(matches!(
+            result,
+            Err(crate::shared::response_wrapper::OpenAIError::InvalidArgument(_))
+        ));
+    }
+
+    /// Happy-path text streaming: created -> in_progress -> output_item.added (Message) ->
+    /// two output_text.delta chunks -> output_text.done -> output_item.done -> completed.
+    /// No `data: [DONE]` sentinel -- see this plan's Global Constraints on why the mocked
+    /// body ends right after the last real event.
+    #[tokio::test]
+    async fn create_with_stream_yields_text_deltas_and_terminates_after_completed() {
+        let mock_server = MockServer::start().await;
+
+        let response_snapshot = |status: &str| {
+            serde_json::json!({
+                "id": "resp_1",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": status,
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null,
+                "previous_response_id": null,
+                "instructions": null,
+                "metadata": null
+            })
+        };
+
+        let events = [
+            serde_json::json!({"type": "response.created", "response": response_snapshot("in_progress")}),
+            serde_json::json!({"type": "response.in_progress", "response": response_snapshot("in_progress")}),
+            serde_json::json!({
+                "type": "response.output_item.added",
+                "output_index": 0,
+                "item": {
+                    "type": "message", "id": "msg_1", "role": "assistant",
+                    "status": "in_progress", "content": []
+                }
+            }),
+            serde_json::json!({
+                "type": "response.output_text.delta",
+                "item_id": "msg_1", "output_index": 0, "content_index": 0, "delta": "Hello"
+            }),
+            serde_json::json!({
+                "type": "response.output_text.delta",
+                "item_id": "msg_1", "output_index": 0, "content_index": 0, "delta": " world"
+            }),
+            serde_json::json!({
+                "type": "response.output_text.done",
+                "item_id": "msg_1", "output_index": 0, "content_index": 0, "text": "Hello world"
+            }),
+            serde_json::json!({
+                "type": "response.output_item.done",
+                "output_index": 0,
+                "item": {
+                    "type": "message", "id": "msg_1", "role": "assistant",
+                    "status": "completed",
+                    "content": [{"type": "output_text", "text": "Hello world", "annotations": []}]
+                }
+            }),
+            serde_json::json!({"type": "response.completed", "response": response_snapshot("completed")}),
+        ];
+
+        let sse_body = events
+            .iter()
+            .map(|e| format!("data: {e}\n\n"))
+            .collect::<Vec<String>>()
+            .join("");
+        let sse_body = format!("{}{}", sse_body, "data: [DONE]\n\n");
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(sse_body.into_bytes(), "text/event-stream"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("Say hello".to_string()))
+            .stream(true)
+            .build();
+
+        let mut stream = client.responses().create_with_stream(&req).await.unwrap();
+
+        let mut received = Vec::new();
+        while let Some(item) = stream.next().await {
+            received.push(item.unwrap());
+        }
+
+        assert_eq!(received.len(), 8);
+        assert!(matches!(received[0], ResponseStreamEvent::Created { .. }));
+        assert!(matches!(
+            received[1],
+            ResponseStreamEvent::InProgress { .. }
+        ));
+        assert!(matches!(
+            received[2],
+            ResponseStreamEvent::OutputItemAdded { .. }
+        ));
+        match &received[3] {
+            ResponseStreamEvent::OutputTextDelta { delta, .. } => assert_eq!(delta, "Hello"),
+            other => panic!("expected OutputTextDelta, got {other:?}"),
+        }
+        match &received[4] {
+            ResponseStreamEvent::OutputTextDelta { delta, .. } => assert_eq!(delta, " world"),
+            other => panic!("expected OutputTextDelta, got {other:?}"),
+        }
+        match &received[5] {
+            ResponseStreamEvent::OutputTextDone { text, .. } => assert_eq!(text, "Hello world"),
+            other => panic!("expected OutputTextDone, got {other:?}"),
+        }
+        assert!(matches!(
+            received[6],
+            ResponseStreamEvent::OutputItemDone { .. }
+        ));
+        match &received[7] {
+            ResponseStreamEvent::Completed { response, .. } => {
+                assert_eq!(response.status.to_string(), "completed");
+            }
+            other => panic!("expected Completed, got {other:?}"),
+        }
+
+        // The stream must be exhausted (no trailing item, no [DONE] needed).
+        assert!(stream.next().await.is_none());
+    }
+
+    /// Function-call argument streaming: output_item.added (FunctionCall) -> two
+    /// function_call_arguments.delta chunks -> function_call_arguments.done ->
+    /// output_item.done. Proves the tagged union discriminates this event family from the
+    /// text-delta family within the same stream.
+    #[tokio::test]
+    async fn create_with_stream_yields_function_call_argument_deltas() {
+        let mock_server = MockServer::start().await;
+
+        let events = [
+            serde_json::json!({
+                "type": "response.output_item.added",
+                "output_index": 0,
+                "item": {
+                    "type": "function_call", "id": "fc_1", "call_id": "call_abc123",
+                    "name": "get_weather", "arguments": "", "status": "in_progress"
+                }
+            }),
+            serde_json::json!({
+                "type": "response.function_call_arguments.delta",
+                "item_id": "fc_1", "output_index": 0, "delta": "{\"location\":"
+            }),
+            serde_json::json!({
+                "type": "response.function_call_arguments.delta",
+                "item_id": "fc_1", "output_index": 0, "delta": "\"Boston\"}"
+            }),
+            serde_json::json!({
+                "type": "response.function_call_arguments.done",
+                "item_id": "fc_1", "output_index": 0, "arguments": "{\"location\":\"Boston\"}"
+            }),
+            serde_json::json!({
+                "type": "response.output_item.done",
+                "output_index": 0,
+                "item": {
+                    "type": "function_call", "id": "fc_1", "call_id": "call_abc123",
+                    "name": "get_weather", "arguments": "{\"location\":\"Boston\"}",
+                    "status": "completed"
+                }
+            }),
+        ];
+
+        let sse_body = events
+            .iter()
+            .map(|e| format!("data: {e}\n\n"))
+            .collect::<Vec<String>>()
+            .join("");
+        let sse_body = format!("{}{}", sse_body, "data: [DONE]\n\n");
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(sse_body.into_bytes(), "text/event-stream"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text(
+                "What's the weather in Boston?".to_string(),
+            ))
+            .stream(true)
+            .build();
+
+        let mut stream = client.responses().create_with_stream(&req).await.unwrap();
+
+        let mut received = Vec::new();
+        while let Some(item) = stream.next().await {
+            received.push(item.unwrap());
+        }
+
+        assert_eq!(received.len(), 5);
+        assert!(matches!(
+            received[0],
+            ResponseStreamEvent::OutputItemAdded { .. }
+        ));
+        match &received[1] {
+            ResponseStreamEvent::FunctionCallArgumentsDelta { delta, .. } => {
+                assert_eq!(delta, "{\"location\":")
+            }
+            other => panic!("expected FunctionCallArgumentsDelta, got {other:?}"),
+        }
+        match &received[3] {
+            ResponseStreamEvent::FunctionCallArgumentsDone { arguments, .. } => {
+                assert_eq!(arguments, "{\"location\":\"Boston\"}")
+            }
+            other => panic!("expected FunctionCallArgumentsDone, got {other:?}"),
+        }
+        assert!(matches!(
+            received[4],
+            ResponseStreamEvent::OutputItemDone { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn create_with_stream_yields_error_event() {
+        let mock_server = MockServer::start().await;
+
+        let sse_body = format!(
+            "data: {}\n\n",
+            serde_json::json!({
+                "type": "error",
+                "message": "the model is overloaded",
+                "param": null,
+                "code": "server_error"
+            })
+        );
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(sse_body.into_bytes(), "text/event-stream"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("hi".to_string()))
+            .stream(true)
+            .build();
+
+        let mut stream = client.responses().create_with_stream(&req).await.unwrap();
+        let first = stream.next().await.unwrap().unwrap();
+        match first {
+            ResponseStreamEvent::Error { message, .. } => {
+                assert_eq!(message, "the model is overloaded");
+            }
+            other => panic!("expected Error, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn create_with_stream_yields_failed_terminal_event() {
+        let mock_server = MockServer::start().await;
+
+        let events = [
+            serde_json::json!({
+                "type": "response.created",
+                "response": {
+                    "id": "resp_2", "object": "response", "created_at": 1700000000_i64,
+                    "status": "in_progress", "error": null, "incomplete_details": null,
+                    "model": "gpt-5-mini", "output": [], "usage": null,
+                    "previous_response_id": null, "instructions": null, "metadata": null
+                }
+            }),
+            serde_json::json!({
+                "type": "response.failed",
+                "response": {
+                    "id": "resp_2", "object": "response", "created_at": 1700000000_i64,
+                    "status": "failed",
+                    "error": {"code": "server_error", "message": "internal error"},
+                    "incomplete_details": null, "model": "gpt-5-mini", "output": [],
+                    "usage": null, "previous_response_id": null, "instructions": null,
+                    "metadata": null
+                }
+            }),
+        ];
+
+        let sse_body = events
+            .iter()
+            .map(|e| format!("data: {e}\n\n"))
+            .collect::<Vec<String>>()
+            .join("");
+        let sse_body = format!("{}{}", sse_body, "data: [DONE]\n\n");
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(sse_body.into_bytes(), "text/event-stream"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("hi".to_string()))
+            .stream(true)
+            .build();
+
+        let mut stream = client.responses().create_with_stream(&req).await.unwrap();
+        let mut received = Vec::new();
+        while let Some(item) = stream.next().await {
+            received.push(item.unwrap());
+        }
+
+        assert_eq!(received.len(), 2);
+        match &received[1] {
+            ResponseStreamEvent::Failed { response, .. } => {
+                assert_eq!(response.status.to_string(), "failed");
+                assert_eq!(
+                    response.error.as_ref().map(|e| e.message.as_str()),
+                    Some("internal error")
+                );
+            }
+            other => panic!("expected Failed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn create_with_stream_yields_incomplete_terminal_event() {
+        let mock_server = MockServer::start().await;
+
+        let sse_body = format!(
+            "data: {}\n\n",
+            serde_json::json!({
+                "type": "response.incomplete",
+                "response": {
+                    "id": "resp_3", "object": "response", "created_at": 1700000000_i64,
+                    "status": "incomplete", "error": null,
+                    "incomplete_details": {"reason": "max_output_tokens"},
+                    "model": "gpt-5-mini", "output": [], "usage": null,
+                    "previous_response_id": null, "instructions": null, "metadata": null
+                }
+            })
+        );
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(sse_body.into_bytes(), "text/event-stream"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("hi".to_string()))
+            .stream(true)
+            .build();
+
+        let mut stream = client.responses().create_with_stream(&req).await.unwrap();
+        let first = stream.next().await.unwrap().unwrap();
+        match first {
+            ResponseStreamEvent::Incomplete { response, .. } => {
+                assert_eq!(
+                    response
+                        .incomplete_details
+                        .as_ref()
+                        .map(|d| d.reason.as_str()),
+                    Some("max_output_tokens")
+                );
+            }
+            other => panic!("expected Incomplete, got {other:?}"),
+        }
     }
 }
