@@ -46,6 +46,30 @@ impl<'a> VectorStore<'a> {
         Self { openai, id }
     }
 
+    /// Retrieves a vector store by ID.
+    pub async fn retrieve(&self) -> OpenAIResponse<vector_stores::VectorStore> {
+        self.openai
+            .get(&format!("/vector_stores/{}", self.id), &())
+            .await
+    }
+
+    /// Updates a vector store's name, expiration policy, or metadata.
+    pub async fn update(
+        &self,
+        req: &vector_stores::UpdateVectorStoreRequest,
+    ) -> OpenAIResponse<vector_stores::VectorStore> {
+        self.openai
+            .post(&format!("/vector_stores/{}", self.id), req)
+            .await
+    }
+
+    /// Deletes a vector store.
+    pub async fn delete(&self) -> OpenAIResponse<vector_stores::DeleteVectorStoreResponse> {
+        self.openai
+            .delete(&format!("/vector_stores/{}", self.id), &())
+            .await
+    }
+
     /// Scoped accessor for files attached to this vector store.
     pub fn files(&self) -> files::VectorStoreFiles<'a> {
         files::VectorStoreFiles::new(self.openai, self.id.clone())
@@ -63,7 +87,8 @@ mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::chat::SortOrder;
     use crate::interfaces::vector_stores::{
-        ChunkingStrategy, CreateVectorStoreRequest, ListVectorStoresRequest, StaticChunkingStrategy,
+        ChunkingStrategy, CreateVectorStoreRequest, ListVectorStoresRequest,
+        StaticChunkingStrategy, UpdateVectorStoreRequest,
     };
     use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -210,5 +235,96 @@ mod tests {
         assert_eq!(res.data.len(), 1);
         assert_eq!(res.data[0].usage_bytes, 1024);
         assert!(!res.has_more);
+    }
+
+    #[tokio::test]
+    async fn retrieve_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/vector_stores/vs_456"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "vs_456",
+                "object": "vector_store",
+                "name": null,
+                "description": null,
+                "status": "completed",
+                "created_at": 1700000000_i64,
+                "last_active_at": null,
+                "expires_at": null,
+                "expires_after": null,
+                "usage_bytes": 0,
+                "file_counts": {
+                    "total": 0, "completed": 0, "in_progress": 0, "failed": 0, "cancelled": 0
+                },
+                "metadata": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let res = client.vector_store("vs_456").retrieve().await.unwrap();
+        assert_eq!(res.id, "vs_456");
+    }
+
+    #[tokio::test]
+    async fn update_serializes_only_updatable_fields() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/vector_stores/vs_456"))
+            .and(body_json(serde_json::json!({"name": "Renamed"})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "vs_456",
+                "object": "vector_store",
+                "name": "Renamed",
+                "description": null,
+                "status": "completed",
+                "created_at": 1700000000_i64,
+                "last_active_at": null,
+                "expires_at": null,
+                "expires_after": null,
+                "usage_bytes": 0,
+                "file_counts": {
+                    "total": 0, "completed": 0, "in_progress": 0, "failed": 0, "cancelled": 0
+                },
+                "metadata": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = UpdateVectorStoreRequest::builder().name("Renamed").build();
+        let res = client.vector_store("vs_456").update(&req).await.unwrap();
+        assert_eq!(res.name.as_deref(), Some("Renamed"));
+    }
+
+    #[tokio::test]
+    async fn delete_maps_api_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/vector_stores/does-not-exist"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "No vector store found",
+                    "type": "invalid_request_error",
+                    "param": null,
+                    "code": "not_found"
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let err = client
+            .vector_store("does-not-exist")
+            .delete()
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            crate::shared::response_wrapper::OpenAIError::ApiError(_)
+        ));
     }
 }

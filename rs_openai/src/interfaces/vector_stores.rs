@@ -117,3 +117,23 @@ pub struct ListVectorStoresResponse {
     pub last_id: Option<String>,
     pub has_more: bool,
 }
+
+#[derive(Builder, Debug, Serialize, Clone)]
+pub struct UpdateVectorStoreRequest {
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_after: Option<VectorStoreExpiresAfter>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<std::collections::HashMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct DeleteVectorStoreResponse {
+    pub id: String,
+    pub object: String,
+    pub deleted: bool,
+}
