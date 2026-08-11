@@ -485,13 +485,15 @@ pub struct ListVectorStoresResponse {
 }
 ```
 
+**Note — this "old_string" reflects the plan's original template, not Task 1's actual output.** Task 1's implementer omitted the bare `use crate::interfaces::vector_stores;` line (it would have been unused dead code at that point in the plan, correctly flagged by clippy) and left the pre-existing `#[allow(dead_code)]` above `VectorStores<'a>` untouched (also pre-existing, from the Phase 2a scaffold). If your actual file doesn't match the "old_string" below exactly, use this note to reconcile: you need to (a) add back `use crate::interfaces::vector_stores;` (now genuinely needed, since `create`/`list` use qualified `vector_stores::Type` paths), and (b) remove the stale `#[allow(dead_code)]` above `VectorStores<'a>` (its field becomes genuinely read once `create`/`list` call `self.openai...`).
+
 In `rs_openai/src/apis/vector_stores/mod.rs`, add the necessary imports and the `create`/`list` methods. Replace:
 
 ```rust
 use crate::client::OpenAI;
-use crate::interfaces::vector_stores;
 pub use crate::interfaces::vector_stores::*;
 
+#[allow(dead_code)]
 pub struct VectorStores<'a> {
     openai: &'a OpenAI,
 }
