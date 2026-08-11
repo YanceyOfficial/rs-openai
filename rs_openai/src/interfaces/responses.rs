@@ -154,6 +154,9 @@ pub struct CreateResponseRequest {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_tier: Option<crate::interfaces::chat::ServiceTier>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
@@ -279,4 +282,101 @@ pub struct ListInputItemsResponse {
     pub first_id: Option<String>,
     pub last_id: Option<String>,
     pub has_more: bool,
+}
+
+/// A single Server-Sent Event from a streamed `Responses::create_with_stream` call. Covers
+/// only the events relevant to this crate's current (text + function-calling only) type
+/// surface — see docs/superpowers/specs/2026-08-11-responses-streaming-design.md for the
+/// full list of deferred event families (content_part, refusal, other tool types, reasoning).
+#[derive(Debug, Deserialize, Clone, Serialize)]
+#[serde(tag = "type")]
+pub enum ResponseStreamEvent {
+    #[serde(rename = "response.created")]
+    Created {
+        response: Response,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
+    #[serde(rename = "response.in_progress")]
+    InProgress {
+        response: Response,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
+    #[serde(rename = "response.completed")]
+    Completed {
+        response: Response,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
+    #[serde(rename = "response.failed")]
+    Failed {
+        response: Response,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
+    #[serde(rename = "response.incomplete")]
+    Incomplete {
+        response: Response,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
+    #[serde(rename = "response.output_item.added")]
+    OutputItemAdded {
+        output_index: u32,
+        item: ResponseOutputItem,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
+    #[serde(rename = "response.output_item.done")]
+    OutputItemDone {
+        output_index: u32,
+        item: ResponseOutputItem,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
+    #[serde(rename = "response.output_text.delta")]
+    OutputTextDelta {
+        item_id: String,
+        output_index: u32,
+        content_index: u32,
+        delta: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
+    #[serde(rename = "response.output_text.done")]
+    OutputTextDone {
+        item_id: String,
+        output_index: u32,
+        content_index: u32,
+        text: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
+    #[serde(rename = "response.function_call_arguments.delta")]
+    FunctionCallArgumentsDelta {
+        item_id: String,
+        output_index: u32,
+        delta: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
+    #[serde(rename = "response.function_call_arguments.done")]
+    FunctionCallArgumentsDone {
+        item_id: String,
+        output_index: u32,
+        arguments: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
+    #[serde(rename = "error")]
+    Error {
+        message: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        param: Option<serde_json::Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        code: Option<serde_json::Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_number: Option<u64>,
+    },
 }

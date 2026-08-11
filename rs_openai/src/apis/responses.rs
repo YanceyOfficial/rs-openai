@@ -74,8 +74,8 @@ mod tests {
     use crate::interfaces::chat::SortOrder;
     use crate::interfaces::responses::{
         CreateResponseRequest, ListInputItemsRequest, ResponseFunctionTool, ResponseInput,
-        ResponseInputItem, ResponseInputRole, ResponseTool, ResponseToolChoice,
-        ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
+        ResponseInputItem, ResponseInputRole, ResponseStreamEvent, ResponseTool,
+        ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
     };
     use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -479,5 +479,117 @@ mod tests {
             other => panic!("expected FunctionCallOutput, got {other:?}"),
         }
         assert!(!res.has_more);
+    }
+
+    #[test]
+    fn response_stream_event_created_deserializes_with_wrapped_response() {
+        let value = serde_json::json!({
+            "type": "response.created",
+            "sequence_number": 1,
+            "response": {
+                "id": "resp_1",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "in_progress",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null,
+                "previous_response_id": null,
+                "instructions": null,
+                "metadata": null
+            }
+        });
+
+        let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+        match event {
+            ResponseStreamEvent::Created {
+                response,
+                sequence_number,
+            } => {
+                assert_eq!(response.id, "resp_1");
+                assert_eq!(sequence_number, Some(1));
+            }
+            other => panic!("expected Created, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_stream_event_output_text_delta_deserializes_without_sequence_number() {
+        let value = serde_json::json!({
+            "type": "response.output_text.delta",
+            "item_id": "msg_1",
+            "output_index": 0,
+            "content_index": 0,
+            "delta": "Hello"
+        });
+
+        let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+        match event {
+            ResponseStreamEvent::OutputTextDelta {
+                item_id,
+                delta,
+                sequence_number,
+                ..
+            } => {
+                assert_eq!(item_id, "msg_1");
+                assert_eq!(delta, "Hello");
+                assert_eq!(sequence_number, None);
+            }
+            other => panic!("expected OutputTextDelta, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_stream_event_function_call_arguments_delta_deserializes() {
+        let value = serde_json::json!({
+            "type": "response.function_call_arguments.delta",
+            "item_id": "fc_1",
+            "output_index": 0,
+            "delta": "{\"location\":"
+        });
+
+        let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+        match event {
+            ResponseStreamEvent::FunctionCallArgumentsDelta { item_id, delta, .. } => {
+                assert_eq!(item_id, "fc_1");
+                assert_eq!(delta, "{\"location\":");
+            }
+            other => panic!("expected FunctionCallArgumentsDelta, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_stream_event_error_deserializes() {
+        let value = serde_json::json!({
+            "type": "error",
+            "message": "rate limit exceeded",
+            "param": null,
+            "code": "rate_limit_exceeded"
+        });
+
+        let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+        match event {
+            ResponseStreamEvent::Error { message, code, .. } => {
+                assert_eq!(message, "rate limit exceeded");
+                assert_eq!(code, Some(serde_json::json!("rate_limit_exceeded")));
+            }
+            other => panic!("expected Error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn create_response_request_serializes_stream_field_only_when_set() {
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .stream(true)
+            .build();
+        let json = serde_json::to_value(&req).unwrap();
+        assert_eq!(json["stream"], serde_json::json!(true));
+
+        let req_without_stream = CreateResponseRequest::builder().model("gpt-5-mini").build();
+        let json_without_stream = serde_json::to_value(&req_without_stream).unwrap();
+        assert!(json_without_stream.get("stream").is_none());
     }
 }
