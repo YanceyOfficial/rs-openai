@@ -193,3 +193,73 @@ pub struct VectorStoreSearchResponse {
     pub has_more: bool,
     pub next_page: Option<String>,
 }
+
+#[derive(Builder, Debug, Serialize, Clone)]
+pub struct CreateVectorStoreFileRequest {
+    #[builder(into)]
+    pub file_id: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<std::collections::HashMap<String, serde_json::Value>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunking_strategy: Option<ChunkingStrategy>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum VectorStoreFileStatus {
+    InProgress,
+    Completed,
+    Cancelled,
+    Failed,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct VectorStoreFileError {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct VectorStoreFile {
+    pub id: String,
+    pub object: String,
+    pub created_at: i64,
+    pub usage_bytes: u64,
+    pub vector_store_id: String,
+    pub status: VectorStoreFileStatus,
+    pub last_error: Option<VectorStoreFileError>,
+    pub chunking_strategy: Option<ChunkingStrategy>,
+    pub attributes: Option<std::collections::HashMap<String, serde_json::Value>>,
+}
+
+#[derive(Builder, Debug, Serialize, Clone)]
+pub struct ListVectorStoreFilesRequest {
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<crate::interfaces::chat::SortOrder>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ListVectorStoreFilesResponse {
+    pub object: String,
+    pub data: Vec<VectorStoreFile>,
+    pub first_id: Option<String>,
+    pub last_id: Option<String>,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct DeleteVectorStoreFileResponse {
+    pub id: String,
+    pub object: String,
+    pub deleted: bool,
+}
