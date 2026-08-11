@@ -70,6 +70,16 @@ impl<'a> VectorStore<'a> {
             .await
     }
 
+    /// Searches a vector store's attached files.
+    pub async fn search(
+        &self,
+        req: &vector_stores::VectorStoreSearchRequest,
+    ) -> OpenAIResponse<vector_stores::VectorStoreSearchResponse> {
+        self.openai
+            .post(&format!("/vector_stores/{}/search", self.id), req)
+            .await
+    }
+
     /// Scoped accessor for files attached to this vector store.
     pub fn files(&self) -> files::VectorStoreFiles<'a> {
         files::VectorStoreFiles::new(self.openai, self.id.clone())
@@ -88,7 +98,8 @@ mod tests {
     use crate::interfaces::chat::SortOrder;
     use crate::interfaces::vector_stores::{
         ChunkingStrategy, CreateVectorStoreRequest, ListVectorStoresRequest,
-        StaticChunkingStrategy, UpdateVectorStoreRequest,
+        StaticChunkingStrategy, UpdateVectorStoreRequest, VectorStoreSearchQuery,
+        VectorStoreSearchRequest,
     };
     use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -326,5 +337,73 @@ mod tests {
             err,
             crate::shared::response_wrapper::OpenAIError::ApiError(_)
         ));
+    }
+
+    #[tokio::test]
+    async fn search_serializes_single_string_query() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/vector_stores/vs_456/search"))
+            .and(body_json(serde_json::json!({"query": "refund policy"})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "vector_store.search_results.page",
+                "search_query": ["refund policy"],
+                "data": [{
+                    "file_id": "file-abc123",
+                    "filename": "policy.md",
+                    "score": 0.87,
+                    "attributes": {"category": "billing"},
+                    "content": [{"type": "text", "text": "Refunds are processed within 5 days."}]
+                }],
+                "has_more": false,
+                "next_page": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = VectorStoreSearchRequest::builder()
+            .query(VectorStoreSearchQuery::Single("refund policy".to_string()))
+            .build();
+
+        let res = client.vector_store("vs_456").search(&req).await.unwrap();
+        assert_eq!(res.data.len(), 1);
+        assert_eq!(res.data[0].file_id, "file-abc123");
+        assert_eq!(
+            res.data[0].content[0].text,
+            "Refunds are processed within 5 days."
+        );
+    }
+
+    #[tokio::test]
+    async fn search_serializes_multiple_string_query() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/vector_stores/vs_456/search"))
+            .and(body_json(serde_json::json!({
+                "query": ["refund policy", "cancellation policy"]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "vector_store.search_results.page",
+                "search_query": ["refund policy", "cancellation policy"],
+                "data": [],
+                "has_more": false,
+                "next_page": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = VectorStoreSearchRequest::builder()
+            .query(VectorStoreSearchQuery::Multiple(vec![
+                "refund policy".to_string(),
+                "cancellation policy".to_string(),
+            ]))
+            .build();
+
+        let res = client.vector_store("vs_456").search(&req).await.unwrap();
+        assert_eq!(res.search_query.len(), 2);
     }
 }

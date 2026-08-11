@@ -137,3 +137,59 @@ pub struct DeleteVectorStoreResponse {
     pub object: String,
     pub deleted: bool,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum VectorStoreSearchQuery {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct VectorStoreSearchRankingOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ranker: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score_threshold: Option<f32>,
+}
+
+#[derive(Builder, Debug, Serialize, Clone)]
+pub struct VectorStoreSearchRequest {
+    pub query: VectorStoreSearchQuery,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filters: Option<serde_json::Value>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_num_results: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ranking_options: Option<VectorStoreSearchRankingOptions>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rewrite_query: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct VectorStoreSearchResultContent {
+    pub r#type: String,
+    pub text: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct VectorStoreSearchResult {
+    pub file_id: String,
+    pub filename: String,
+    pub score: f32,
+    pub attributes: Option<std::collections::HashMap<String, serde_json::Value>>,
+    pub content: Vec<VectorStoreSearchResultContent>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct VectorStoreSearchResponse {
+    pub object: String,
+    pub search_query: Vec<String>,
+    pub data: Vec<VectorStoreSearchResult>,
+    pub has_more: bool,
+    pub next_page: Option<String>,
+}
