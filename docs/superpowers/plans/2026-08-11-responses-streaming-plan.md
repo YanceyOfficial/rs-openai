@@ -15,12 +15,13 @@
 - `ResponseStreamEvent`'s `type` strings are dot-separated literals (e.g. `response.output_item.added`) — NOT expressible via `#[serde(rename_all = "snake_case")]` (which would produce `output_item_added`, no `response.` prefix, underscores not dots). Every variant needs an explicit per-variant `#[serde(rename = "...")]`, following the exact precedent already in this crate: `BatchEndpoint` in `rs_openai/src/interfaces/batch.rs` (e.g. `#[serde(rename = "/v1/responses")]`).
 - Every `sequence_number` field on every `ResponseStreamEvent` variant is `Option<u64>`, never bare `u64` — applying the same deserialization-fragility lesson already applied to `ResponseUsageTokenDetails` in the core slice (an uncertain-presence field must not be required, or one real event omitting it fails the whole stream item).
 - Lifecycle variants (`Created`/`InProgress`/`Completed`/`Failed`/`Incomplete`) wrap the existing `Response` type directly (`rs_openai/src/interfaces/responses.rs`) — do not duplicate a smaller/partial response-snapshot type. `OutputItemAdded`/`OutputItemDone` wrap the existing `ResponseOutputItem` directly. `Error`'s fields (`message: String`, `param: Option<serde_json::Value>`, `code: Option<serde_json::Value>`) match `ApiErrorDetail` (`rs_openai/src/shared/response_wrapper.rs`) exactly, minus `r#type` (subsumed by the enum's own `"error"` tag) — do not invent a different error shape.
-- `create`/`create_with_stream` must structurally mirror `Chat::create`/`create_with_stream` (`rs_openai/src/apis/chat.rs`) and `Completions::create`/`create_with_stream` exactly: same `is_stream(req.stream)` gate from `crate::shared::utils::is_stream`, same `OpenAIError::InvalidArgument` rejection wording pattern ("When stream is true/false, use Responses::create_with_stream"/"...::create"), same `self.openai.post_stream(...)` call. No new client.rs changes — `post_stream`/`stream_sse<T>` are already fully generic over the deserialized type.
-- **Do not include a literal `data: [DONE]\n\n` sentinel in any mocked SSE test body.** Unlike Chat (which is confirmed to send `[DONE]`), whether Responses sends a `[DONE]` sentinel was not confirmed this session (see spec Context). The existing `stream_sse` implementation already handles a stream that simply closes after its last real event with no sentinel (the loop ends naturally when `event_source.next()` returns `None`) — so every test's mocked SSE body should end right after its last `data: {...}\n\n` line, proving that code path specifically.
+- `create`/`create_with_stream` must structurally mirror `Chat::create`/`create_with_stream` (`rs_openai/src/apis/chat.rs`) and `Completions::create`/`create_with_stream` exactly: same `is_stream(req.stream)` gate from `crate::shared::utils::is_stream`, same `OpenAIError::InvalidArgument` rejection wording pattern ("When stream is true/false, use Responses::create_with_stream"/"...::create"), same `self.openai.post_stream(...)` call.
+- **Do not include a literal `data: [DONE]\n\n` sentinel in any mocked SSE test body.** Unlike Chat (which is confirmed to send `[DONE]`), whether Responses sends a `[DONE]` sentinel was not confirmed this session (see spec Context).
+- **AMENDMENT (discovered during Task 2's first review pass, resolved by explicit project-owner decision — supersedes the original "no client.rs changes" constraint above):** the plan's original premise that `stream_sse` (`rs_openai/src/client.rs`) "ends naturally when `event_source.next()` returns `None`" on a `[DONE]`-less connection close is **wrong**. Empirically confirmed: `reqwest-eventsource` 0.6.0 surfaces a real, no-more-data connection close as `Poll::Ready(Some(Err(Error::StreamEnded)))`, NOT as `Poll::Ready(None)` (see `reqwest-eventsource` source, `event_source.rs`'s `Poll::Ready(None) => { let err = Error::StreamEnded; ... Poll::Ready(Some(Err(err))) }`). `stream_sse`'s current `Err(e) => { tx.send(Err(OpenAIError::StreamError(e.to_string()))); }` arm forwards this as a spurious trailing error to every consumer that fully drains the stream without a `[DONE]` sentinel — confirmed by reproducing the exact panic (`StreamError("Stream ended")`) this way. Since Chat (the crate's only other `create_with_stream`) is confirmed to always send `[DONE]`, this defect was latent and never previously exercised. **Task 2 is amended to include a fix to `stream_sse` in `rs_openai/src/client.rs`**: treat `Err(reqwest_eventsource::Error::StreamEnded)` as a clean stream end (`break`, same as reaching `[DONE]`), not an error to forward. This fixes the bug for both a `[DONE]`-sending API (no behavior change — `[DONE]` still breaks the loop first, so `StreamEnded` is never reached) and a non-`[DONE]`-sending API (now breaks cleanly instead of surfacing a spurious error). The 3 tests that were incorrectly patched to add `[DONE]` (violating the original constraint below) must be reverted back to their original no-`[DONE]` bodies now that the underlying plumbing is fixed to support that correctly.
 - Every task's "done" check includes `cargo build --workspace --all-targets`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo test --workspace`, and `cargo fmt --all -- --check`.
 - **This machine has `http_proxy`/`https_proxy`/`all_proxy` set to a local proxy client.** `reqwest` (used by both the crate itself and every `wiremock`-based test) honors these by default and routes even `127.0.0.1`-bound test traffic through that proxy, which breaks every HTTP-mocked test with a misleading `JSONDeserialize(Error("EOF while parsing a value", ...))` — this is an environment quirk, not a code defect, confirmed by the fact that the crate's 6 pure `#[test]`s (no HTTP) are unaffected while every `#[tokio::test]` that hits a `wiremock::MockServer` fails identically. **Always run `cargo test`/`cargo build`/`cargo clippy` with `NO_PROXY=127.0.0.1,localhost` set** (e.g. `NO_PROXY=127.0.0.1,localhost cargo test --workspace`) to bypass it. If a task's tests fail with this exact `EOF while parsing a value` symptom on every HTTP test and none of the pure unit tests, re-run with `NO_PROXY` set before concluding the implementation is broken.
 - Follow TDD: write the failing test first, confirm it fails for the expected reason, then implement.
-- `rs_openai/src/apis/mod.rs`, `rs_openai/src/interfaces/mod.rs`, and `rs_openai/src/client.rs` are already fully wired for `responses` from the core slice — do not touch any of them in this plan.
+- `rs_openai/src/apis/mod.rs` and `rs_openai/src/interfaces/mod.rs` are already fully wired for `responses` from the core slice — do not touch either in this plan. `rs_openai/src/client.rs` may ONLY be touched for the specific `stream_sse` fix described in the AMENDMENT above — no other changes to that file.
 
 ---
 
@@ -347,10 +348,51 @@ EOF
 
 **Files:**
 - Modify: `rs_openai/src/apis/responses.rs`
+- Modify: `rs_openai/src/client.rs` (per the AMENDMENT in Global Constraints — the `stream_sse` `StreamEnded` fix only, no other changes)
 
 **Interfaces:**
-- Consumes: `ResponseStreamEvent`, `CreateResponseRequest.stream` from Task 1; `crate::shared::utils::is_stream`, `crate::shared::response_wrapper::OpenAIError`, `OpenAI::post_stream` (all pre-existing crate infrastructure, unchanged).
-- Produces: `Responses::create_with_stream(&self, req: &responses::CreateResponseRequest) -> OpenAIResponse<Pin<Box<dyn Stream<Item = OpenAIResponse<responses::ResponseStreamEvent>> + Send>>>`; `Responses::create` now rejects `stream: true`. Nothing later in this plan depends on this task's specifics beyond it existing and working — Task 3 is a read-only cross-check.
+- Consumes: `ResponseStreamEvent`, `CreateResponseRequest.stream` from Task 1; `crate::shared::utils::is_stream`, `crate::shared::response_wrapper::OpenAIError`, `OpenAI::post_stream` (all pre-existing crate infrastructure).
+- Produces: `Responses::create_with_stream(&self, req: &responses::CreateResponseRequest) -> OpenAIResponse<Pin<Box<dyn Stream<Item = OpenAIResponse<responses::ResponseStreamEvent>> + Send>>>`; `Responses::create` now rejects `stream: true`; `stream_sse` (shared, used by Chat/Completions too) now treats a `[DONE]`-less connection close as a clean stream end instead of a spurious trailing error. Nothing later in this plan depends on this task's specifics beyond it existing and working — Task 3 is a read-only cross-check.
+
+**`stream_sse` fix (in `rs_openai/src/client.rs`):** inside the `tokio::spawn`'d loop, add a match arm before the general `Err(e) => { ... }` arm:
+
+```rust
+                match evt {
+                    // `reqwest-eventsource` surfaces a normal "no more data" connection close as
+                    // this variant (see its `Poll::Ready(None)` handling), not as `None` from
+                    // `event_source.next()` directly -- some APIs may not send a `[DONE]`
+                    // sentinel, so this must be treated the same as reaching `[DONE]`: break
+                    // without forwarding a spurious error to the consumer.
+                    Err(reqwest_eventsource::Error::StreamEnded) => break,
+                    Err(e) => {
+                        if tx
+                            .send(Err(OpenAIError::StreamError(e.to_string())))
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(evt) => match evt {
+                        Event::Message(message) => {
+                            if message.data == "[DONE]" {
+                                break;
+                            }
+
+                            let response = match serde_json::from_str::<T>(&message.data) {
+                                Err(e) => Err(OpenAIError::JSONDeserialize(e)),
+                                Ok(output) => Ok(output),
+                            };
+
+                            if tx.send(response).is_err() {
+                                break;
+                            }
+                        }
+                        Event::Open => continue,
+                    },
+                }
+```
+
+This is additive to the existing match — every other arm is unchanged. `reqwest_eventsource::Error` doesn't need a new `use` import; refer to it via the fully-qualified path as shown (the crate is already a direct dependency, imported unqualified items are `Event`, `EventSource`, `RequestBuilderExt` — this avoids a naming collision with the crate's own `OpenAIError`).
 
 - [ ] **Step 1: Write the failing tests**
 
