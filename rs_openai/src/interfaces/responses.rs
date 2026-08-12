@@ -86,6 +86,13 @@ pub enum ResponseToolChoice {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum ResponseConversationParam {
+    Id(String),
+    Object { id: String },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum TruncationStrategy {
     Auto,
@@ -157,6 +164,9 @@ pub struct CreateResponseRequest {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversation: Option<ResponseConversationParam>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]

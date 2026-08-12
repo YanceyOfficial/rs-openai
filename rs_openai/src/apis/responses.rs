@@ -98,9 +98,10 @@ mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::chat::SortOrder;
     use crate::interfaces::responses::{
-        CreateResponseRequest, ListInputItemsRequest, ResponseFunctionTool, ResponseInput,
-        ResponseInputItem, ResponseInputRole, ResponseStreamEvent, ResponseTool,
-        ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
+        CreateResponseRequest, ListInputItemsRequest, ResponseConversationParam,
+        ResponseFunctionTool, ResponseInput, ResponseInputItem, ResponseInputRole,
+        ResponseStreamEvent, ResponseTool, ResponseToolChoice, ResponseToolChoiceFunctionName,
+        ResponseToolChoiceMode,
     };
     use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path};
@@ -1017,5 +1018,61 @@ mod tests {
             }
             other => panic!("expected Incomplete, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn response_conversation_param_serializes_bare_string_id() {
+        let param = ResponseConversationParam::Id("conv_123".to_string());
+        assert_eq!(
+            serde_json::to_value(&param).unwrap(),
+            serde_json::json!("conv_123")
+        );
+    }
+
+    #[test]
+    fn response_conversation_param_serializes_object_with_id() {
+        let param = ResponseConversationParam::Object {
+            id: "conv_123".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&param).unwrap(),
+            serde_json::json!({"id": "conv_123"})
+        );
+    }
+
+    #[tokio::test]
+    async fn create_serializes_conversation_as_bare_string() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "hi",
+                "conversation": "conv_123"
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_1",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("hi".to_string()))
+            .conversation(ResponseConversationParam::Id("conv_123".to_string()))
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_1");
     }
 }
