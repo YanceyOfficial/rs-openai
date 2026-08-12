@@ -8,5 +8,11 @@ target
 # Env files
 .env
 
+# Audio::create_speech's tests write real fixture files to the crate root
+# (rs_openai/src/apis/audio/mod.rs) during `cargo test` runs -- harmless but
+# should never be tracked
+rs_openai/*.mp3
+rs_openai/*.opus
+
 # Scratch state for superpowers subagent-driven-development
 .superpowers/
