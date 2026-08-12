@@ -17,3 +17,16 @@ pub struct Conversation {
     pub created_at: i64,
     pub metadata: Option<std::collections::HashMap<String, String>>,
 }
+
+#[derive(Builder, Debug, Serialize, Clone)]
+pub struct UpdateConversationRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<std::collections::HashMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct DeleteConversationResponse {
+    pub id: String,
+    pub object: String,
+    pub deleted: bool,
+}
