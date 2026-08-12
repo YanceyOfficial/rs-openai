@@ -325,8 +325,43 @@ pub struct ResponseFileSearchCallItem {
     pub results: Option<Vec<FileSearchResult>>,
 }
 
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct WebSearchActionSource {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub url: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum WebSearchAction {
+    Search {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        query: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        queries: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sources: Option<Vec<WebSearchActionSource>>,
+    },
+    OpenPage {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+    },
+    FindInPage {
+        pattern: String,
+        url: String,
+    },
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ResponseWebSearchCallItem {
+    pub id: String,
+    pub action: WebSearchAction,
+    pub status: String,
+}
+
 /// One item in a response's `output` array. Extensible union — this slice implements
-/// `Message`/`FunctionCall`/`FileSearchCall`; later slices add `Reasoning`/`WebSearchCall`/
+/// `Message`/`FunctionCall`/`FileSearchCall`/`WebSearchCall`; later slices add `Reasoning`/
 /// `ComputerCall`/`CodeInterpreterCall`/`ImageGenerationCall`/`McpCall`/etc. as new
 /// non-breaking variants.
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -335,6 +370,7 @@ pub enum ResponseOutputItem {
     Message(ResponseOutputMessage),
     FunctionCall(ResponseFunctionCallItem),
     FileSearchCall(ResponseFileSearchCallItem),
+    WebSearchCall(ResponseWebSearchCallItem),
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]

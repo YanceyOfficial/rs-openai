@@ -102,7 +102,7 @@ mod tests {
         ResponseConversationParam, ResponseFileSearchTool, ResponseFunctionTool, ResponseInput,
         ResponseInputItem, ResponseInputRole, ResponseOutputItem, ResponseStreamEvent,
         ResponseTool, ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
-        ResponseWebSearchTool, WebSearchContextSize, WebSearchUserLocation,
+        ResponseWebSearchTool, WebSearchAction, WebSearchContextSize, WebSearchUserLocation,
     };
     use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path};
@@ -1261,5 +1261,124 @@ mod tests {
 
         let res = client.responses().create(&req).await.unwrap();
         assert_eq!(res.id, "resp_3");
+    }
+
+    #[tokio::test]
+    async fn create_deserializes_web_search_call_with_search_action() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_4",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [{
+                    "type": "web_search_call",
+                    "id": "ws_1",
+                    "status": "completed",
+                    "action": {
+                        "type": "search",
+                        "query": "latest news about AI"
+                    }
+                }],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("Search for AI news".to_string()))
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        match &res.output[0] {
+            ResponseOutputItem::WebSearchCall(call) => {
+                assert_eq!(call.id, "ws_1");
+                match &call.action {
+                    WebSearchAction::Search { query, .. } => {
+                        assert_eq!(query.as_deref(), Some("latest news about AI"));
+                    }
+                    other => panic!("expected Search action, got {other:?}"),
+                }
+            }
+            other => panic!("expected WebSearchCall, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn web_search_action_open_page_deserializes() {
+        let value = serde_json::json!({"type": "open_page", "url": "https://example.com"});
+        let action: WebSearchAction = serde_json::from_value(value).unwrap();
+        match action {
+            WebSearchAction::OpenPage { url } => {
+                assert_eq!(url.as_deref(), Some("https://example.com"));
+            }
+            other => panic!("expected OpenPage, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn web_search_action_find_in_page_deserializes_with_required_fields() {
+        let value = serde_json::json!({
+            "type": "find_in_page",
+            "pattern": "climate change",
+            "url": "https://example.com/article"
+        });
+        let action: WebSearchAction = serde_json::from_value(value).unwrap();
+        match action {
+            WebSearchAction::FindInPage { pattern, url } => {
+                assert_eq!(pattern, "climate change");
+                assert_eq!(url, "https://example.com/article");
+            }
+            other => panic!("expected FindInPage, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_output_item_discriminates_all_four_variants_in_same_array() {
+        let value = serde_json::json!([
+            {
+                "type": "message",
+                "id": "msg_1",
+                "role": "assistant",
+                "status": "completed",
+                "content": [{"type": "output_text", "text": "Here's what I found.", "annotations": []}]
+            },
+            {
+                "type": "function_call",
+                "id": "fc_1",
+                "call_id": "call_abc123",
+                "name": "get_weather",
+                "arguments": "{}",
+                "status": "completed"
+            },
+            {
+                "type": "file_search_call",
+                "id": "fs_1",
+                "queries": ["policy"],
+                "status": "completed",
+                "results": null
+            },
+            {
+                "type": "web_search_call",
+                "id": "ws_2",
+                "status": "completed",
+                "action": {"type": "search", "query": "weather"}
+            }
+        ]);
+
+        let items: Vec<ResponseOutputItem> = serde_json::from_value(value).unwrap();
+        assert_eq!(items.len(), 4);
+        assert!(matches!(items[0], ResponseOutputItem::Message(_)));
+        assert!(matches!(items[1], ResponseOutputItem::FunctionCall(_)));
+        assert!(matches!(items[2], ResponseOutputItem::FileSearchCall(_)));
+        assert!(matches!(items[3], ResponseOutputItem::WebSearchCall(_)));
     }
 }
