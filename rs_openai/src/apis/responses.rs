@@ -98,10 +98,10 @@ mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::chat::SortOrder;
     use crate::interfaces::responses::{
-        CreateResponseRequest, ListInputItemsRequest, ResponseConversationParam,
-        ResponseFunctionTool, ResponseInput, ResponseInputItem, ResponseInputRole,
-        ResponseStreamEvent, ResponseTool, ResponseToolChoice, ResponseToolChoiceFunctionName,
-        ResponseToolChoiceMode,
+        CreateResponseRequest, FileSearchRankingOptions, ListInputItemsRequest,
+        ResponseConversationParam, ResponseFileSearchTool, ResponseFunctionTool, ResponseInput,
+        ResponseInputItem, ResponseInputRole, ResponseOutputItem, ResponseStreamEvent,
+        ResponseTool, ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
     };
     use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path};
@@ -1074,5 +1074,133 @@ mod tests {
 
         let res = client.responses().create(&req).await.unwrap();
         assert_eq!(res.id, "resp_1");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_file_search_tool_and_deserializes_call_with_results() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "What does our refund policy say?",
+                "tools": [{
+                    "type": "file_search",
+                    "vector_store_ids": ["vs_456"],
+                    "max_num_results": 5,
+                    "ranking_options": {
+                        "ranker": "auto",
+                        "score_threshold": 0.5
+                    }
+                }]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_2",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [{
+                    "type": "file_search_call",
+                    "id": "fs_1",
+                    "queries": ["refund policy"],
+                    "status": "completed",
+                    "results": [{
+                        "attributes": {"category": "billing"},
+                        "file_id": "file-abc123",
+                        "filename": "policy.md",
+                        "score": 0.87,
+                        "text": "Refunds are processed within 5 days."
+                    }]
+                }],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let tool = ResponseTool::FileSearch(
+            ResponseFileSearchTool::builder()
+                .vector_store_ids(vec!["vs_456".to_string()])
+                .max_num_results(5_u32)
+                .ranking_options(
+                    FileSearchRankingOptions::builder()
+                        .ranker("auto")
+                        .score_threshold(0.5_f32)
+                        .build(),
+                )
+                .build(),
+        );
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text(
+                "What does our refund policy say?".to_string(),
+            ))
+            .tools(vec![tool])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        match &res.output[0] {
+            ResponseOutputItem::FileSearchCall(call) => {
+                assert_eq!(call.id, "fs_1");
+                assert_eq!(call.queries, vec!["refund policy".to_string()]);
+                assert_eq!(call.status, "completed");
+                let results = call.results.as_ref().expect("expected results");
+                assert_eq!(results.len(), 1);
+                assert_eq!(
+                    results[0].text.as_deref(),
+                    Some("Refunds are processed within 5 days.")
+                );
+            }
+            other => panic!("expected FileSearchCall, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_file_search_call_deserializes_with_null_results() {
+        let value = serde_json::json!({
+            "type": "file_search_call",
+            "id": "fs_2",
+            "queries": ["deep research"],
+            "status": "in_progress",
+            "results": null
+        });
+
+        let item: ResponseOutputItem = serde_json::from_value(value).unwrap();
+        match item {
+            ResponseOutputItem::FileSearchCall(call) => {
+                assert_eq!(call.status, "in_progress");
+                assert!(call.results.is_none());
+            }
+            other => panic!("expected FileSearchCall, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_output_item_discriminates_message_and_file_search_call_in_same_array() {
+        let value = serde_json::json!([
+            {
+                "type": "message",
+                "id": "msg_1",
+                "role": "assistant",
+                "status": "completed",
+                "content": [{"type": "output_text", "text": "Here's what I found.", "annotations": []}]
+            },
+            {
+                "type": "file_search_call",
+                "id": "fs_3",
+                "queries": ["refund policy"],
+                "status": "completed",
+                "results": null
+            }
+        ]);
+
+        let items: Vec<ResponseOutputItem> = serde_json::from_value(value).unwrap();
+        assert_eq!(items.len(), 2);
+        assert!(matches!(items[0], ResponseOutputItem::Message(_)));
+        assert!(matches!(items[1], ResponseOutputItem::FileSearchCall(_)));
     }
 }

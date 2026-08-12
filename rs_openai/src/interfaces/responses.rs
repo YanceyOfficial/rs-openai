@@ -47,13 +47,49 @@ pub struct ResponseFunctionTool {
     pub strict: Option<bool>,
 }
 
-/// A tool the model may call. Extensible union — this slice implements only `Function`;
-/// later slices add `WebSearch`/`FileSearch`/`CodeInterpreter`/`ComputerUse`/
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct FileSearchRankingOptionsHybridSearch {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedding_weight: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_weight: Option<f32>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct FileSearchRankingOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hybrid_search: Option<FileSearchRankingOptionsHybridSearch>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ranker: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score_threshold: Option<f32>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ResponseFileSearchTool {
+    pub vector_store_ids: Vec<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filters: Option<serde_json::Value>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_num_results: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ranking_options: Option<FileSearchRankingOptions>,
+}
+
+/// A tool the model may call. Extensible union — this slice implements `Function` and
+/// `FileSearch`; later slices add `WebSearch`/`CodeInterpreter`/`ComputerUse`/
 /// `ImageGeneration`/`Mcp` as new non-breaking variants.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseTool {
     Function(ResponseFunctionTool),
+    FileSearch(ResponseFileSearchTool),
 }
 
 /// The plain string modes `tool_choice` can take.
@@ -221,8 +257,25 @@ pub struct ResponseFunctionCallItem {
     pub status: ResponseStatus,
 }
 
-/// One item in a response's `output` array. Extensible union — this slice implements only
-/// `Message`/`FunctionCall`; later slices add `Reasoning`/`WebSearchCall`/`FileSearchCall`/
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct FileSearchResult {
+    pub attributes: Option<std::collections::HashMap<String, serde_json::Value>>,
+    pub file_id: Option<String>,
+    pub filename: Option<String>,
+    pub score: Option<f32>,
+    pub text: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ResponseFileSearchCallItem {
+    pub id: String,
+    pub queries: Vec<String>,
+    pub status: String,
+    pub results: Option<Vec<FileSearchResult>>,
+}
+
+/// One item in a response's `output` array. Extensible union — this slice implements
+/// `Message`/`FunctionCall`/`FileSearchCall`; later slices add `Reasoning`/`WebSearchCall`/
 /// `ComputerCall`/`CodeInterpreterCall`/`ImageGenerationCall`/`McpCall`/etc. as new
 /// non-breaking variants.
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -230,6 +283,7 @@ pub struct ResponseFunctionCallItem {
 pub enum ResponseOutputItem {
     Message(ResponseOutputMessage),
     FunctionCall(ResponseFunctionCallItem),
+    FileSearchCall(ResponseFileSearchCallItem),
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
