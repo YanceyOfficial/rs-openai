@@ -102,6 +102,7 @@ mod tests {
         ResponseConversationParam, ResponseFileSearchTool, ResponseFunctionTool, ResponseInput,
         ResponseInputItem, ResponseInputRole, ResponseOutputItem, ResponseStreamEvent,
         ResponseTool, ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
+        ResponseWebSearchTool, WebSearchContextSize, WebSearchUserLocation,
     };
     use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path};
@@ -1202,5 +1203,63 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert!(matches!(items[0], ResponseOutputItem::Message(_)));
         assert!(matches!(items[1], ResponseOutputItem::FileSearchCall(_)));
+    }
+
+    #[tokio::test]
+    async fn create_serializes_web_search_tool_with_location_and_context_size() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "What's the weather in London right now?",
+                "tools": [{
+                    "type": "web_search",
+                    "search_context_size": "low",
+                    "user_location": {
+                        "type": "approximate",
+                        "city": "London",
+                        "country": "GB"
+                    }
+                }]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_3",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let tool = ResponseTool::WebSearch(
+            ResponseWebSearchTool::builder()
+                .search_context_size(WebSearchContextSize::Low)
+                .user_location(
+                    WebSearchUserLocation::builder()
+                        .kind("approximate")
+                        .city("London")
+                        .country("GB")
+                        .build(),
+                )
+                .build(),
+        );
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text(
+                "What's the weather in London right now?".to_string(),
+            ))
+            .tools(vec![tool])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_3");
     }
 }

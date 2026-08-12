@@ -82,14 +82,65 @@ pub struct ResponseFileSearchTool {
     pub ranking_options: Option<FileSearchRankingOptions>,
 }
 
-/// A tool the model may call. Extensible union — this slice implements `Function` and
-/// `FileSearch`; later slices add `WebSearch`/`CodeInterpreter`/`ComputerUse`/
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct WebSearchFilters {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_domains: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum WebSearchContextSize {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct WebSearchUserLocation {
+    #[builder(into)]
+    #[serde(rename = "type")]
+    pub kind: String,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ResponseWebSearchTool {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filters: Option<WebSearchFilters>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_context_size: Option<WebSearchContextSize>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_location: Option<WebSearchUserLocation>,
+}
+
+/// A tool the model may call. Extensible union — this slice implements `Function`,
+/// `FileSearch`, and `WebSearch`; later slices add `CodeInterpreter`/`ComputerUse`/
 /// `ImageGeneration`/`Mcp` as new non-breaking variants.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseTool {
     Function(ResponseFunctionTool),
     FileSearch(ResponseFileSearchTool),
+    WebSearch(ResponseWebSearchTool),
 }
 
 /// The plain string modes `tool_choice` can take.
