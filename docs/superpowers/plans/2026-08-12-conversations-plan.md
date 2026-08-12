@@ -389,7 +389,26 @@ pub struct DeleteConversationResponse {
 }
 ```
 
-In `rs_openai/src/apis/conversations.rs`, add the three methods to `impl<'a> Conversation<'a>`. Replace:
+In `rs_openai/src/apis/conversations.rs`, first remove the now-stale `#[allow(dead_code)]` above `pub struct Conversation<'a>` (its fields become genuinely read once `retrieve`/`update`/`delete` exist — same cleanup already established for `Responses`/`Response` and `VectorStores`/`VectorStore` in prior slices). Replace:
+
+```rust
+#[allow(dead_code)]
+pub struct Conversation<'a> {
+    openai: &'a OpenAI,
+    id: String,
+}
+```
+
+with:
+
+```rust
+pub struct Conversation<'a> {
+    openai: &'a OpenAI,
+    id: String,
+}
+```
+
+Then add the three methods to `impl<'a> Conversation<'a>`. Replace:
 
 ```rust
 impl<'a> Conversation<'a> {
