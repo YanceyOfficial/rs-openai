@@ -97,11 +97,13 @@ impl<'a> Response<'a> {
 mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::chat::SortOrder;
+    use crate::interfaces::images::{Background, ImageSize, Quality};
     use crate::interfaces::responses::{
-        CreateResponseRequest, FileSearchRankingOptions, ListInputItemsRequest,
-        ResponseConversationParam, ResponseFileSearchTool, ResponseFunctionTool, ResponseInput,
-        ResponseInputItem, ResponseInputRole, ResponseOutputItem, ResponseStreamEvent,
-        ResponseTool, ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
+        CreateResponseRequest, FileSearchRankingOptions, ImageGenerationAction,
+        ListInputItemsRequest, ResponseConversationParam, ResponseFileSearchTool,
+        ResponseFunctionTool, ResponseImageGenerationTool, ResponseInput, ResponseInputItem,
+        ResponseInputRole, ResponseOutputItem, ResponseStreamEvent, ResponseTool,
+        ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
         ResponseWebSearchTool, WebSearchAction, WebSearchContextSize, WebSearchUserLocation,
     };
     use futures::StreamExt;
@@ -1380,5 +1382,57 @@ mod tests {
         assert!(matches!(items[1], ResponseOutputItem::FunctionCall(_)));
         assert!(matches!(items[2], ResponseOutputItem::FileSearchCall(_)));
         assert!(matches!(items[3], ResponseOutputItem::WebSearchCall(_)));
+    }
+
+    #[tokio::test]
+    async fn create_serializes_image_generation_tool_reusing_images_module_enums() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "Draw a gray tabby cat hugging an otter",
+                "tools": [{
+                    "type": "image_generation",
+                    "action": "generate",
+                    "background": "transparent",
+                    "quality": "high",
+                    "size": "1024x1024"
+                }]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_5",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let tool = ResponseTool::ImageGeneration(
+            ResponseImageGenerationTool::builder()
+                .action(ImageGenerationAction::Generate)
+                .background(Background::Transparent)
+                .quality(Quality::High)
+                .size(ImageSize::S1024x1024)
+                .build(),
+        );
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text(
+                "Draw a gray tabby cat hugging an otter".to_string(),
+            ))
+            .tools(vec![tool])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_5");
     }
 }

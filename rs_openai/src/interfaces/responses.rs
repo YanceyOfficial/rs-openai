@@ -132,15 +132,58 @@ pub struct ResponseWebSearchTool {
     pub user_location: Option<WebSearchUserLocation>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageGenerationAction {
+    Generate,
+    Edit,
+    Auto,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ResponseImageGenerationTool {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<ImageGenerationAction>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<crate::interfaces::images::Background>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_fidelity: Option<crate::interfaces::images::InputFidelity>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub moderation: Option<crate::interfaces::images::Moderation>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_compression: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_format: Option<crate::interfaces::images::OutputFormat>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partial_images: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quality: Option<crate::interfaces::images::Quality>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<crate::interfaces::images::ImageSize>,
+}
+
 /// A tool the model may call. Extensible union — this slice implements `Function`,
-/// `FileSearch`, and `WebSearch`; later slices add `CodeInterpreter`/`ComputerUse`/
-/// `ImageGeneration`/`Mcp` as new non-breaking variants.
+/// `FileSearch`, `WebSearch`, and `ImageGeneration`; later slices add `CodeInterpreter`/
+/// `ComputerUse`/`Mcp` as new non-breaking variants.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseTool {
     Function(ResponseFunctionTool),
     FileSearch(ResponseFileSearchTool),
     WebSearch(ResponseWebSearchTool),
+    ImageGeneration(ResponseImageGenerationTool),
 }
 
 /// The plain string modes `tool_choice` can take.
