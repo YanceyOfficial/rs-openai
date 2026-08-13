@@ -174,6 +174,63 @@ pub struct ResponseImageGenerationTool {
     pub size: Option<crate::interfaces::images::ImageSize>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum McpApprovalMode {
+    Never,
+    Always,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct McpToolNameFilter {
+    pub tool_names: Vec<String>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct McpApprovalFilter {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub never: Option<McpToolNameFilter>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub always: Option<McpToolNameFilter>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum McpRequireApproval {
+    Mode(McpApprovalMode),
+    Filter(McpApprovalFilter),
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ResponseMcpTool {
+    #[builder(into)]
+    pub server_label: String,
+
+    #[builder(into)]
+    pub server_url: String,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_description: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<std::collections::HashMap<String, String>>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub require_approval: Option<McpRequireApproval>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_tools: Option<Vec<String>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub defer_loading: Option<bool>,
+}
+
 /// A tool the model may call. Extensible union — this slice implements `Function`,
 /// `FileSearch`, `WebSearch`, and `ImageGeneration`; later slices add `CodeInterpreter`/
 /// `ComputerUse`/`Mcp` as new non-breaking variants.
@@ -184,6 +241,7 @@ pub enum ResponseTool {
     FileSearch(ResponseFileSearchTool),
     WebSearch(ResponseWebSearchTool),
     ImageGeneration(ResponseImageGenerationTool),
+    Mcp(ResponseMcpTool),
 }
 
 /// The plain string modes `tool_choice` can take.

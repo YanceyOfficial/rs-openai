@@ -100,11 +100,12 @@ mod tests {
     use crate::interfaces::images::{Background, ImageSize, Quality};
     use crate::interfaces::responses::{
         CreateResponseRequest, FileSearchRankingOptions, ImageGenerationAction,
-        ListInputItemsRequest, ResponseConversationParam, ResponseFileSearchTool,
-        ResponseFunctionTool, ResponseImageGenerationTool, ResponseInput, ResponseInputItem,
-        ResponseInputRole, ResponseOutputItem, ResponseStreamEvent, ResponseTool,
-        ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
-        ResponseWebSearchTool, WebSearchAction, WebSearchContextSize, WebSearchUserLocation,
+        ListInputItemsRequest, McpApprovalFilter, McpApprovalMode, McpRequireApproval,
+        McpToolNameFilter, ResponseConversationParam, ResponseFileSearchTool, ResponseFunctionTool,
+        ResponseImageGenerationTool, ResponseInput, ResponseInputItem, ResponseInputRole,
+        ResponseMcpTool, ResponseOutputItem, ResponseStreamEvent, ResponseTool, ResponseToolChoice,
+        ResponseToolChoiceFunctionName, ResponseToolChoiceMode, ResponseWebSearchTool,
+        WebSearchAction, WebSearchContextSize, WebSearchUserLocation,
     };
     use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path};
@@ -1434,6 +1435,115 @@ mod tests {
 
         let res = client.responses().create(&req).await.unwrap();
         assert_eq!(res.id, "resp_5");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_mcp_tool_with_plain_require_approval() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "List the files in my repo",
+                "tools": [{
+                    "type": "mcp",
+                    "server_label": "github",
+                    "server_url": "https://mcp.example.com/github",
+                    "headers": {"X-Api-Key": "secret"},
+                    "require_approval": "never",
+                    "allowed_tools": ["list_files", "read_file"]
+                }]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_7",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let mut headers = std::collections::HashMap::new();
+        headers.insert("X-Api-Key".to_string(), "secret".to_string());
+        let tool = ResponseTool::Mcp(
+            ResponseMcpTool::builder()
+                .server_label("github")
+                .server_url("https://mcp.example.com/github")
+                .headers(headers)
+                .require_approval(McpRequireApproval::Mode(McpApprovalMode::Never))
+                .allowed_tools(vec!["list_files".to_string(), "read_file".to_string()])
+                .build(),
+        );
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("List the files in my repo".to_string()))
+            .tools(vec![tool])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_7");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_mcp_tool_with_filter_require_approval() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "Read a file",
+                "tools": [{
+                    "type": "mcp",
+                    "server_label": "github",
+                    "server_url": "https://mcp.example.com/github",
+                    "require_approval": {
+                        "never": {"tool_names": ["read_file"]}
+                    }
+                }]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_8",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let tool = ResponseTool::Mcp(
+            ResponseMcpTool::builder()
+                .server_label("github")
+                .server_url("https://mcp.example.com/github")
+                .require_approval(McpRequireApproval::Filter(McpApprovalFilter {
+                    never: Some(McpToolNameFilter {
+                        tool_names: vec!["read_file".to_string()],
+                    }),
+                    always: None,
+                }))
+                .build(),
+        );
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("Read a file".to_string()))
+            .tools(vec![tool])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_8");
     }
 
     #[tokio::test]
