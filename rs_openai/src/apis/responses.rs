@@ -144,6 +144,24 @@ mod tests {
     }
 
     #[test]
+    fn response_input_item_mcp_approval_response_serializes() {
+        let item = ResponseInputItem::McpApprovalResponse {
+            approval_request_id: "mcpr_1".to_string(),
+            approve: true,
+        };
+
+        let value = serde_json::to_value(&item).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "type": "mcp_approval_response",
+                "approval_request_id": "mcpr_1",
+                "approve": true
+            })
+        );
+    }
+
+    #[test]
     fn response_tool_function_serializes_with_type_tag() {
         let tool = ResponseTool::Function(
             ResponseFunctionTool::builder()
@@ -1778,6 +1796,44 @@ mod tests {
         assert!(matches!(
             items[4],
             ResponseOutputItem::ImageGenerationCall(_)
+        ));
+    }
+
+    #[test]
+    fn response_output_item_discriminates_mcp_variants_in_same_array() {
+        let value = serde_json::json!([
+            {
+                "type": "mcp_list_tools",
+                "id": "mcpl_2",
+                "server_label": "github",
+                "tools": []
+            },
+            {
+                "type": "mcp_call",
+                "id": "mcp_2",
+                "server_label": "github",
+                "name": "list_files",
+                "arguments": "{}",
+                "output": "[]",
+                "error": null,
+                "approval_request_id": null
+            },
+            {
+                "type": "mcp_approval_request",
+                "id": "mcpr_2",
+                "server_label": "github",
+                "name": "delete_file",
+                "arguments": "{}"
+            }
+        ]);
+
+        let items: Vec<ResponseOutputItem> = serde_json::from_value(value).unwrap();
+        assert_eq!(items.len(), 3);
+        assert!(matches!(items[0], ResponseOutputItem::McpListTools(_)));
+        assert!(matches!(items[1], ResponseOutputItem::McpCall(_)));
+        assert!(matches!(
+            items[2],
+            ResponseOutputItem::McpApprovalRequest(_)
         ));
     }
 }

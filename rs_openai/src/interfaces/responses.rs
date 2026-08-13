@@ -29,6 +29,10 @@ pub enum ResponseInputItem {
         call_id: String,
         output: String,
     },
+    McpApprovalResponse {
+        approval_request_id: String,
+        approve: bool,
+    },
 }
 
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
