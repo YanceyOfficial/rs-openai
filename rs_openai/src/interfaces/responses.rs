@@ -270,6 +270,10 @@ pub enum ComputerEnvironment {
     Browser,
 }
 
+/// Config for the older `computer_use_preview` tool. OpenAI's guides steer new integrations
+/// toward the minimal GA `ResponseTool::Computer` instead, but the API still accepts this
+/// tool type, and its `computer_call` output populates a single `action` field rather than
+/// the GA tool's `actions` array — see `ResponseComputerCallItem`.
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
 pub struct ResponseComputerUsePreviewTool {
     pub display_width: u32,
