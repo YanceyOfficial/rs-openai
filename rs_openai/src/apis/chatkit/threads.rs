@@ -154,6 +154,7 @@ mod tests {
 
         Mock::given(method("DELETE"))
             .and(path("/chatkit/threads/thread_9"))
+            .and(header("OpenAI-Beta", "chatkit_beta=v1"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "thread_9",
                 "object": "chatkit.thread.deleted",
