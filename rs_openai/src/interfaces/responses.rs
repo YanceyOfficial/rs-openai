@@ -528,10 +528,88 @@ pub struct ResponseMcpApprovalRequestItem {
     pub arguments: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, strum::Display)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ComputerActionButton {
+    Left,
+    Right,
+    Wheel,
+    Back,
+    Forward,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ComputerAction {
+    Click {
+        x: i64,
+        y: i64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        button: Option<ComputerActionButton>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        keys: Option<Vec<String>>,
+    },
+    DoubleClick {
+        x: i64,
+        y: i64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        keys: Option<Vec<String>>,
+    },
+    Drag {
+        path: Vec<(i64, i64)>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        keys: Option<Vec<String>>,
+    },
+    Keypress {
+        keys: Vec<String>,
+    },
+    Move {
+        x: i64,
+        y: i64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        keys: Option<Vec<String>>,
+    },
+    Screenshot {},
+    Scroll {
+        x: i64,
+        y: i64,
+        scroll_x: i64,
+        scroll_y: i64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        keys: Option<Vec<String>>,
+    },
+    Type {
+        text: String,
+    },
+    Wait {},
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ComputerSafetyCheck {
+    #[builder(into)]
+    pub id: String,
+
+    #[builder(into)]
+    pub code: String,
+
+    #[builder(into)]
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ResponseComputerCallItem {
+    pub id: String,
+    pub call_id: String,
+    pub status: String,
+    pub action: Option<ComputerAction>,
+    pub actions: Option<Vec<ComputerAction>>,
+    pub pending_safety_checks: Option<Vec<ComputerSafetyCheck>>,
+}
+
 /// One item in a response's `output` array. Extensible union — this slice implements
-/// `Message`/`FunctionCall`/`FileSearchCall`/`WebSearchCall`/`ImageGenerationCall`/`McpListTools`/`McpCall`/`McpApprovalRequest`;
-/// later slices add `Reasoning`/`ComputerCall`/`CodeInterpreterCall`/etc. as new
-/// non-breaking variants.
+/// `Message`/`FunctionCall`/`FileSearchCall`/`WebSearchCall`/`ImageGenerationCall`/`McpListTools`/`McpCall`/`McpApprovalRequest`/`ComputerCall`;
+/// only `Reasoning`/`CodeInterpreterCall`/etc. remain as future non-breaking variants.
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseOutputItem {
@@ -543,6 +621,7 @@ pub enum ResponseOutputItem {
     McpListTools(ResponseMcpListToolsItem),
     McpCall(ResponseMcpCallItem),
     McpApprovalRequest(ResponseMcpApprovalRequestItem),
+    ComputerCall(ResponseComputerCallItem),
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]

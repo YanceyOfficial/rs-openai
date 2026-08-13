@@ -99,9 +99,9 @@ mod tests {
     use crate::interfaces::chat::SortOrder;
     use crate::interfaces::images::{Background, ImageSize, Quality};
     use crate::interfaces::responses::{
-        ComputerEnvironment, CreateResponseRequest, FileSearchRankingOptions,
-        ImageGenerationAction, ListInputItemsRequest, McpApprovalFilter, McpApprovalMode,
-        McpRequireApproval, McpToolNameFilter, ResponseComputerUsePreviewTool,
+        ComputerAction, ComputerActionButton, ComputerEnvironment, CreateResponseRequest,
+        FileSearchRankingOptions, ImageGenerationAction, ListInputItemsRequest, McpApprovalFilter,
+        McpApprovalMode, McpRequireApproval, McpToolNameFilter, ResponseComputerUsePreviewTool,
         ResponseConversationParam, ResponseFileSearchTool, ResponseFunctionTool,
         ResponseImageGenerationTool, ResponseInput, ResponseInputItem, ResponseInputRole,
         ResponseMcpTool, ResponseOutputItem, ResponseStreamEvent, ResponseTool, ResponseToolChoice,
@@ -1743,6 +1743,118 @@ mod tests {
                 assert!(call.approval_request_id.is_none());
             }
             other => panic!("expected McpCall, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn create_deserializes_computer_call_with_actions_array() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_12",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [{
+                    "type": "computer_call",
+                    "id": "cu_1",
+                    "call_id": "call_cu_1",
+                    "status": "completed",
+                    "action": null,
+                    "actions": [
+                        {"type": "screenshot"},
+                        {"type": "click", "x": 405, "y": 157, "button": "left"}
+                    ],
+                    "pending_safety_checks": []
+                }],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("Take a screenshot".to_string()))
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        match &res.output[0] {
+            ResponseOutputItem::ComputerCall(call) => {
+                assert_eq!(call.id, "cu_1");
+                assert_eq!(call.call_id, "call_cu_1");
+                assert_eq!(call.status, "completed");
+                assert!(call.action.is_none());
+                let actions = call.actions.as_ref().expect("actions array");
+                assert_eq!(actions.len(), 2);
+                assert!(matches!(actions[0], ComputerAction::Screenshot {}));
+                match &actions[1] {
+                    ComputerAction::Click { x, y, button, keys } => {
+                        assert_eq!(*x, 405);
+                        assert_eq!(*y, 157);
+                        assert_eq!(*button, Some(ComputerActionButton::Left));
+                        assert!(keys.is_none());
+                    }
+                    other => panic!("expected Click, got {other:?}"),
+                }
+                assert_eq!(call.pending_safety_checks.as_ref().unwrap().len(), 0);
+            }
+            other => panic!("expected ComputerCall, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_computer_call_deserializes_with_pending_safety_checks() {
+        let value = serde_json::json!({
+            "type": "computer_call",
+            "id": "cu_2",
+            "call_id": "call_cu_2",
+            "status": "completed",
+            "action": {"type": "type", "text": "hello"},
+            "actions": null,
+            "pending_safety_checks": [
+                {"id": "sc_1", "code": "malicious_instructions", "message": "Detected a potentially malicious instruction."}
+            ]
+        });
+
+        let item: ResponseOutputItem = serde_json::from_value(value).unwrap();
+        match item {
+            ResponseOutputItem::ComputerCall(call) => {
+                assert_eq!(call.id, "cu_2");
+                assert!(call.actions.is_none());
+                match call.action.as_ref().unwrap() {
+                    ComputerAction::Type { text } => assert_eq!(text, "hello"),
+                    other => panic!("expected Type, got {other:?}"),
+                }
+                let checks = call.pending_safety_checks.as_ref().unwrap();
+                assert_eq!(checks.len(), 1);
+                assert_eq!(checks[0].id, "sc_1");
+                assert_eq!(checks[0].code, "malicious_instructions");
+            }
+            other => panic!("expected ComputerCall, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn computer_action_drag_deserializes_path_as_coordinate_pairs() {
+        let value = serde_json::json!({
+            "type": "drag",
+            "path": [[100, 200], [150, 250], [200, 300]],
+            "keys": ["CTRL"]
+        });
+
+        let action: ComputerAction = serde_json::from_value(value).unwrap();
+        match action {
+            ComputerAction::Drag { path, keys } => {
+                assert_eq!(path, vec![(100, 200), (150, 250), (200, 300)]);
+                assert_eq!(keys, Some(vec!["CTRL".to_string()]));
+            }
+            other => panic!("expected Drag, got {other:?}"),
         }
     }
 
