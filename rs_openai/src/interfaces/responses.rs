@@ -232,8 +232,8 @@ pub struct ResponseMcpTool {
 }
 
 /// A tool the model may call. Extensible union — this slice implements `Function`,
-/// `FileSearch`, `WebSearch`, and `ImageGeneration`; later slices add `CodeInterpreter`/
-/// `ComputerUse`/`Mcp` as new non-breaking variants.
+/// `FileSearch`, `WebSearch`, `ImageGeneration`, and `Mcp`; later slices add
+/// `CodeInterpreter`/`ComputerUse` as new non-breaking variants.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseTool {
