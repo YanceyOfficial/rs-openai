@@ -57,8 +57,10 @@ pub enum OutputFormat {
     Webp,
 }
 
-/// Content-moderation strictness for gpt-image models. Request-only — OpenAI does not echo
-/// this back on the response, unlike `Quality`/`Background`/`OutputFormat`.
+/// Content-moderation strictness for gpt-image models. Request-only on the standalone Images
+/// API — OpenAI does not echo this back on the response, unlike `Quality`/`Background`/
+/// `OutputFormat`. Derives `Deserialize` because `interfaces::responses::ResponseImageGenerationTool`
+/// reuses this type and needs to deserialize `Response` bodies that echo the tool config back.
 #[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
 #[serde(rename_all = "snake_case")]
 pub enum Moderation {
@@ -80,7 +82,9 @@ pub enum Style {
 }
 
 /// Edit-only, gpt-image models: how closely the edited output should match the input
-/// image's fine details. Request-only.
+/// image's fine details. Request-only on the standalone Images API. Derives `Deserialize`
+/// because `interfaces::responses::ResponseImageGenerationTool` reuses this type and needs
+/// to deserialize `Response` bodies that echo the tool config back.
 #[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
 #[serde(rename_all = "snake_case")]
 pub enum InputFidelity {
