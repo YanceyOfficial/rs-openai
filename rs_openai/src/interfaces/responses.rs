@@ -18,6 +18,20 @@ pub enum ResponseInputRole {
     Developer,
 }
 
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ComputerCallOutputScreenshot {
+    #[builder(into)]
+    #[serde(rename = "type")]
+    pub kind: String,
+
+    #[builder(into)]
+    pub image_url: String,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseInputItem {
@@ -32,6 +46,16 @@ pub enum ResponseInputItem {
     McpApprovalResponse {
         approval_request_id: String,
         approve: bool,
+    },
+    ComputerCallOutput {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        call_id: String,
+        output: ComputerCallOutputScreenshot,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        acknowledged_safety_checks: Option<Vec<ComputerSafetyCheck>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        status: Option<String>,
     },
 }
 

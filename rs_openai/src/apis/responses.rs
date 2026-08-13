@@ -99,9 +99,10 @@ mod tests {
     use crate::interfaces::chat::SortOrder;
     use crate::interfaces::images::{Background, ImageSize, Quality};
     use crate::interfaces::responses::{
-        ComputerAction, ComputerActionButton, ComputerEnvironment, CreateResponseRequest,
-        FileSearchRankingOptions, ImageGenerationAction, ListInputItemsRequest, McpApprovalFilter,
-        McpApprovalMode, McpRequireApproval, McpToolNameFilter, ResponseComputerUsePreviewTool,
+        ComputerAction, ComputerActionButton, ComputerCallOutputScreenshot, ComputerEnvironment,
+        ComputerSafetyCheck, CreateResponseRequest, FileSearchRankingOptions,
+        ImageGenerationAction, ListInputItemsRequest, McpApprovalFilter, McpApprovalMode,
+        McpRequireApproval, McpToolNameFilter, ResponseComputerUsePreviewTool,
         ResponseConversationParam, ResponseFileSearchTool, ResponseFunctionTool,
         ResponseImageGenerationTool, ResponseInput, ResponseInputItem, ResponseInputRole,
         ResponseMcpTool, ResponseOutputItem, ResponseStreamEvent, ResponseTool, ResponseToolChoice,
@@ -158,6 +159,44 @@ mod tests {
                 "type": "mcp_approval_response",
                 "approval_request_id": "mcpr_1",
                 "approve": true
+            })
+        );
+    }
+
+    #[test]
+    fn response_input_item_computer_call_output_serializes_with_safety_checks() {
+        let item = ResponseInputItem::ComputerCallOutput {
+            id: None,
+            call_id: "call_cu_1".to_string(),
+            output: ComputerCallOutputScreenshot::builder()
+                .kind("computer_screenshot")
+                .image_url("data:image/png;base64,abc123")
+                .detail("original")
+                .build(),
+            acknowledged_safety_checks: Some(vec![
+                ComputerSafetyCheck::builder()
+                    .id("sc_1")
+                    .code("malicious_instructions")
+                    .message("Detected a potentially malicious instruction.")
+                    .build(),
+            ]),
+            status: None,
+        };
+
+        let value = serde_json::to_value(&item).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "type": "computer_call_output",
+                "call_id": "call_cu_1",
+                "output": {
+                    "type": "computer_screenshot",
+                    "image_url": "data:image/png;base64,abc123",
+                    "detail": "original"
+                },
+                "acknowledged_safety_checks": [
+                    {"id": "sc_1", "code": "malicious_instructions", "message": "Detected a potentially malicious instruction."}
+                ]
             })
         );
     }
@@ -2032,5 +2071,32 @@ mod tests {
             items[2],
             ResponseOutputItem::McpApprovalRequest(_)
         ));
+    }
+
+    #[test]
+    fn response_output_item_discriminates_computer_call_in_same_array() {
+        let value = serde_json::json!([
+            {
+                "type": "message",
+                "id": "msg_2",
+                "role": "assistant",
+                "status": "completed",
+                "content": [{"type": "output_text", "text": "Done.", "annotations": []}]
+            },
+            {
+                "type": "computer_call",
+                "id": "cu_3",
+                "call_id": "call_cu_3",
+                "status": "completed",
+                "action": null,
+                "actions": [{"type": "wait"}],
+                "pending_safety_checks": null
+            }
+        ]);
+
+        let items: Vec<ResponseOutputItem> = serde_json::from_value(value).unwrap();
+        assert_eq!(items.len(), 2);
+        assert!(matches!(items[0], ResponseOutputItem::Message(_)));
+        assert!(matches!(items[1], ResponseOutputItem::ComputerCall(_)));
     }
 }
