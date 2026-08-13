@@ -101,3 +101,42 @@ pub struct ChatKitSession {
     pub rate_limits: ChatKitRateLimits,
     pub max_requests_per_1_minute: u32,
 }
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ListChatKitThreadsRequest {
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ChatKitThread {
+    pub id: String,
+    pub object: String,
+    pub created_at: i64,
+    pub status: String,
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ListChatKitThreadsResponse {
+    pub object: String,
+    pub data: Vec<ChatKitThread>,
+    pub first_id: Option<String>,
+    pub last_id: Option<String>,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct DeleteChatKitThreadResponse {
+    pub id: String,
+    pub object: String,
+    pub deleted: bool,
+}

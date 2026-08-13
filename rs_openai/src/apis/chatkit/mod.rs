@@ -27,12 +27,12 @@ impl<'a> ChatKit<'a> {
         sessions::ChatKitSession::new(self.openai, id.into())
     }
 
-    /// Scoped accessor for ChatKit threads. Not yet implemented.
+    /// Scoped accessor for ChatKit threads.
     pub fn threads(&self) -> threads::ChatKitThreads<'a> {
         threads::ChatKitThreads::new(self.openai)
     }
 
-    /// Scoped accessor for a specific ChatKit thread. Not yet implemented.
+    /// Scoped accessor for a specific ChatKit thread.
     pub fn thread(&self, id: impl Into<String>) -> threads::ChatKitThread<'a> {
         threads::ChatKitThread::new(self.openai, id.into())
     }

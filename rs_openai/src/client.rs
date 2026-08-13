@@ -309,9 +309,7 @@ impl OpenAI {
             .header("OpenAI-Beta", "chatkit_beta=v1"))
     }
 
-    /// Not yet called within the crate as of this commit — `sessions.rs` only needs
-    /// `chatkit_post`. ChatKit threads' `list`/`retrieve` (Task 2) call this directly.
-    #[allow(dead_code)]
+    /// Called by ChatKit threads' `list` and `retrieve` methods.
     pub(crate) async fn chatkit_get<T, F>(&self, route: &str, query: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
@@ -330,9 +328,7 @@ impl OpenAI {
         Self::resolve_response(request).await
     }
 
-    /// Not yet called within the crate as of this commit — ChatKit threads' `delete`
-    /// (Task 2) calls this directly.
-    #[allow(dead_code)]
+    /// Called by ChatKit threads' `delete` method.
     pub(crate) async fn chatkit_delete<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
