@@ -1593,6 +1593,121 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn create_deserializes_completed_mcp_call() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_9",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [{
+                    "type": "mcp_call",
+                    "id": "mcp_1",
+                    "server_label": "github",
+                    "name": "list_files",
+                    "arguments": "{\"path\":\"/\"}",
+                    "output": "[\"README.md\", \"src/\"]",
+                    "error": null,
+                    "approval_request_id": null
+                }],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("List files".to_string()))
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        match &res.output[0] {
+            ResponseOutputItem::McpCall(call) => {
+                assert_eq!(call.id, "mcp_1");
+                assert_eq!(call.server_label, "github");
+                assert_eq!(call.name, "list_files");
+                assert_eq!(call.arguments, "{\"path\":\"/\"}");
+                assert_eq!(call.output.as_deref(), Some("[\"README.md\", \"src/\"]"));
+                assert!(call.error.is_none());
+                assert!(call.approval_request_id.is_none());
+            }
+            other => panic!("expected McpCall, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_mcp_list_tools_deserializes_with_two_tools() {
+        let value = serde_json::json!({
+            "type": "mcp_list_tools",
+            "id": "mcpl_1",
+            "server_label": "github",
+            "tools": [
+                {
+                    "name": "list_files",
+                    "description": "List files in a directory",
+                    "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}},
+                    "annotations": null
+                },
+                {
+                    "name": "read_file",
+                    "description": null,
+                    "input_schema": {"type": "object"},
+                    "annotations": {"readOnly": true}
+                }
+            ]
+        });
+
+        let item: ResponseOutputItem = serde_json::from_value(value).unwrap();
+        match item {
+            ResponseOutputItem::McpListTools(list) => {
+                assert_eq!(list.id, "mcpl_1");
+                assert_eq!(list.server_label, "github");
+                assert_eq!(list.tools.len(), 2);
+                assert_eq!(list.tools[0].name, "list_files");
+                assert_eq!(
+                    list.tools[0].description.as_deref(),
+                    Some("List files in a directory")
+                );
+                assert!(list.tools[1].description.is_none());
+                assert_eq!(
+                    list.tools[1].annotations,
+                    Some(serde_json::json!({"readOnly": true}))
+                );
+            }
+            other => panic!("expected McpListTools, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_mcp_approval_request_deserializes() {
+        let value = serde_json::json!({
+            "type": "mcp_approval_request",
+            "id": "mcpr_1",
+            "server_label": "github",
+            "name": "delete_file",
+            "arguments": "{\"path\":\"/tmp/x\"}"
+        });
+
+        let item: ResponseOutputItem = serde_json::from_value(value).unwrap();
+        match item {
+            ResponseOutputItem::McpApprovalRequest(req) => {
+                assert_eq!(req.id, "mcpr_1");
+                assert_eq!(req.server_label, "github");
+                assert_eq!(req.name, "delete_file");
+                assert_eq!(req.arguments, "{\"path\":\"/tmp/x\"}");
+            }
+            other => panic!("expected McpApprovalRequest, got {other:?}"),
+        }
+    }
+
     #[test]
     fn response_image_generation_call_deserializes_with_null_result_and_prompt() {
         let value = serde_json::json!({

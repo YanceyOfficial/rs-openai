@@ -469,9 +469,43 @@ pub struct ResponseImageGenerationCallItem {
     pub revised_prompt: Option<String>,
 }
 
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct McpListedTool {
+    pub name: String,
+    pub description: Option<String>,
+    pub input_schema: serde_json::Value,
+    pub annotations: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ResponseMcpListToolsItem {
+    pub id: String,
+    pub server_label: String,
+    pub tools: Vec<McpListedTool>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ResponseMcpCallItem {
+    pub id: String,
+    pub server_label: String,
+    pub name: String,
+    pub arguments: String,
+    pub output: Option<String>,
+    pub error: Option<String>,
+    pub approval_request_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ResponseMcpApprovalRequestItem {
+    pub id: String,
+    pub server_label: String,
+    pub name: String,
+    pub arguments: String,
+}
+
 /// One item in a response's `output` array. Extensible union — this slice implements
-/// `Message`/`FunctionCall`/`FileSearchCall`/`WebSearchCall`/`ImageGenerationCall`; later
-/// slices add `Reasoning`/`ComputerCall`/`CodeInterpreterCall`/`McpCall`/etc. as new
+/// `Message`/`FunctionCall`/`FileSearchCall`/`WebSearchCall`/`ImageGenerationCall`/`McpListTools`/`McpCall`/`McpApprovalRequest`;
+/// later slices add `Reasoning`/`ComputerCall`/`CodeInterpreterCall`/etc. as new
 /// non-breaking variants.
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -481,6 +515,9 @@ pub enum ResponseOutputItem {
     FileSearchCall(ResponseFileSearchCallItem),
     WebSearchCall(ResponseWebSearchCallItem),
     ImageGenerationCall(ResponseImageGenerationCallItem),
+    McpListTools(ResponseMcpListToolsItem),
+    McpCall(ResponseMcpCallItem),
+    McpApprovalRequest(ResponseMcpApprovalRequestItem),
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
