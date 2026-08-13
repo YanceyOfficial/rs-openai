@@ -235,9 +235,28 @@ pub struct ResponseMcpTool {
     pub defer_loading: Option<bool>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ComputerEnvironment {
+    Windows,
+    Mac,
+    Linux,
+    Ubuntu,
+    Browser,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ResponseComputerUsePreviewTool {
+    pub display_width: u32,
+    pub display_height: u32,
+    pub environment: ComputerEnvironment,
+}
+
 /// A tool the model may call. Extensible union — this slice implements `Function`,
-/// `FileSearch`, `WebSearch`, `ImageGeneration`, and `Mcp`; later slices add
-/// `CodeInterpreter`/`ComputerUse` as new non-breaking variants.
+/// `FileSearch`, `WebSearch`, `ImageGeneration`, `Mcp`, `Computer`, and `ComputerUsePreview`;
+/// only `CodeInterpreter` remains as a future non-breaking variant (gated on the Containers
+/// resource).
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseTool {
@@ -246,6 +265,8 @@ pub enum ResponseTool {
     WebSearch(ResponseWebSearchTool),
     ImageGeneration(ResponseImageGenerationTool),
     Mcp(ResponseMcpTool),
+    Computer,
+    ComputerUsePreview(ResponseComputerUsePreviewTool),
 }
 
 /// The plain string modes `tool_choice` can take.

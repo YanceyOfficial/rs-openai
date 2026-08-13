@@ -99,9 +99,10 @@ mod tests {
     use crate::interfaces::chat::SortOrder;
     use crate::interfaces::images::{Background, ImageSize, Quality};
     use crate::interfaces::responses::{
-        CreateResponseRequest, FileSearchRankingOptions, ImageGenerationAction,
-        ListInputItemsRequest, McpApprovalFilter, McpApprovalMode, McpRequireApproval,
-        McpToolNameFilter, ResponseConversationParam, ResponseFileSearchTool, ResponseFunctionTool,
+        ComputerEnvironment, CreateResponseRequest, FileSearchRankingOptions,
+        ImageGenerationAction, ListInputItemsRequest, McpApprovalFilter, McpApprovalMode,
+        McpRequireApproval, McpToolNameFilter, ResponseComputerUsePreviewTool,
+        ResponseConversationParam, ResponseFileSearchTool, ResponseFunctionTool,
         ResponseImageGenerationTool, ResponseInput, ResponseInputItem, ResponseInputRole,
         ResponseMcpTool, ResponseOutputItem, ResponseStreamEvent, ResponseTool, ResponseToolChoice,
         ResponseToolChoiceFunctionName, ResponseToolChoiceMode, ResponseWebSearchTool,
@@ -1562,6 +1563,90 @@ mod tests {
 
         let res = client.responses().create(&req).await.unwrap();
         assert_eq!(res.id, "resp_8");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_computer_tool_as_bare_tag() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "Take a screenshot",
+                "tools": [{"type": "computer"}]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_10",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("Take a screenshot".to_string()))
+            .tools(vec![ResponseTool::Computer])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_10");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_computer_use_preview_tool() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "Take a screenshot",
+                "tools": [{
+                    "type": "computer_use_preview",
+                    "display_width": 1024,
+                    "display_height": 768,
+                    "environment": "browser"
+                }]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_11",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let tool = ResponseTool::ComputerUsePreview(
+            ResponseComputerUsePreviewTool::builder()
+                .display_width(1024)
+                .display_height(768)
+                .environment(ComputerEnvironment::Browser)
+                .build(),
+        );
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("Take a screenshot".to_string()))
+            .tools(vec![tool])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_11");
     }
 
     #[tokio::test]
