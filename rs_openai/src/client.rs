@@ -297,6 +297,51 @@ impl OpenAI {
         Self::resolve_response(request).await
     }
 
+    /// Same as `openai_request`, but adds the `OpenAI-Beta: chatkit_beta=v1` header every
+    /// ChatKit endpoint requires in addition to the standard auth/org/project headers.
+    fn chatkit_request(
+        &self,
+        method: Method,
+        route: &str,
+    ) -> Result<reqwest_middleware::RequestBuilder, OpenAIError> {
+        Ok(self
+            .openai_request(method, route)?
+            .header("OpenAI-Beta", "chatkit_beta=v1"))
+    }
+
+    /// Not yet called within the crate as of this commit — `sessions.rs` only needs
+    /// `chatkit_post`. ChatKit threads' `list`/`retrieve` (Task 2) call this directly.
+    #[allow(dead_code)]
+    pub(crate) async fn chatkit_get<T, F>(&self, route: &str, query: &F) -> OpenAIResponse<T>
+    where
+        T: DeserializeOwned + Debug,
+        F: Serialize,
+    {
+        let request = self.chatkit_request(Method::GET, route)?.query(query);
+        Self::resolve_response(request).await
+    }
+
+    pub(crate) async fn chatkit_post<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
+    where
+        T: DeserializeOwned + Debug,
+        F: Serialize,
+    {
+        let request = self.chatkit_request(Method::POST, route)?.json(json);
+        Self::resolve_response(request).await
+    }
+
+    /// Not yet called within the crate as of this commit — ChatKit threads' `delete`
+    /// (Task 2) calls this directly.
+    #[allow(dead_code)]
+    pub(crate) async fn chatkit_delete<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
+    where
+        T: DeserializeOwned + Debug,
+        F: Serialize,
+    {
+        let request = self.chatkit_request(Method::DELETE, route)?.json(json);
+        Self::resolve_response(request).await
+    }
+
     async fn stream_sse<T>(
         mut event_source: EventSource,
     ) -> Pin<Box<dyn Stream<Item = OpenAIResponse<T>> + Send>>

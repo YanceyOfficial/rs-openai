@@ -2,6 +2,7 @@ pub mod assistants;
 pub mod audio;
 pub mod batch;
 pub mod chat;
+pub mod chatkit;
 pub mod completions;
 pub mod conversations;
 pub mod embeddings;

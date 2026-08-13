@@ -1,10 +1,12 @@
-//! ChatKit (Beta): embeddable chat UI sessions and their threads. Not yet implemented — see
-//! docs/superpowers/research/2026-07-31-openai-api-structure.md.
+//! ChatKit (Beta): embeddable chat UI sessions and their threads. Sessions implemented;
+//! Threads implemented at minimal fidelity (list/retrieve/delete only, Items sub-resource
+//! still not implemented) — see docs/superpowers/specs/2026-08-14-chatkit-design.md.
 
 pub mod sessions;
 pub mod threads;
 
 use crate::client::OpenAI;
+pub use crate::interfaces::chatkit::*;
 
 pub struct ChatKit<'a> {
     openai: &'a OpenAI,
@@ -15,12 +17,12 @@ impl<'a> ChatKit<'a> {
         Self { openai }
     }
 
-    /// Scoped accessor for ChatKit sessions. Not yet implemented.
+    /// Scoped accessor for ChatKit sessions.
     pub fn sessions(&self) -> sessions::ChatKitSessions<'a> {
         sessions::ChatKitSessions::new(self.openai)
     }
 
-    /// Scoped accessor for a specific ChatKit session. Not yet implemented.
+    /// Scoped accessor for a specific ChatKit session.
     pub fn session(&self, id: impl Into<String>) -> sessions::ChatKitSession<'a> {
         sessions::ChatKitSession::new(self.openai, id.into())
     }
