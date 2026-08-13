@@ -403,9 +403,17 @@ pub struct ResponseWebSearchCallItem {
     pub status: String,
 }
 
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ResponseImageGenerationCallItem {
+    pub id: String,
+    pub status: String,
+    pub result: Option<String>,
+    pub revised_prompt: Option<String>,
+}
+
 /// One item in a response's `output` array. Extensible union — this slice implements
-/// `Message`/`FunctionCall`/`FileSearchCall`/`WebSearchCall`; later slices add `Reasoning`/
-/// `ComputerCall`/`CodeInterpreterCall`/`ImageGenerationCall`/`McpCall`/etc. as new
+/// `Message`/`FunctionCall`/`FileSearchCall`/`WebSearchCall`/`ImageGenerationCall`; later
+/// slices add `Reasoning`/`ComputerCall`/`CodeInterpreterCall`/`McpCall`/etc. as new
 /// non-breaking variants.
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -414,6 +422,7 @@ pub enum ResponseOutputItem {
     FunctionCall(ResponseFunctionCallItem),
     FileSearchCall(ResponseFileSearchCallItem),
     WebSearchCall(ResponseWebSearchCallItem),
+    ImageGenerationCall(ResponseImageGenerationCallItem),
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]

@@ -1435,4 +1435,124 @@ mod tests {
         let res = client.responses().create(&req).await.unwrap();
         assert_eq!(res.id, "resp_5");
     }
+
+    #[tokio::test]
+    async fn create_deserializes_completed_image_generation_call() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_6",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [{
+                    "type": "image_generation_call",
+                    "id": "ig_1",
+                    "status": "completed",
+                    "revised_prompt": "A gray tabby cat hugging an otter, warm heartwarming style.",
+                    "result": "base64imagedatahere"
+                }],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("Draw a cat".to_string()))
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        match &res.output[0] {
+            ResponseOutputItem::ImageGenerationCall(call) => {
+                assert_eq!(call.id, "ig_1");
+                assert_eq!(call.status, "completed");
+                assert_eq!(call.result.as_deref(), Some("base64imagedatahere"));
+                assert_eq!(
+                    call.revised_prompt.as_deref(),
+                    Some("A gray tabby cat hugging an otter, warm heartwarming style.")
+                );
+            }
+            other => panic!("expected ImageGenerationCall, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_image_generation_call_deserializes_with_null_result_and_prompt() {
+        let value = serde_json::json!({
+            "type": "image_generation_call",
+            "id": "ig_2",
+            "status": "in_progress",
+            "result": null,
+            "revised_prompt": null
+        });
+
+        let item: ResponseOutputItem = serde_json::from_value(value).unwrap();
+        match item {
+            ResponseOutputItem::ImageGenerationCall(call) => {
+                assert_eq!(call.status, "in_progress");
+                assert!(call.result.is_none());
+                assert!(call.revised_prompt.is_none());
+            }
+            other => panic!("expected ImageGenerationCall, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_output_item_discriminates_all_five_variants_in_same_array() {
+        let value = serde_json::json!([
+            {
+                "type": "message",
+                "id": "msg_1",
+                "role": "assistant",
+                "status": "completed",
+                "content": [{"type": "output_text", "text": "Here you go.", "annotations": []}]
+            },
+            {
+                "type": "function_call",
+                "id": "fc_1",
+                "call_id": "call_abc123",
+                "name": "get_weather",
+                "arguments": "{}",
+                "status": "completed"
+            },
+            {
+                "type": "file_search_call",
+                "id": "fs_1",
+                "queries": ["policy"],
+                "status": "completed",
+                "results": null
+            },
+            {
+                "type": "web_search_call",
+                "id": "ws_2",
+                "status": "completed",
+                "action": {"type": "search", "query": "weather"}
+            },
+            {
+                "type": "image_generation_call",
+                "id": "ig_3",
+                "status": "completed",
+                "result": "abc",
+                "revised_prompt": null
+            }
+        ]);
+
+        let items: Vec<ResponseOutputItem> = serde_json::from_value(value).unwrap();
+        assert_eq!(items.len(), 5);
+        assert!(matches!(items[0], ResponseOutputItem::Message(_)));
+        assert!(matches!(items[1], ResponseOutputItem::FunctionCall(_)));
+        assert!(matches!(items[2], ResponseOutputItem::FileSearchCall(_)));
+        assert!(matches!(items[3], ResponseOutputItem::WebSearchCall(_)));
+        assert!(matches!(
+            items[4],
+            ResponseOutputItem::ImageGenerationCall(_)
+        ));
+    }
 }
