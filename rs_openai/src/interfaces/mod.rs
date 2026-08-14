@@ -4,6 +4,7 @@ pub mod batch;
 pub mod chat;
 pub mod chatkit;
 pub mod completions;
+pub mod containers;
 pub mod conversations;
 pub mod embeddings;
 pub mod files;
