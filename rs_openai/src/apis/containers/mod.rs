@@ -58,7 +58,7 @@ impl<'a> Container<'a> {
             .await
     }
 
-    /// Scoped accessor for files inside this container. Not yet implemented.
+    /// Scoped accessor for files inside this container.
     pub fn files(&self) -> files::ContainerFiles<'a> {
         files::ContainerFiles::new(self.openai, self.id.clone())
     }
