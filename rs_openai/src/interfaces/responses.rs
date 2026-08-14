@@ -281,10 +281,34 @@ pub struct ResponseComputerUsePreviewTool {
     pub environment: ComputerEnvironment,
 }
 
-/// A tool the model may call. Extensible union — this slice implements `Function`,
-/// `FileSearch`, `WebSearch`, `ImageGeneration`, `Mcp`, `Computer`, and `ComputerUsePreview`;
-/// only `CodeInterpreter` remains as a future non-breaking variant (gated on the Containers
-/// resource).
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ResponseCodeInterpreterAutoContainer {
+    #[builder(into)]
+    #[serde(rename = "type")]
+    pub kind: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_limit: Option<crate::interfaces::containers::ContainerMemoryLimit>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_ids: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum ResponseCodeInterpreterContainer {
+    Id(String),
+    Auto(ResponseCodeInterpreterAutoContainer),
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ResponseCodeInterpreterTool {
+    pub container: ResponseCodeInterpreterContainer,
+}
+
+/// A tool the model may call. This is the complete, confirmed set of Responses tool types --
+/// `Function`, `FileSearch`, `WebSearch`, `ImageGeneration`, `Mcp`, `Computer`,
+/// `ComputerUsePreview`, and `CodeInterpreter`.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseTool {
@@ -295,6 +319,7 @@ pub enum ResponseTool {
     Mcp(ResponseMcpTool),
     Computer,
     ComputerUsePreview(ResponseComputerUsePreviewTool),
+    CodeInterpreter(ResponseCodeInterpreterTool),
 }
 
 /// The plain string modes `tool_choice` can take.
@@ -635,9 +660,18 @@ pub struct ResponseComputerCallItem {
     pub pending_safety_checks: Option<Vec<ComputerSafetyCheck>>,
 }
 
-/// One item in a response's `output` array. Extensible union — this slice implements
-/// `Message`/`FunctionCall`/`FileSearchCall`/`WebSearchCall`/`ImageGenerationCall`/`McpListTools`/`McpCall`/`McpApprovalRequest`/`ComputerCall`;
-/// only `Reasoning`/`CodeInterpreterCall`/etc. remain as future non-breaking variants.
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ResponseCodeInterpreterCallItem {
+    pub id: String,
+    pub code: String,
+    pub container_id: String,
+    pub status: String,
+}
+
+/// One item in a response's `output` array. This is the complete, confirmed set of output
+/// item types for the tools this crate implements -- `Message`, `FunctionCall`,
+/// `FileSearchCall`, `WebSearchCall`, `ImageGenerationCall`, `McpListTools`, `McpCall`,
+/// `McpApprovalRequest`, `ComputerCall`, and `CodeInterpreterCall`.
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseOutputItem {
@@ -650,6 +684,7 @@ pub enum ResponseOutputItem {
     McpCall(ResponseMcpCallItem),
     McpApprovalRequest(ResponseMcpApprovalRequestItem),
     ComputerCall(ResponseComputerCallItem),
+    CodeInterpreterCall(ResponseCodeInterpreterCallItem),
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]

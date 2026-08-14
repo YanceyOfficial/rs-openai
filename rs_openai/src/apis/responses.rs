@@ -97,17 +97,19 @@ impl<'a> Response<'a> {
 mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::chat::SortOrder;
+    use crate::interfaces::containers::ContainerMemoryLimit;
     use crate::interfaces::images::{Background, ImageSize, Quality};
     use crate::interfaces::responses::{
         ComputerAction, ComputerActionButton, ComputerCallOutputScreenshot, ComputerEnvironment,
         ComputerSafetyCheck, CreateResponseRequest, FileSearchRankingOptions,
         ImageGenerationAction, ListInputItemsRequest, McpApprovalFilter, McpApprovalMode,
-        McpRequireApproval, McpToolNameFilter, ResponseComputerUsePreviewTool,
-        ResponseConversationParam, ResponseFileSearchTool, ResponseFunctionTool,
-        ResponseImageGenerationTool, ResponseInput, ResponseInputItem, ResponseInputRole,
-        ResponseMcpTool, ResponseOutputItem, ResponseStreamEvent, ResponseTool, ResponseToolChoice,
-        ResponseToolChoiceFunctionName, ResponseToolChoiceMode, ResponseWebSearchTool,
-        WebSearchAction, WebSearchContextSize, WebSearchUserLocation,
+        McpRequireApproval, McpToolNameFilter, ResponseCodeInterpreterAutoContainer,
+        ResponseCodeInterpreterContainer, ResponseCodeInterpreterTool,
+        ResponseComputerUsePreviewTool, ResponseConversationParam, ResponseFileSearchTool,
+        ResponseFunctionTool, ResponseImageGenerationTool, ResponseInput, ResponseInputItem,
+        ResponseInputRole, ResponseMcpTool, ResponseOutputItem, ResponseStreamEvent, ResponseTool,
+        ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
+        ResponseWebSearchTool, WebSearchAction, WebSearchContextSize, WebSearchUserLocation,
     };
     use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path};
@@ -1686,6 +1688,184 @@ mod tests {
 
         let res = client.responses().create(&req).await.unwrap();
         assert_eq!(res.id, "resp_11");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_code_interpreter_tool_with_container_id() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "Compute the mean of [1, 2, 3]",
+                "tools": [{
+                    "type": "code_interpreter",
+                    "container": "cntr_abc123"
+                }]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_13",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let tool = ResponseTool::CodeInterpreter(
+            ResponseCodeInterpreterTool::builder()
+                .container(ResponseCodeInterpreterContainer::Id(
+                    "cntr_abc123".to_string(),
+                ))
+                .build(),
+        );
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text(
+                "Compute the mean of [1, 2, 3]".to_string(),
+            ))
+            .tools(vec![tool])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_13");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_code_interpreter_tool_with_auto_container() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "Compute the mean of [1, 2, 3]",
+                "tools": [{
+                    "type": "code_interpreter",
+                    "container": {
+                        "type": "auto",
+                        "memory_limit": "4g",
+                        "file_ids": ["file_1", "file_2"]
+                    }
+                }]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_14",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let tool = ResponseTool::CodeInterpreter(
+            ResponseCodeInterpreterTool::builder()
+                .container(ResponseCodeInterpreterContainer::Auto(
+                    ResponseCodeInterpreterAutoContainer::builder()
+                        .kind("auto")
+                        .memory_limit(ContainerMemoryLimit::FourGb)
+                        .file_ids(vec!["file_1".to_string(), "file_2".to_string()])
+                        .build(),
+                ))
+                .build(),
+        );
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text(
+                "Compute the mean of [1, 2, 3]".to_string(),
+            ))
+            .tools(vec![tool])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_14");
+    }
+
+    #[tokio::test]
+    async fn create_deserializes_code_interpreter_call() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_15",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [{
+                    "type": "code_interpreter_call",
+                    "id": "ci_1",
+                    "code": "print(sum([1, 2, 3]) / 3)",
+                    "container_id": "cntr_abc123",
+                    "status": "completed"
+                }],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text(
+                "Compute the mean of [1, 2, 3]".to_string(),
+            ))
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        match &res.output[0] {
+            ResponseOutputItem::CodeInterpreterCall(call) => {
+                assert_eq!(call.id, "ci_1");
+                assert_eq!(call.code, "print(sum([1, 2, 3]) / 3)");
+                assert_eq!(call.container_id, "cntr_abc123");
+                assert_eq!(call.status, "completed");
+            }
+            other => panic!("expected CodeInterpreterCall, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_output_item_discriminates_code_interpreter_call_in_same_array() {
+        let value = serde_json::json!([
+            {
+                "type": "message",
+                "id": "msg_3",
+                "role": "assistant",
+                "status": "completed",
+                "content": [{"type": "output_text", "text": "Done.", "annotations": []}]
+            },
+            {
+                "type": "code_interpreter_call",
+                "id": "ci_2",
+                "code": "1 + 1",
+                "container_id": "cntr_xyz",
+                "status": "completed"
+            }
+        ]);
+
+        let items: Vec<ResponseOutputItem> = serde_json::from_value(value).unwrap();
+        assert_eq!(items.len(), 2);
+        assert!(matches!(items[0], ResponseOutputItem::Message(_)));
+        assert!(matches!(
+            items[1],
+            ResponseOutputItem::CodeInterpreterCall(_)
+        ));
     }
 
     #[tokio::test]
