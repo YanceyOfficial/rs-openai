@@ -191,6 +191,32 @@ impl OpenAI {
         Ok(text)
     }
 
+    /// Same as `resolve_raw_text_response`, but preserves byte-for-byte fidelity instead of a
+    /// lossy UTF-8 decode — required for content that may be genuinely binary (e.g. a Code
+    /// Interpreter-generated chart image inside a container file). Do not reuse
+    /// `resolve_raw_text_response`/`resolve_file_response` for binary content — both call
+    /// `response.text()`, which silently corrupts non-UTF-8 bytes.
+    async fn resolve_raw_bytes_response(
+        request: reqwest::RequestBuilder,
+    ) -> OpenAIResponse<Vec<u8>> {
+        let response = request.send().await?;
+        let status = response.status();
+        let bytes = response.bytes().await?;
+
+        if !status.is_success() {
+            let api_error: ApiErrorResponse =
+                serde_json::from_slice(bytes.as_ref()).map_err(OpenAIError::JSONDeserialize)?;
+            return Err(OpenAIError::ApiError(api_error));
+        }
+
+        Ok(bytes.to_vec())
+    }
+
+    pub(crate) async fn get_raw_bytes(&self, route: &str) -> OpenAIResponse<Vec<u8>> {
+        let request = self.raw_request(Method::GET, route)?;
+        Self::resolve_raw_bytes_response(request).await
+    }
+
     async fn resolve_file_response(
         request: reqwest_middleware::RequestBuilder,
         filename: &str,

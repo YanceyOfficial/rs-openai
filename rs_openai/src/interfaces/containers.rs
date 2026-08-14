@@ -114,3 +114,49 @@ pub struct DeleteContainerResponse {
     pub object: String,
     pub deleted: bool,
 }
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct CreateContainerFileRequest {
+    #[builder(into)]
+    pub file_id: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ContainerFile {
+    pub id: String,
+    pub bytes: u64,
+    pub container_id: String,
+    pub created_at: i64,
+    pub object: String,
+    pub path: String,
+    pub source: String,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ListContainerFilesRequest {
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<crate::interfaces::chat::SortOrder>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ListContainerFilesResponse {
+    pub object: String,
+    pub data: Vec<ContainerFile>,
+    pub first_id: Option<String>,
+    pub last_id: Option<String>,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct DeleteContainerFileResponse {
+    pub id: String,
+    pub object: String,
+    pub deleted: bool,
+}
