@@ -1868,6 +1868,34 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn response_code_interpreter_container_deserializes_both_untagged_forms() {
+        let id_form: ResponseCodeInterpreterContainer =
+            serde_json::from_value(serde_json::json!("cntr_abc123")).unwrap();
+        assert!(
+            matches!(id_form, ResponseCodeInterpreterContainer::Id(ref id) if id == "cntr_abc123")
+        );
+
+        let auto_form: ResponseCodeInterpreterContainer =
+            serde_json::from_value(serde_json::json!({
+                "type": "auto",
+                "memory_limit": "4g",
+                "file_ids": ["file_1"]
+            }))
+            .unwrap();
+        match auto_form {
+            ResponseCodeInterpreterContainer::Auto(container) => {
+                assert_eq!(container.kind, "auto");
+                assert!(matches!(
+                    container.memory_limit,
+                    Some(crate::interfaces::containers::ContainerMemoryLimit::FourGb)
+                ));
+                assert_eq!(container.file_ids, Some(vec!["file_1".to_string()]));
+            }
+            other => panic!("expected Auto, got {other:?}"),
+        }
+    }
+
     #[tokio::test]
     async fn create_deserializes_completed_image_generation_call() {
         let mock_server = MockServer::start().await;
