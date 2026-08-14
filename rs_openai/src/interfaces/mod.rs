@@ -7,6 +7,7 @@ pub mod completions;
 pub mod containers;
 pub mod conversations;
 pub mod embeddings;
+pub mod evals;
 pub mod files;
 pub mod fine_tuning;
 pub mod images;
