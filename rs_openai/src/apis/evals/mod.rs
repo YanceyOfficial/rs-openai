@@ -21,6 +21,14 @@ impl<'a> Evals<'a> {
     pub async fn create(&self, req: &evals::CreateEvalRequest) -> OpenAIResponse<evals::Eval> {
         self.openai.post("/evals", req).await
     }
+
+    /// Lists eval definitions.
+    pub async fn list(
+        &self,
+        req: &evals::ListEvalsRequest,
+    ) -> OpenAIResponse<evals::ListEvalsResponse> {
+        self.openai.get("/evals", req).await
+    }
 }
 
 pub struct Eval<'a> {
@@ -31,6 +39,23 @@ pub struct Eval<'a> {
 impl<'a> Eval<'a> {
     pub(crate) fn new(openai: &'a OpenAI, id: String) -> Self {
         Self { openai, id }
+    }
+
+    /// Retrieves an eval by ID.
+    pub async fn retrieve(&self) -> OpenAIResponse<evals::Eval> {
+        self.openai.get(&format!("/evals/{}", self.id), &()).await
+    }
+
+    /// Updates an eval's name and/or metadata.
+    pub async fn update(&self, req: &evals::UpdateEvalRequest) -> OpenAIResponse<evals::Eval> {
+        self.openai.post(&format!("/evals/{}", self.id), req).await
+    }
+
+    /// Deletes an eval.
+    pub async fn delete(&self) -> OpenAIResponse<evals::DeleteEvalResponse> {
+        self.openai
+            .delete(&format!("/evals/{}", self.id), &())
+            .await
     }
 
     /// Scoped accessor for this eval's runs. Not yet implemented -- the run's request/response
@@ -51,9 +76,9 @@ mod tests {
     use crate::interfaces::evals::{
         CreateEvalRequest, EvalCustomDataSourceConfig, EvalDataSourceConfig, EvalGrader,
         EvalStringCheckGrader, EvalStringCheckOperation, EvalTextSimilarityGrader,
-        EvalTextSimilarityMetric,
+        EvalTextSimilarityMetric, ListEvalsRequest, UpdateEvalRequest,
     };
-    use wiremock::matchers::{body_json, method, path};
+    use wiremock::matchers::{body_json, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[tokio::test]
@@ -239,5 +264,104 @@ mod tests {
 
         let res = client.evals().create(&req).await.unwrap();
         assert_eq!(res.id, "eval_2");
+    }
+
+    #[tokio::test]
+    async fn list_serializes_query_params_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/evals"))
+            .and(query_param("limit", "5"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [{
+                    "id": "eval_3",
+                    "object": "eval",
+                    "created_at": 1700000000_i64,
+                    "name": "My eval",
+                    "metadata": null,
+                    "data_source_config": {"type": "custom", "item_schema": {"type": "object"}, "include_sample_schema": null},
+                    "testing_criteria": []
+                }],
+                "first_id": "eval_3",
+                "last_id": "eval_3",
+                "has_more": false
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = ListEvalsRequest::builder().limit(5).build();
+        let res = client.evals().list(&req).await.unwrap();
+        assert_eq!(res.data.len(), 1);
+        assert_eq!(res.data[0].id, "eval_3");
+    }
+
+    #[tokio::test]
+    async fn retrieve_deserializes_eval() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/evals/eval_4"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "eval_4",
+                "object": "eval",
+                "created_at": 1700000000_i64,
+                "name": "Retrieved eval",
+                "metadata": null,
+                "data_source_config": {"type": "custom", "item_schema": {"type": "object"}, "include_sample_schema": null},
+                "testing_criteria": []
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let res = client.eval("eval_4").retrieve().await.unwrap();
+        assert_eq!(res.id, "eval_4");
+    }
+
+    #[tokio::test]
+    async fn update_serializes_only_name_and_metadata() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/evals/eval_4"))
+            .and(body_json(serde_json::json!({"name": "Renamed eval"})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "eval_4",
+                "object": "eval",
+                "created_at": 1700000000_i64,
+                "name": "Renamed eval",
+                "metadata": null,
+                "data_source_config": {"type": "custom", "item_schema": {"type": "object"}, "include_sample_schema": null},
+                "testing_criteria": []
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = UpdateEvalRequest::builder().name("Renamed eval").build();
+        let res = client.eval("eval_4").update(&req).await.unwrap();
+        assert_eq!(res.name.as_deref(), Some("Renamed eval"));
+    }
+
+    #[tokio::test]
+    async fn delete_deserializes_confirmation() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/evals/eval_4"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "eval_4",
+                "object": "eval.deleted",
+                "deleted": true
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let res = client.eval("eval_4").delete().await.unwrap();
+        assert!(res.deleted);
     }
 }

@@ -191,3 +191,42 @@ pub struct Eval {
     pub data_source_config: EvalDataSourceConfig,
     pub testing_criteria: Vec<EvalGrader>,
 }
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct UpdateEvalRequest {
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<std::collections::HashMap<String, String>>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ListEvalsRequest {
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<crate::interfaces::chat::SortOrder>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ListEvalsResponse {
+    pub object: String,
+    pub data: Vec<Eval>,
+    pub first_id: Option<String>,
+    pub last_id: Option<String>,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct DeleteEvalResponse {
+    pub id: String,
+    pub object: String,
+    pub deleted: bool,
+}

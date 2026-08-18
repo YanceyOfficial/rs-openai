@@ -1,5 +1,10 @@
-//! Standalone grading-logic definitions used by Evals. Operation set not yet confirmed — see
-//! docs/superpowers/research/2026-07-31-openai-api-structure.md. Not yet implemented.
+//! Grading logic used by Evals. There is no standalone `/graders` REST endpoint -- graders
+//! only ever exist embedded within an eval's `testing_criteria` array (see
+//! `crate::interfaces::evals::EvalGrader` and its 5 variants:
+//! `StringCheck`/`TextSimilarity`/`Python`/`ScoreModel`/`LabelModel`). This accessor is kept
+//! for API-surface completeness (matching Phase 2a's original scaffold) but intentionally has
+//! no methods, since none exist on OpenAI's side to call -- see
+//! docs/superpowers/specs/2026-08-14-evals-design.md.
 
 use crate::client::OpenAI;
 
