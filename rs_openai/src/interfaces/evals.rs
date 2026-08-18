@@ -5,12 +5,23 @@
 use bon::Builder;
 use serde::{Deserialize, Serialize};
 
+/// Request-side only. The `custom` eval's response shape genuinely differs -- see
+/// `EvalCustomDataSourceConfigResponse`.
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
 pub struct EvalCustomDataSourceConfig {
     pub item_schema: serde_json::Value,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_sample_schema: Option<bool>,
+}
+
+/// Response-side only. OpenAI echoes back a server-generated `schema` for a `custom` eval,
+/// not the `item_schema`/`include_sample_schema` fields sent on create -- confirmed via live
+/// docs. Do not merge this back into `EvalCustomDataSourceConfig`; the two directions have
+/// genuinely different wire shapes.
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalCustomDataSourceConfigResponse {
+    pub schema: serde_json::Value,
 }
 
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
@@ -26,10 +37,23 @@ pub struct EvalStoredCompletionsDataSourceConfig {
     pub metadata: Option<std::collections::HashMap<String, serde_json::Value>>,
 }
 
+/// Request-side only (`CreateEvalRequest.data_source_config`) -- see `EvalDataSourceConfigResponse`
+/// for the response-side union, which differs only in the `Custom` variant's payload type.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EvalDataSourceConfig {
     Custom(EvalCustomDataSourceConfig),
+    Logs(EvalLogsDataSourceConfig),
+    StoredCompletions(EvalStoredCompletionsDataSourceConfig),
+}
+
+/// Response-side only (`Eval.data_source_config`). `Logs`/`StoredCompletions` echo back
+/// unchanged, but `Custom` carries a server-generated `schema` instead of the request's
+/// `item_schema`/`include_sample_schema` -- see `EvalCustomDataSourceConfigResponse`.
+#[derive(Debug, Deserialize, Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum EvalDataSourceConfigResponse {
+    Custom(EvalCustomDataSourceConfigResponse),
     Logs(EvalLogsDataSourceConfig),
     StoredCompletions(EvalStoredCompletionsDataSourceConfig),
 }
@@ -188,7 +212,7 @@ pub struct Eval {
     pub created_at: i64,
     pub name: Option<String>,
     pub metadata: Option<std::collections::HashMap<String, String>>,
-    pub data_source_config: EvalDataSourceConfig,
+    pub data_source_config: EvalDataSourceConfigResponse,
     pub testing_criteria: Vec<EvalGrader>,
 }
 

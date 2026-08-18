@@ -122,8 +122,7 @@ mod tests {
                 "metadata": null,
                 "data_source_config": {
                     "type": "custom",
-                    "item_schema": {"type": "object"},
-                    "include_sample_schema": true
+                    "schema": {"type": "object"}
                 },
                 "testing_criteria": [
                     {
@@ -266,6 +265,38 @@ mod tests {
         assert_eq!(res.id, "eval_2");
     }
 
+    #[test]
+    fn eval_score_model_grader_serializes_sampling_params() {
+        let grader = crate::interfaces::evals::EvalScoreModelGrader::builder()
+            .name("LLM judge")
+            .model("gpt-5-mini")
+            .input(vec![
+                crate::interfaces::evals::EvalGraderMessage::builder()
+                    .role("user")
+                    .kind("message")
+                    .content(serde_json::json!("Grade this."))
+                    .build(),
+            ])
+            .sampling_params(
+                crate::interfaces::evals::EvalScoreModelSamplingParams::builder()
+                    .max_completions_tokens(512)
+                    .reasoning_effort("low")
+                    .seed(42)
+                    .temperature(0.2)
+                    .top_p(0.9)
+                    .build(),
+            )
+            .build();
+
+        let value = serde_json::to_value(EvalGrader::ScoreModel(grader)).unwrap();
+        let sampling_params = &value["sampling_params"];
+        assert_eq!(sampling_params["max_completions_tokens"], 512);
+        assert_eq!(sampling_params["reasoning_effort"], "low");
+        assert_eq!(sampling_params["seed"], 42);
+        assert!((sampling_params["temperature"].as_f64().unwrap() - 0.2).abs() < 1e-6);
+        assert!((sampling_params["top_p"].as_f64().unwrap() - 0.9).abs() < 1e-6);
+    }
+
     #[tokio::test]
     async fn list_serializes_query_params_and_deserializes_response() {
         let mock_server = MockServer::start().await;
@@ -281,7 +312,7 @@ mod tests {
                     "created_at": 1700000000_i64,
                     "name": "My eval",
                     "metadata": null,
-                    "data_source_config": {"type": "custom", "item_schema": {"type": "object"}, "include_sample_schema": null},
+                    "data_source_config": {"type": "custom", "schema": {"type": "object"}},
                     "testing_criteria": []
                 }],
                 "first_id": "eval_3",
@@ -310,7 +341,7 @@ mod tests {
                 "created_at": 1700000000_i64,
                 "name": "Retrieved eval",
                 "metadata": null,
-                "data_source_config": {"type": "custom", "item_schema": {"type": "object"}, "include_sample_schema": null},
+                "data_source_config": {"type": "custom", "schema": {"type": "object"}},
                 "testing_criteria": []
             })))
             .mount(&mock_server)
@@ -334,7 +365,7 @@ mod tests {
                 "created_at": 1700000000_i64,
                 "name": "Renamed eval",
                 "metadata": null,
-                "data_source_config": {"type": "custom", "item_schema": {"type": "object"}, "include_sample_schema": null},
+                "data_source_config": {"type": "custom", "schema": {"type": "object"}},
                 "testing_criteria": []
             })))
             .mount(&mock_server)
