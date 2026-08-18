@@ -211,7 +211,7 @@ mod tests {
                 "created_at": 1700000000_i64,
                 "name": "Multi-grader eval",
                 "metadata": null,
-                "data_source_config": {"type": "logs", "metadata": null},
+                "data_source_config": {"type": "logs", "metadata": null, "schema": {"type": "object"}},
                 "testing_criteria": []
             })))
             .mount(&mock_server)

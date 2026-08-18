@@ -28,6 +28,12 @@ pub struct EvalCustomDataSourceConfigResponse {
 pub struct EvalLogsDataSourceConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<std::collections::HashMap<String, serde_json::Value>>,
+
+    /// Server-generated on the response; a caller never sets this on create, so it's always
+    /// omitted from the outbound request (`skip_serializing_if`) and only ever populated when
+    /// deserializing an `Eval`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema: Option<serde_json::Value>,
 }
 
 /// Deprecated by OpenAI in favor of `EvalLogsDataSourceConfig`; still a live wire type.
@@ -35,6 +41,10 @@ pub struct EvalLogsDataSourceConfig {
 pub struct EvalStoredCompletionsDataSourceConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<std::collections::HashMap<String, serde_json::Value>>,
+
+    /// Server-generated on the response; see `EvalLogsDataSourceConfig.schema`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema: Option<serde_json::Value>,
 }
 
 /// Request-side only (`CreateEvalRequest.data_source_config`) -- see `EvalDataSourceConfigResponse`
