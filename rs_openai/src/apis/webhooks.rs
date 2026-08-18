@@ -73,7 +73,7 @@ impl<'a> Webhooks<'a> {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as i64;
-        if (now - timestamp).unsigned_abs() > tolerance.as_secs() {
+        if now.abs_diff(timestamp) > tolerance.as_secs() {
             return Err(WebhookVerificationError::TimestampOutOfTolerance);
         }
 
@@ -219,6 +219,37 @@ mod tests {
         let headers = WebhookHeaders {
             webhook_id,
             webhook_timestamp: &old_timestamp,
+            webhook_signature: &signature,
+        };
+
+        let err = client
+            .webhooks()
+            .verify_and_unwrap(payload, headers, &secret, None)
+            .unwrap_err();
+
+        assert!(matches!(
+            err,
+            WebhookVerificationError::TimestampOutOfTolerance
+        ));
+    }
+
+    #[test]
+    fn verify_and_unwrap_rejects_extreme_timestamp_without_panicking() {
+        // A crafted webhook-timestamp at the very edge of i64's range: `now - timestamp`
+        // would overflow i64 if computed via signed subtraction (panics under overflow
+        // checks, silently wraps in release builds) -- the fix uses i64::abs_diff, which
+        // cannot overflow. This must return an error, not panic, on genuinely hostile input.
+        let secret_body = "dGVzdHNlY3JldA==";
+        let secret = format!("whsec_{secret_body}");
+        let webhook_id = "wh_7";
+        let extreme_timestamp = i64::MIN.to_string();
+        let payload = r#"{"id":"evt_7","object":"event","type":"response.completed","created_at":1700000000,"data":{}}"#;
+        let signature = sign(secret_body, webhook_id, &extreme_timestamp, payload);
+
+        let client = OpenAI::new("sk-test");
+        let headers = WebhookHeaders {
+            webhook_id,
+            webhook_timestamp: &extreme_timestamp,
             webhook_signature: &signature,
         };
 
