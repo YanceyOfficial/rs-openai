@@ -28,12 +28,12 @@ impl<'a> Organization<'a> {
         audit_logs::OrganizationAuditLogs::new(self.openai)
     }
 
-    /// Scoped accessor for organization admin API keys. Not yet implemented.
+    /// Scoped accessor for organization admin API keys.
     pub fn admin_api_keys(&self) -> admin_api_keys::OrganizationAdminApiKeys<'a> {
         admin_api_keys::OrganizationAdminApiKeys::new(self.openai)
     }
 
-    /// Scoped accessor for a specific admin API key. Not yet implemented.
+    /// Scoped accessor for a specific admin API key.
     pub fn admin_api_key(
         &self,
         id: impl Into<String>,
