@@ -23,7 +23,7 @@ impl<'a> Organization<'a> {
         Self { openai }
     }
 
-    /// Scoped accessor for organization audit logs. Not yet implemented.
+    /// Scoped accessor for organization audit logs.
     pub fn audit_logs(&self) -> audit_logs::OrganizationAuditLogs<'a> {
         audit_logs::OrganizationAuditLogs::new(self.openai)
     }
