@@ -3,4 +3,5 @@
 
 pub mod admin_api_keys;
 pub mod audit_logs;
+pub mod invites;
 pub mod users;
