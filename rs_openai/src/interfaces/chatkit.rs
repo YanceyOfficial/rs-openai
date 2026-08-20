@@ -116,13 +116,27 @@ pub struct ListChatKitThreadsRequest {
     pub limit: Option<u32>,
 }
 
+/// Confirmed via source: a `type`-discriminated union, not a plain string. A real
+/// `locked`/`closed` thread response could never deserialize against a bare `String`.
+#[derive(Debug, Deserialize, Clone, Serialize)]
+#[serde(tag = "type")]
+pub enum ChatKitThreadStatus {
+    #[serde(rename = "active")]
+    Active,
+    #[serde(rename = "locked")]
+    Locked { reason: Option<String> },
+    #[serde(rename = "closed")]
+    Closed { reason: Option<String> },
+}
+
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct ChatKitThread {
     pub id: String,
     pub object: String,
     pub created_at: i64,
-    pub status: String,
+    pub status: ChatKitThreadStatus,
     pub title: Option<String>,
+    pub user: String,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]

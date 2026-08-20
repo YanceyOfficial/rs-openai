@@ -69,7 +69,7 @@ impl<'a> ChatKitThreadItems<'a> {
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
-    use crate::interfaces::chatkit::ListChatKitThreadsRequest;
+    use crate::interfaces::chatkit::{ChatKitThreadStatus, ListChatKitThreadsRequest};
     use wiremock::matchers::{header, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -89,15 +89,17 @@ mod tests {
                         "id": "thread_1",
                         "object": "chatkit.thread",
                         "created_at": 1700000000_i64,
-                        "status": "active",
-                        "title": "Support chat"
+                        "status": {"type": "active"},
+                        "title": "Support chat",
+                        "user": "user_abc"
                     },
                     {
                         "id": "thread_2",
                         "object": "chatkit.thread",
                         "created_at": 1700000100_i64,
-                        "status": "active",
-                        "title": null
+                        "status": {"type": "locked", "reason": "under review"},
+                        "title": null,
+                        "user": "user_abc"
                     }
                 ],
                 "first_id": "thread_1",
@@ -117,6 +119,13 @@ mod tests {
         assert_eq!(res.data.len(), 2);
         assert_eq!(res.data[0].id, "thread_1");
         assert_eq!(res.data[0].title.as_deref(), Some("Support chat"));
+        assert!(matches!(res.data[0].status, ChatKitThreadStatus::Active));
+        match &res.data[1].status {
+            ChatKitThreadStatus::Locked { reason } => {
+                assert_eq!(reason.as_deref(), Some("under review"));
+            }
+            other => panic!("expected Locked, got {other:?}"),
+        }
         assert!(res.data[1].title.is_none());
         assert!(!res.has_more);
     }
@@ -131,8 +140,9 @@ mod tests {
                 "id": "thread_9",
                 "object": "chatkit.thread",
                 "created_at": 1700000000_i64,
-                "status": "active",
-                "title": "Billing question"
+                "status": {"type": "active"},
+                "title": "Billing question",
+                "user": "user_abc"
             })))
             .mount(&mock_server)
             .await;
