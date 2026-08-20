@@ -81,12 +81,12 @@ impl<'a> Organization<'a> {
         projects::OrganizationProject::new(self.openai, id.into())
     }
 
-    /// Scoped accessor for organization roles. Not yet implemented.
+    /// Scoped accessor for organization roles.
     pub fn roles(&self) -> roles::OrganizationRoles<'a> {
         roles::OrganizationRoles::new(self.openai)
     }
 
-    /// Scoped accessor for a specific organization role. Not yet implemented.
+    /// Scoped accessor for a specific organization role.
     pub fn role(&self, id: impl Into<String>) -> roles::OrganizationRole<'a> {
         roles::OrganizationRole::new(self.openai, id.into())
     }

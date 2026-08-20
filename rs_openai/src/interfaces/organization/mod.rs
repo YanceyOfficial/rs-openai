@@ -6,5 +6,6 @@ pub mod audit_logs;
 pub mod groups;
 pub mod invites;
 pub mod projects;
+pub mod roles;
 pub mod usage;
 pub mod users;
