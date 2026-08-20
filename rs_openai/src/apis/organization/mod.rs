@@ -48,12 +48,12 @@ impl<'a> Organization<'a> {
         usage::OrganizationUsage::new(self.openai)
     }
 
-    /// Scoped accessor for organization groups. Not yet implemented.
+    /// Scoped accessor for organization groups.
     pub fn groups(&self) -> groups::OrganizationGroups<'a> {
         groups::OrganizationGroups::new(self.openai)
     }
 
-    /// Scoped accessor for a specific organization group. Not yet implemented.
+    /// Scoped accessor for a specific organization group.
     pub fn group(&self, id: impl Into<String>) -> groups::OrganizationGroup<'a> {
         groups::OrganizationGroup::new(self.openai, id.into())
     }
