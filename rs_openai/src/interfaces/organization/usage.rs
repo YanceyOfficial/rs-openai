@@ -634,3 +634,209 @@ impl UsageWebSearchCallsRequest {
         pairs
     }
 }
+
+/// Query params for `GET /organization/usage/vector_stores`. `group_by` accepts only
+/// `project_id`.
+#[derive(Builder, Debug, Clone, Default)]
+pub struct UsageVectorStoresRequest {
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    #[builder(into)]
+    pub bucket_width: Option<String>,
+    pub limit: Option<u32>,
+    #[builder(into)]
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub group_by: Option<Vec<String>>,
+}
+
+impl UsageVectorStoresRequest {
+    pub(crate) fn to_query_pairs(&self) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        pairs.push(("start_time".to_string(), self.start_time.to_string()));
+        if let Some(v) = self.end_time {
+            pairs.push(("end_time".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.bucket_width {
+            pairs.push(("bucket_width".to_string(), v.clone()));
+        }
+        if let Some(v) = self.limit {
+            pairs.push(("limit".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.page {
+            pairs.push(("page".to_string(), v.clone()));
+        }
+        if let Some(values) = &self.project_ids {
+            for v in values {
+                pairs.push(("project_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.group_by {
+            for v in values {
+                pairs.push(("group_by".to_string(), v.clone()));
+            }
+        }
+        pairs
+    }
+}
+
+/// Query params for `GET /organization/usage/code_interpreter_sessions`. `group_by`
+/// accepts only `project_id`.
+#[derive(Builder, Debug, Clone, Default)]
+pub struct UsageCodeInterpreterSessionsRequest {
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    #[builder(into)]
+    pub bucket_width: Option<String>,
+    pub limit: Option<u32>,
+    #[builder(into)]
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub group_by: Option<Vec<String>>,
+}
+
+impl UsageCodeInterpreterSessionsRequest {
+    pub(crate) fn to_query_pairs(&self) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        pairs.push(("start_time".to_string(), self.start_time.to_string()));
+        if let Some(v) = self.end_time {
+            pairs.push(("end_time".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.bucket_width {
+            pairs.push(("bucket_width".to_string(), v.clone()));
+        }
+        if let Some(v) = self.limit {
+            pairs.push(("limit".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.page {
+            pairs.push(("page".to_string(), v.clone()));
+        }
+        if let Some(values) = &self.project_ids {
+            for v in values {
+                pairs.push(("project_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.group_by {
+            for v in values {
+                pairs.push(("group_by".to_string(), v.clone()));
+            }
+        }
+        pairs
+    }
+}
+
+/// Query params for `GET /organization/usage/file_search_calls`. `group_by` accepts any
+/// combination of `project_id`, `user_id`, `api_key_id`, `vector_store_id`.
+#[derive(Builder, Debug, Clone, Default)]
+pub struct UsageFileSearchCallsRequest {
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    #[builder(into)]
+    pub bucket_width: Option<String>,
+    pub limit: Option<u32>,
+    #[builder(into)]
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub user_ids: Option<Vec<String>>,
+    pub vector_store_ids: Option<Vec<String>>,
+    pub group_by: Option<Vec<String>>,
+}
+
+impl UsageFileSearchCallsRequest {
+    pub(crate) fn to_query_pairs(&self) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        pairs.push(("start_time".to_string(), self.start_time.to_string()));
+        if let Some(v) = self.end_time {
+            pairs.push(("end_time".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.bucket_width {
+            pairs.push(("bucket_width".to_string(), v.clone()));
+        }
+        if let Some(v) = self.limit {
+            pairs.push(("limit".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.page {
+            pairs.push(("page".to_string(), v.clone()));
+        }
+        if let Some(values) = &self.project_ids {
+            for v in values {
+                pairs.push(("project_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.api_key_ids {
+            for v in values {
+                pairs.push(("api_key_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.user_ids {
+            for v in values {
+                pairs.push(("user_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.vector_store_ids {
+            for v in values {
+                pairs.push(("vector_store_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.group_by {
+            for v in values {
+                pairs.push(("group_by".to_string(), v.clone()));
+            }
+        }
+        pairs
+    }
+}
+
+/// Query params for `GET /organization/costs`. `group_by` accepts any combination of
+/// `project_id`, `line_item`, `api_key_id`. `bucket_width` is `"1d"`-only on this
+/// endpoint (unlike the other 10, which also support `"1m"`/`"1h"`) -- kept a plain
+/// `Option<String>` regardless, per this crate's standing convention.
+#[derive(Builder, Debug, Clone, Default)]
+pub struct UsageCostsRequest {
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    #[builder(into)]
+    pub bucket_width: Option<String>,
+    pub limit: Option<u32>,
+    #[builder(into)]
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub group_by: Option<Vec<String>>,
+}
+
+impl UsageCostsRequest {
+    pub(crate) fn to_query_pairs(&self) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        pairs.push(("start_time".to_string(), self.start_time.to_string()));
+        if let Some(v) = self.end_time {
+            pairs.push(("end_time".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.bucket_width {
+            pairs.push(("bucket_width".to_string(), v.clone()));
+        }
+        if let Some(v) = self.limit {
+            pairs.push(("limit".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.page {
+            pairs.push(("page".to_string(), v.clone()));
+        }
+        if let Some(values) = &self.project_ids {
+            for v in values {
+                pairs.push(("project_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.api_key_ids {
+            for v in values {
+                pairs.push(("api_key_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.group_by {
+            for v in values {
+                pairs.push(("group_by".to_string(), v.clone()));
+            }
+        }
+        pairs
+    }
+}

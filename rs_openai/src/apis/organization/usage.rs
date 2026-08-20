@@ -82,6 +82,48 @@ impl<'a> OrganizationUsage<'a> {
             )
             .await
     }
+
+    pub async fn vector_stores(
+        &self,
+        req: &usage::UsageVectorStoresRequest,
+    ) -> OpenAIResponse<usage::UsageResponse> {
+        self.openai
+            .get_with_pairs("/organization/usage/vector_stores", &req.to_query_pairs())
+            .await
+    }
+
+    pub async fn code_interpreter_sessions(
+        &self,
+        req: &usage::UsageCodeInterpreterSessionsRequest,
+    ) -> OpenAIResponse<usage::UsageResponse> {
+        self.openai
+            .get_with_pairs(
+                "/organization/usage/code_interpreter_sessions",
+                &req.to_query_pairs(),
+            )
+            .await
+    }
+
+    pub async fn file_search_calls(
+        &self,
+        req: &usage::UsageFileSearchCallsRequest,
+    ) -> OpenAIResponse<usage::UsageResponse> {
+        self.openai
+            .get_with_pairs(
+                "/organization/usage/file_search_calls",
+                &req.to_query_pairs(),
+            )
+            .await
+    }
+
+    pub async fn costs(
+        &self,
+        req: &usage::UsageCostsRequest,
+    ) -> OpenAIResponse<usage::UsageResponse> {
+        self.openai
+            .get_with_pairs("/organization/costs", &req.to_query_pairs())
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -89,8 +131,10 @@ mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::organization::usage::UsageCompletionsRequest;
     use crate::interfaces::organization::usage::{
-        UsageAudioSpeechesRequest, UsageAudioTranscriptionsRequest, UsageEmbeddingsRequest,
-        UsageImagesRequest, UsageModerationsRequest, UsageWebSearchCallsRequest,
+        UsageAudioSpeechesRequest, UsageAudioTranscriptionsRequest,
+        UsageCodeInterpreterSessionsRequest, UsageCostsRequest, UsageEmbeddingsRequest,
+        UsageFileSearchCallsRequest, UsageImagesRequest, UsageModerationsRequest,
+        UsageVectorStoresRequest, UsageWebSearchCallsRequest,
     };
     use wiremock::matchers::{method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -514,6 +558,182 @@ mod tests {
                 assert_eq!(r.context_level.as_deref(), Some("high"));
             }
             other => panic!("expected WebSearches variant, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn vector_stores_serializes_request_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/usage/vector_stores"))
+            .and(query_param("start_time", "1700000000"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "page",
+                "has_more": false,
+                "next_page": null,
+                "data": [{
+                    "object": "bucket",
+                    "start_time": 1700000000_i64,
+                    "end_time": 1700086400_i64,
+                    "results": [{
+                        "object": "organization.usage.vector_stores.result",
+                        "usage_bytes": 1024_i64
+                    }]
+                }]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let req = UsageVectorStoresRequest::builder()
+            .start_time(1700000000)
+            .build();
+        let result = client
+            .organization()
+            .usage()
+            .vector_stores(&req)
+            .await
+            .unwrap();
+
+        match &result.data[0].results[0] {
+            crate::interfaces::organization::usage::UsageResult::VectorStores(r) => {
+                assert_eq!(r.usage_bytes, 1024);
+            }
+            other => panic!("expected VectorStores variant, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn code_interpreter_sessions_serializes_request_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/usage/code_interpreter_sessions"))
+            .and(query_param("start_time", "1700000000"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "page",
+                "has_more": false,
+                "next_page": null,
+                "data": [{
+                    "object": "bucket",
+                    "start_time": 1700000000_i64,
+                    "end_time": 1700086400_i64,
+                    "results": [{
+                        "object": "organization.usage.code_interpreter_sessions.result",
+                        "num_sessions": 7_i64
+                    }]
+                }]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let req = UsageCodeInterpreterSessionsRequest::builder()
+            .start_time(1700000000)
+            .build();
+        let result = client
+            .organization()
+            .usage()
+            .code_interpreter_sessions(&req)
+            .await
+            .unwrap();
+
+        match &result.data[0].results[0] {
+            crate::interfaces::organization::usage::UsageResult::CodeInterpreterSessions(r) => {
+                assert_eq!(r.num_sessions, 7);
+            }
+            other => panic!("expected CodeInterpreterSessions variant, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn file_search_calls_serializes_vector_store_ids_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/usage/file_search_calls"))
+            .and(query_param("start_time", "1700000000"))
+            .and(query_param("vector_store_ids", "vs_1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "page",
+                "has_more": false,
+                "next_page": null,
+                "data": [{
+                    "object": "bucket",
+                    "start_time": 1700000000_i64,
+                    "end_time": 1700086400_i64,
+                    "results": [{
+                        "object": "organization.usage.file_searches.result",
+                        "num_requests": 9_i64,
+                        "vector_store_id": "vs_1"
+                    }]
+                }]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let req = UsageFileSearchCallsRequest::builder()
+            .start_time(1700000000)
+            .vector_store_ids(vec!["vs_1".to_string()])
+            .build();
+        let result = client
+            .organization()
+            .usage()
+            .file_search_calls(&req)
+            .await
+            .unwrap();
+
+        match &result.data[0].results[0] {
+            crate::interfaces::organization::usage::UsageResult::FileSearches(r) => {
+                assert_eq!(r.vector_store_id.as_deref(), Some("vs_1"));
+            }
+            other => panic!("expected FileSearches variant, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn costs_uses_distinct_route_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/costs"))
+            .and(query_param("start_time", "1700000000"))
+            .and(query_param("group_by", "line_item"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "page",
+                "has_more": false,
+                "next_page": null,
+                "data": [{
+                    "object": "bucket",
+                    "start_time": 1700000000_i64,
+                    "end_time": 1700086400_i64,
+                    "results": [{
+                        "object": "organization.costs.result",
+                        "amount": {"currency": "usd", "value": 12.5},
+                        "line_item": "gpt-4o"
+                    }]
+                }]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let req = UsageCostsRequest::builder()
+            .start_time(1700000000)
+            .group_by(vec!["line_item".to_string()])
+            .build();
+        let result = client.organization().usage().costs(&req).await.unwrap();
+
+        match &result.data[0].results[0] {
+            crate::interfaces::organization::usage::UsageResult::Costs(r) => {
+                assert_eq!(r.line_item.as_deref(), Some("gpt-4o"));
+                let amount = r.amount.as_ref().unwrap();
+                assert_eq!(amount.currency.as_deref(), Some("usd"));
+                assert_eq!(amount.value, Some(12.5));
+            }
+            other => panic!("expected Costs variant, got {other:?}"),
         }
     }
 }
