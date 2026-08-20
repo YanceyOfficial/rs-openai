@@ -4,6 +4,7 @@
 pub mod api_keys;
 pub mod groups;
 pub mod rate_limits;
+pub mod service_accounts;
 
 use bon::Builder;
 use serde::{Deserialize, Serialize};
