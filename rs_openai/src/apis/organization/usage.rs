@@ -61,6 +61,27 @@ impl<'a> OrganizationUsage<'a> {
             )
             .await
     }
+
+    pub async fn images(
+        &self,
+        req: &usage::UsageImagesRequest,
+    ) -> OpenAIResponse<usage::UsageResponse> {
+        self.openai
+            .get_with_pairs("/organization/usage/images", &req.to_query_pairs())
+            .await
+    }
+
+    pub async fn web_search_calls(
+        &self,
+        req: &usage::UsageWebSearchCallsRequest,
+    ) -> OpenAIResponse<usage::UsageResponse> {
+        self.openai
+            .get_with_pairs(
+                "/organization/usage/web_search_calls",
+                &req.to_query_pairs(),
+            )
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -69,7 +90,7 @@ mod tests {
     use crate::interfaces::organization::usage::UsageCompletionsRequest;
     use crate::interfaces::organization::usage::{
         UsageAudioSpeechesRequest, UsageAudioTranscriptionsRequest, UsageEmbeddingsRequest,
-        UsageModerationsRequest,
+        UsageImagesRequest, UsageModerationsRequest, UsageWebSearchCallsRequest,
     };
     use wiremock::matchers::{method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -400,6 +421,99 @@ mod tests {
                 assert_eq!(r.seconds, 120);
             }
             other => panic!("expected AudioTranscriptions variant, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn images_serializes_sizes_and_sources_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/usage/images"))
+            .and(query_param("start_time", "1700000000"))
+            .and(query_param("sizes", "1024x1024"))
+            .and(query_param("sources", "image.generation"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "page",
+                "has_more": false,
+                "next_page": null,
+                "data": [{
+                    "object": "bucket",
+                    "start_time": 1700000000_i64,
+                    "end_time": 1700086400_i64,
+                    "results": [{
+                        "object": "organization.usage.images.result",
+                        "images": 5_i64,
+                        "num_model_requests": 5_i64,
+                        "size": "1024x1024",
+                        "source": "image.generation"
+                    }]
+                }]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let req = UsageImagesRequest::builder()
+            .start_time(1700000000)
+            .sizes(vec!["1024x1024".to_string()])
+            .sources(vec!["image.generation".to_string()])
+            .build();
+        let result = client.organization().usage().images(&req).await.unwrap();
+
+        match &result.data[0].results[0] {
+            crate::interfaces::organization::usage::UsageResult::Images(r) => {
+                assert_eq!(r.images, 5);
+                assert_eq!(r.source.as_deref(), Some("image.generation"));
+            }
+            other => panic!("expected Images variant, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn web_search_calls_serializes_context_levels_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/usage/web_search_calls"))
+            .and(query_param("start_time", "1700000000"))
+            .and(query_param("context_levels", "high"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "page",
+                "has_more": false,
+                "next_page": null,
+                "data": [{
+                    "object": "bucket",
+                    "start_time": 1700000000_i64,
+                    "end_time": 1700086400_i64,
+                    "results": [{
+                        "object": "organization.usage.web_searches.result",
+                        "num_model_requests": 3_i64,
+                        "num_requests": 3_i64,
+                        "context_level": "high"
+                    }]
+                }]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let req = UsageWebSearchCallsRequest::builder()
+            .start_time(1700000000)
+            .context_levels(vec!["high".to_string()])
+            .build();
+        let result = client
+            .organization()
+            .usage()
+            .web_search_calls(&req)
+            .await
+            .unwrap();
+
+        match &result.data[0].results[0] {
+            crate::interfaces::organization::usage::UsageResult::WebSearches(r) => {
+                assert_eq!(r.context_level.as_deref(), Some("high"));
+            }
+            other => panic!("expected WebSearches variant, got {other:?}"),
         }
     }
 }

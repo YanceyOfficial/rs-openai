@@ -490,3 +490,147 @@ impl UsageAudioTranscriptionsRequest {
         pairs
     }
 }
+
+/// Query params for `GET /organization/usage/images`. `group_by` accepts any
+/// combination of `project_id`, `user_id`, `api_key_id`, `model`, `size`, `source`.
+#[derive(Builder, Debug, Clone, Default)]
+pub struct UsageImagesRequest {
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    #[builder(into)]
+    pub bucket_width: Option<String>,
+    pub limit: Option<u32>,
+    #[builder(into)]
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub user_ids: Option<Vec<String>>,
+    pub models: Option<Vec<String>>,
+    pub sizes: Option<Vec<String>>,
+    pub sources: Option<Vec<String>>,
+    pub group_by: Option<Vec<String>>,
+}
+
+impl UsageImagesRequest {
+    pub(crate) fn to_query_pairs(&self) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        pairs.push(("start_time".to_string(), self.start_time.to_string()));
+        if let Some(v) = self.end_time {
+            pairs.push(("end_time".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.bucket_width {
+            pairs.push(("bucket_width".to_string(), v.clone()));
+        }
+        if let Some(v) = self.limit {
+            pairs.push(("limit".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.page {
+            pairs.push(("page".to_string(), v.clone()));
+        }
+        if let Some(values) = &self.project_ids {
+            for v in values {
+                pairs.push(("project_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.api_key_ids {
+            for v in values {
+                pairs.push(("api_key_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.user_ids {
+            for v in values {
+                pairs.push(("user_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.models {
+            for v in values {
+                pairs.push(("models".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.sizes {
+            for v in values {
+                pairs.push(("sizes".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.sources {
+            for v in values {
+                pairs.push(("sources".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.group_by {
+            for v in values {
+                pairs.push(("group_by".to_string(), v.clone()));
+            }
+        }
+        pairs
+    }
+}
+
+/// Query params for `GET /organization/usage/web_search_calls`. `group_by` accepts any
+/// combination of `project_id`, `user_id`, `api_key_id`, `model`, `context_level`.
+#[derive(Builder, Debug, Clone, Default)]
+pub struct UsageWebSearchCallsRequest {
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    #[builder(into)]
+    pub bucket_width: Option<String>,
+    pub limit: Option<u32>,
+    #[builder(into)]
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub user_ids: Option<Vec<String>>,
+    pub models: Option<Vec<String>>,
+    pub context_levels: Option<Vec<String>>,
+    pub group_by: Option<Vec<String>>,
+}
+
+impl UsageWebSearchCallsRequest {
+    pub(crate) fn to_query_pairs(&self) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        pairs.push(("start_time".to_string(), self.start_time.to_string()));
+        if let Some(v) = self.end_time {
+            pairs.push(("end_time".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.bucket_width {
+            pairs.push(("bucket_width".to_string(), v.clone()));
+        }
+        if let Some(v) = self.limit {
+            pairs.push(("limit".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.page {
+            pairs.push(("page".to_string(), v.clone()));
+        }
+        if let Some(values) = &self.project_ids {
+            for v in values {
+                pairs.push(("project_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.api_key_ids {
+            for v in values {
+                pairs.push(("api_key_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.user_ids {
+            for v in values {
+                pairs.push(("user_ids".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.models {
+            for v in values {
+                pairs.push(("models".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.context_levels {
+            for v in values {
+                pairs.push(("context_levels".to_string(), v.clone()));
+            }
+        }
+        if let Some(values) = &self.group_by {
+            for v in values {
+                pairs.push(("group_by".to_string(), v.clone()));
+            }
+        }
+        pairs
+    }
+}
