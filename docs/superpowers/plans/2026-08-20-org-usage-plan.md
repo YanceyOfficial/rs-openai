@@ -412,6 +412,11 @@ impl UsageCompletionsRequest {
                 pairs.push(("api_key_ids".to_string(), v.clone()));
             }
         }
+        if let Some(values) = &self.user_ids {
+            for v in values {
+                pairs.push(("user_ids".to_string(), v.clone()));
+            }
+        }
         if let Some(values) = &self.models {
             for v in values {
                 pairs.push(("models".to_string(), v.clone()));
