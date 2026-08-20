@@ -1,10 +1,11 @@
 //! Organization-level administration: audit logs, admin API keys, usage, groups, invites,
 //! projects, roles, and users. A distinct "admin tier", separate from the "call the model"
 //! surface the rest of this crate exposes. Admin API keys, audit logs, users, invites,
-//! groups, and usage are implemented (see
+//! groups, usage, and projects are implemented (see
 //! docs/superpowers/specs/2026-08-19-org-admin-api-keys-audit-logs-design.md,
-//! docs/superpowers/specs/2026-08-20-org-users-invites-groups-design.md, and
-//! docs/superpowers/specs/2026-08-20-org-usage-design.md); projects and roles are not yet
+//! docs/superpowers/specs/2026-08-20-org-users-invites-groups-design.md,
+//! docs/superpowers/specs/2026-08-20-org-usage-design.md, and
+//! docs/superpowers/specs/2026-08-20-org-projects-design.md); only roles remains not yet
 //! implemented — see docs/superpowers/research/2026-07-31-openai-api-structure.md.
 
 pub mod admin_api_keys;
