@@ -1,6 +1,10 @@
 //! Organization users (`/organization/users`) -- see
 //! docs/superpowers/specs/2026-08-20-org-users-invites-groups-design.md.
+//! Role assignment types (Users.Roles) are appended below -- see
+//! docs/superpowers/specs/2026-08-20-org-roles-design.md.
 
+use crate::interfaces::chat::SortOrder;
+use crate::interfaces::organization::roles::Role;
 use bon::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -90,6 +94,73 @@ pub struct ListOrganizationUsersResponse {
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct DeleteOrganizationUserResponse {
     pub id: String,
+    pub deleted: bool,
+    pub object: String,
+}
+
+// Users.Roles sub-resource, colocated here (matching the established Groups.Users precedent).
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct AssignUserRoleRequest {
+    #[builder(into)]
+    pub role_id: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct AssignUserRoleResponse {
+    pub object: String,
+    pub role: Role,
+    pub user: OrganizationUser,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct AssignmentSource {
+    pub principal_id: String,
+    pub principal_type: String,
+}
+
+/// The full detail of one role assignment -- shared between Users.Roles and Groups.Roles'
+/// `retrieve`/`list` responses, which are confirmed byte-identical in shape.
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct RoleAssignmentDetail {
+    pub id: String,
+    pub name: String,
+    pub permissions: Vec<String>,
+    pub predefined_role: bool,
+    pub resource_type: String,
+    pub assignment_sources: Option<Vec<AssignmentSource>>,
+    pub created_at: Option<i64>,
+    pub created_by: Option<String>,
+    pub created_by_user_obj: Option<serde_json::Value>,
+    pub description: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+    pub updated_at: Option<i64>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ListUserRolesRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub after: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<SortOrder>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ListUserRolesResponse {
+    pub object: String,
+    pub data: Vec<RoleAssignmentDetail>,
+    pub first_id: Option<String>,
+    pub last_id: Option<String>,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct RemoveUserRoleResponse {
     pub deleted: bool,
     pub object: String,
 }

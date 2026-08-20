@@ -1,7 +1,6 @@
 //! Organization users (`/organization/users`) and their assigned roles -- see
-//! docs/superpowers/specs/2026-08-20-org-users-invites-groups-design.md.
-//! Role assignment (`OrganizationUserRoles`) is not yet implemented -- deferred
-//! to a future slice.
+//! docs/superpowers/specs/2026-08-20-org-users-invites-groups-design.md and
+//! docs/superpowers/specs/2026-08-20-org-roles-design.md.
 
 use crate::client::OpenAI;
 use crate::interfaces::organization::users;
@@ -59,13 +58,12 @@ impl<'a> OrganizationUser<'a> {
             .await
     }
 
-    /// Scoped accessor for this user's assigned roles. Not yet implemented.
+    /// Scoped accessor for this user's assigned roles.
     pub fn roles(&self) -> OrganizationUserRoles<'a> {
         OrganizationUserRoles::new(self.openai, self.id.clone())
     }
 }
 
-#[allow(dead_code)]
 pub struct OrganizationUserRoles<'a> {
     openai: &'a OpenAI,
     user_id: String,
@@ -75,13 +73,70 @@ impl<'a> OrganizationUserRoles<'a> {
     pub(crate) fn new(openai: &'a OpenAI, user_id: String) -> Self {
         Self { openai, user_id }
     }
+
+    pub async fn create(
+        &self,
+        req: &users::AssignUserRoleRequest,
+    ) -> OpenAIResponse<users::AssignUserRoleResponse> {
+        self.openai
+            .post(&format!("/organization/users/{}/roles", self.user_id), req)
+            .await
+    }
+
+    pub async fn list(
+        &self,
+        req: &users::ListUserRolesRequest,
+    ) -> OpenAIResponse<users::ListUserRolesResponse> {
+        self.openai
+            .get(&format!("/organization/users/{}/roles", self.user_id), req)
+            .await
+    }
+
+    pub fn role(&self, id: impl Into<String>) -> OrganizationUserRole<'a> {
+        OrganizationUserRole::new(self.openai, self.user_id.clone(), id.into())
+    }
+}
+
+pub struct OrganizationUserRole<'a> {
+    openai: &'a OpenAI,
+    user_id: String,
+    id: String,
+}
+
+impl<'a> OrganizationUserRole<'a> {
+    pub(crate) fn new(openai: &'a OpenAI, user_id: String, id: String) -> Self {
+        Self {
+            openai,
+            user_id,
+            id,
+        }
+    }
+
+    pub async fn retrieve(&self) -> OpenAIResponse<users::RoleAssignmentDetail> {
+        self.openai
+            .get(
+                &format!("/organization/users/{}/roles/{}", self.user_id, self.id),
+                &(),
+            )
+            .await
+    }
+
+    pub async fn delete(&self) -> OpenAIResponse<users::RemoveUserRoleResponse> {
+        self.openai
+            .delete(
+                &format!("/organization/users/{}/roles/{}", self.user_id, self.id),
+                &(),
+            )
+            .await
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::organization::users::{
-        ListOrganizationUsersRequest, UpdateOrganizationUserRequest,
+        AssignUserRoleRequest, ListOrganizationUsersRequest, ListUserRolesRequest,
+        UpdateOrganizationUserRequest,
     };
     use wiremock::matchers::{body_json, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -206,6 +261,140 @@ mod tests {
         let result = client
             .organization()
             .user("user_abc")
+            .delete()
+            .await
+            .unwrap();
+
+        assert!(result.deleted);
+    }
+
+    #[tokio::test]
+    async fn user_roles_create_serializes_request_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/organization/users/user_abc/roles"))
+            .and(body_json(serde_json::json!({"role_id": "role_1"})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "user.role",
+                "role": {
+                    "id": "role_1",
+                    "name": "Custom Role",
+                    "object": "role",
+                    "permissions": ["api.model.request"],
+                    "predefined_role": false,
+                    "resource_type": "api.organization"
+                },
+                "user": {
+                    "id": "user_abc",
+                    "added_at": 1700000000_i64,
+                    "object": "organization.user"
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-admin-test").with_base_url(mock_server.uri());
+        let req = AssignUserRoleRequest::builder().role_id("role_1").build();
+        let result = client
+            .organization()
+            .user("user_abc")
+            .roles()
+            .create(&req)
+            .await
+            .unwrap();
+
+        assert_eq!(result.role.id, "role_1");
+        assert_eq!(result.user.id, "user_abc");
+    }
+
+    #[tokio::test]
+    async fn user_roles_list_deserializes_role_assignment_detail() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/users/user_abc/roles"))
+            .and(query_param("limit", "5"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [{
+                    "id": "role_1",
+                    "name": "Custom Role",
+                    "permissions": ["api.model.request"],
+                    "predefined_role": false,
+                    "resource_type": "api.organization",
+                    "assignment_sources": [{"principal_id": "group_1", "principal_type": "group"}]
+                }],
+                "first_id": "role_1",
+                "last_id": "role_1",
+                "has_more": false
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-admin-test").with_base_url(mock_server.uri());
+        let req = ListUserRolesRequest::builder().limit(5).build();
+        let result = client
+            .organization()
+            .user("user_abc")
+            .roles()
+            .list(&req)
+            .await
+            .unwrap();
+
+        assert_eq!(result.data.len(), 1);
+        let sources = result.data[0].assignment_sources.as_ref().unwrap();
+        assert_eq!(sources[0].principal_type, "group");
+    }
+
+    #[tokio::test]
+    async fn user_role_retrieve_deserializes_role_assignment_detail() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/users/user_abc/roles/role_1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "role_1",
+                "name": "Custom Role",
+                "permissions": ["api.model.request"],
+                "predefined_role": false,
+                "resource_type": "api.organization"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-admin-test").with_base_url(mock_server.uri());
+        let result = client
+            .organization()
+            .user("user_abc")
+            .roles()
+            .role("role_1")
+            .retrieve()
+            .await
+            .unwrap();
+
+        assert_eq!(result.name, "Custom Role");
+    }
+
+    #[tokio::test]
+    async fn user_role_delete_deserializes_confirmation_without_id() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/organization/users/user_abc/roles/role_1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "deleted": true,
+                "object": "user.role.deleted"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-admin-test").with_base_url(mock_server.uri());
+        let result = client
+            .organization()
+            .user("user_abc")
+            .roles()
+            .role("role_1")
             .delete()
             .await
             .unwrap();
