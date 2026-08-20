@@ -1,10 +1,9 @@
 //! A project-scoped view of organization resources: API keys, groups, rate limits, service
 //! accounts, and users, all scoped to one project -- see
-//! docs/superpowers/specs/2026-08-20-org-projects-design.md.
-//!
-//! Note: the structure research also found a parallel, slightly differently-scoped
-//! "Projects" family (Groups Roles, Roles, Users Roles) in OpenAI's reference index --
-//! deferred along with the rest of Organization/admin's Roles-related sub-resources.
+//! docs/superpowers/specs/2026-08-20-org-projects-design.md. Project-scoped role
+//! assignment (Groups.Roles/Users.Roles, both confirmed to route WITHOUT the usual
+//! `/organization` prefix) is implemented too -- see
+//! docs/superpowers/specs/2026-08-20-org-project-roles-design.md.
 
 pub mod api_keys;
 pub mod groups;

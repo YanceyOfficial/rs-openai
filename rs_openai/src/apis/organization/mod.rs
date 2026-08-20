@@ -1,12 +1,13 @@
 //! Organization-level administration: audit logs, admin API keys, usage, groups, invites,
 //! projects, roles, and users. A distinct "admin tier", separate from the "call the model"
-//! surface the rest of this crate exposes. Every sub-resource is now implemented (see
+//! surface the rest of this crate exposes. Every sub-resource is now implemented, at both
+//! org and project scope -- see
 //! docs/superpowers/specs/2026-08-19-org-admin-api-keys-audit-logs-design.md,
 //! docs/superpowers/specs/2026-08-20-org-users-invites-groups-design.md,
 //! docs/superpowers/specs/2026-08-20-org-usage-design.md,
-//! docs/superpowers/specs/2026-08-20-org-projects-design.md, and
-//! docs/superpowers/specs/2026-08-20-org-roles-design.md), except project-scoped
-//! Groups.Roles/Users.Roles (deferred, see the Roles design doc's Non-goals).
+//! docs/superpowers/specs/2026-08-20-org-projects-design.md,
+//! docs/superpowers/specs/2026-08-20-org-roles-design.md, and
+//! docs/superpowers/specs/2026-08-20-org-project-roles-design.md.
 
 pub mod admin_api_keys;
 pub mod audit_logs;
