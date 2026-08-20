@@ -79,7 +79,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let result = client
             .organization()
             .user("user_abc")
@@ -332,7 +332,7 @@ Add to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let req = UpdateOrganizationUserRequest::builder().role("reader").build();
         let result = client
             .organization()
@@ -361,7 +361,7 @@ Add to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let req = ListOrganizationUsersRequest::builder().limit(10).build();
         let result = client.organization().users().list(&req).await.unwrap();
 
@@ -383,7 +383,7 @@ Add to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let result = client.organization().user("user_abc").delete().await.unwrap();
 
         assert!(result.deleted);
@@ -495,7 +495,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let req = CreateInviteRequest::builder()
             .email("new@example.com")
             .role("reader")
@@ -530,7 +530,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let req = CreateInviteRequest::builder().email("new@example.com").role("owner").build();
         let result = client.organization().invites().create(&req).await.unwrap();
 
@@ -706,7 +706,7 @@ Add to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let req = ListInvitesRequest::builder().limit(5).build();
         let result = client.organization().invites().list(&req).await.unwrap();
 
@@ -732,7 +732,7 @@ Add to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let result = client.organization().invite("invite_1").retrieve().await.unwrap();
 
         assert_eq!(result.status, "accepted");
@@ -753,7 +753,7 @@ Add to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let result = client.organization().invite("invite_1").delete().await.unwrap();
 
         assert!(result.deleted);
@@ -832,7 +832,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let req = CreateGroupRequest::builder().name("Engineering").build();
         let result = client.organization().groups().create(&req).await.unwrap();
 
@@ -856,7 +856,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let req = UpdateGroupRequest::builder().name("Eng Renamed").build();
         let result = client.organization().group("group_1").update(&req).await.unwrap();
 
@@ -1063,7 +1063,7 @@ Add to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let result = client.organization().group("group_1").retrieve().await.unwrap();
 
         assert_eq!(result.group_type, "tenant_group");
@@ -1087,7 +1087,7 @@ Add to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let req = ListGroupsRequest::builder()
             .order(crate::interfaces::chat::SortOrder::Desc)
             .build();
@@ -1110,7 +1110,7 @@ Add to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let result = client.organization().group("group_1").delete().await.unwrap();
 
         assert!(result.deleted);
@@ -1179,7 +1179,7 @@ Append to the `tests` module in `rs_openai/src/apis/organization/groups.rs` (add
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let req = AddGroupUserRequest::builder().user_id("user_abc").build();
         let result = client
             .organization()
@@ -1347,7 +1347,7 @@ Append to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let req = ListGroupUsersRequest::builder().limit(20).build();
         let result = client
             .organization()
@@ -1374,7 +1374,7 @@ Append to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let result = client
             .organization()
             .group("group_1")
@@ -1400,7 +1400,7 @@ Append to the same test module:
             .mount(&mock_server)
             .await;
 
-        let client = OpenAI::new_with_base_url("test-key", mock_server.uri());
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
         let result = client
             .organization()
             .group("group_1")
