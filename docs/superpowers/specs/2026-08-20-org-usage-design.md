@@ -90,16 +90,16 @@ Per-endpoint field deltas (confirmed via source, all optional):
 
 | Endpoint | Extra fields beyond the shared core | `group_by` confirmed valid values |
 |---|---|---|
-| `completions` | `api_key_ids`, `batch: Option<bool>`, `models` | `project_id`, `user_id`, `api_key_id`, `model`, `batch`, `service_tier` |
-| `embeddings` | `api_key_ids`, `models` | `project_id`, `user_id`, `api_key_id`, `model` |
-| `moderations` | `api_key_ids`, `models` | `project_id`, `user_id`, `api_key_id`, `model` |
-| `images` | `api_key_ids`, `models`, `sizes`, `sources` | `project_id`, `user_id`, `api_key_id`, `model`, `size`, `source` |
-| `audio_speeches` | `api_key_ids`, `models` | `project_id`, `user_id`, `api_key_id`, `model` |
-| `audio_transcriptions` | `api_key_ids`, `models` | `project_id`, `user_id`, `api_key_id`, `model` |
+| `completions` | `api_key_ids`, `user_ids`, `batch: Option<bool>`, `models` | `project_id`, `user_id`, `api_key_id`, `model`, `batch`, `service_tier` |
+| `embeddings` | `api_key_ids`, `user_ids`, `models` | `project_id`, `user_id`, `api_key_id`, `model` |
+| `moderations` | `api_key_ids`, `user_ids`, `models` | `project_id`, `user_id`, `api_key_id`, `model` |
+| `images` | `api_key_ids`, `user_ids`, `models`, `sizes`, `sources` | `project_id`, `user_id`, `api_key_id`, `model`, `size`, `source` |
+| `audio_speeches` | `api_key_ids`, `user_ids`, `models` | `project_id`, `user_id`, `api_key_id`, `model` |
+| `audio_transcriptions` | `api_key_ids`, `user_ids`, `models` | `project_id`, `user_id`, `api_key_id`, `model` |
 | `vector_stores` | (none — no `api_key_ids`/`models`/`user_ids` at all) | `project_id` only |
 | `code_interpreter_sessions` | (none — same reduced set as `vector_stores`) | `project_id` only |
-| `file_search_calls` | `api_key_ids`, `vector_store_ids` (no `models`) | `project_id`, `user_id`, `api_key_id`, `vector_store_id` |
-| `web_search_calls` | `api_key_ids`, `context_levels`, `models` | `project_id`, `user_id`, `api_key_id`, `model`, `context_level` |
+| `file_search_calls` | `api_key_ids`, `user_ids`, `vector_store_ids` (no `models`) | `project_id`, `user_id`, `api_key_id`, `vector_store_id` |
+| `web_search_calls` | `api_key_ids`, `user_ids`, `context_levels`, `models` | `project_id`, `user_id`, `api_key_id`, `model`, `context_level` |
 | `costs` | `api_key_ids` (no `models`/`user_ids`); `bucket_width` confirmed `"1d"`-only (kept plain `String` regardless, doc-noted) | `project_id`, `line_item`, `api_key_id` |
 
 Every request type name: `UsageCompletionsRequest`, `UsageEmbeddingsRequest`, `UsageModerationsRequest`, `UsageImagesRequest`, `UsageAudioSpeechesRequest`, `UsageAudioTranscriptionsRequest`, `UsageVectorStoresRequest`, `UsageCodeInterpreterSessionsRequest`, `UsageFileSearchCallsRequest`, `UsageWebSearchCallsRequest`, `UsageCostsRequest`.
