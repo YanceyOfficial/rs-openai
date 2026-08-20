@@ -5,5 +5,6 @@ pub mod admin_api_keys;
 pub mod audit_logs;
 pub mod groups;
 pub mod invites;
+pub mod projects;
 pub mod usage;
 pub mod users;
