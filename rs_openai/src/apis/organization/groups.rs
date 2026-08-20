@@ -57,13 +57,12 @@ impl<'a> OrganizationGroup<'a> {
             .await
     }
 
-    /// Scoped accessor for this group's member users. Not yet implemented.
+    /// Scoped accessor for this group's member users.
     pub fn users(&self) -> OrganizationGroupUsers<'a> {
         OrganizationGroupUsers::new(self.openai, self.id.clone())
     }
 }
 
-#[allow(dead_code)]
 pub struct OrganizationGroupUsers<'a> {
     openai: &'a OpenAI,
     group_id: String,
@@ -73,13 +72,82 @@ impl<'a> OrganizationGroupUsers<'a> {
     pub(crate) fn new(openai: &'a OpenAI, group_id: String) -> Self {
         Self { openai, group_id }
     }
+
+    pub async fn create(
+        &self,
+        req: &groups::AddGroupUserRequest,
+    ) -> OpenAIResponse<groups::GroupUser> {
+        self.openai
+            .post(
+                &format!("/organization/groups/{}/users", self.group_id),
+                req,
+            )
+            .await
+    }
+
+    pub async fn list(
+        &self,
+        req: &groups::ListGroupUsersRequest,
+    ) -> OpenAIResponse<groups::ListGroupUsersResponse> {
+        self.openai
+            .get(
+                &format!("/organization/groups/{}/users", self.group_id),
+                req,
+            )
+            .await
+    }
+
+    pub fn user(&self, user_id: impl Into<String>) -> OrganizationGroupUser<'a> {
+        OrganizationGroupUser::new(self.openai, self.group_id.clone(), user_id.into())
+    }
+}
+
+pub struct OrganizationGroupUser<'a> {
+    openai: &'a OpenAI,
+    group_id: String,
+    user_id: String,
+}
+
+impl<'a> OrganizationGroupUser<'a> {
+    pub(crate) fn new(openai: &'a OpenAI, group_id: String, user_id: String) -> Self {
+        Self {
+            openai,
+            group_id,
+            user_id,
+        }
+    }
+
+    pub async fn retrieve(&self) -> OpenAIResponse<groups::GroupUser> {
+        self.openai
+            .get(
+                &format!(
+                    "/organization/groups/{}/users/{}",
+                    self.group_id, self.user_id
+                ),
+                &(),
+            )
+            .await
+    }
+
+    pub async fn delete(&self) -> OpenAIResponse<groups::RemoveGroupUserResponse> {
+        self.openai
+            .delete(
+                &format!(
+                    "/organization/groups/{}/users/{}",
+                    self.group_id, self.user_id
+                ),
+                &(),
+            )
+            .await
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::organization::groups::{
-        CreateGroupRequest, ListGroupsRequest, UpdateGroupRequest,
+        AddGroupUserRequest, CreateGroupRequest, ListGroupUsersRequest, ListGroupsRequest,
+        UpdateGroupRequest,
     };
     use wiremock::matchers::{body_json, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -216,5 +284,119 @@ mod tests {
             .unwrap();
 
         assert!(result.deleted);
+    }
+
+    #[tokio::test]
+    async fn group_users_create_adds_member_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/organization/groups/group_1/users"))
+            .and(body_json(serde_json::json!({"user_id": "user_abc"})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "user_abc",
+                "email": "dev@example.com",
+                "name": "Dev User"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let req = AddGroupUserRequest::builder().user_id("user_abc").build();
+        let result = client
+            .organization()
+            .group("group_1")
+            .users()
+            .create(&req)
+            .await
+            .unwrap();
+
+        assert_eq!(result.id, "user_abc");
+        assert_eq!(result.name, "Dev User");
+    }
+
+    #[tokio::test]
+    async fn group_users_list_serializes_query_params_and_deserializes_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/groups/group_1/users"))
+            .and(query_param("limit", "20"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [{"id": "user_abc", "email": "dev@example.com", "name": "Dev User"}],
+                "first_id": "user_abc",
+                "last_id": "user_abc",
+                "has_more": false
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let req = ListGroupUsersRequest::builder().limit(20).build();
+        let result = client
+            .organization()
+            .group("group_1")
+            .users()
+            .list(&req)
+            .await
+            .unwrap();
+
+        assert_eq!(result.data.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn group_user_retrieve_deserializes_membership() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/groups/group_1/users/user_abc"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "user_abc",
+                "email": "dev@example.com",
+                "name": "Dev User"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let result = client
+            .organization()
+            .group("group_1")
+            .users()
+            .user("user_abc")
+            .retrieve()
+            .await
+            .unwrap();
+
+        assert_eq!(result.name, "Dev User");
+    }
+
+    #[tokio::test]
+    async fn group_user_delete_deserializes_confirmation_without_id() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/organization/groups/group_1/users/user_abc"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "deleted": true,
+                "object": "group.user.deleted"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let result = client
+            .organization()
+            .group("group_1")
+            .users()
+            .user("user_abc")
+            .delete()
+            .await
+            .unwrap();
+
+        assert!(result.deleted);
+        // RemoveGroupUserResponse has no `id` field -- this test compiling and
+        // passing is itself the proof that the asymmetry is modeled correctly.
     }
 }

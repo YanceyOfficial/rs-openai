@@ -62,3 +62,46 @@ pub struct DeleteGroupResponse {
     pub deleted: bool,
     pub object: String,
 }
+
+// Groups.Users sub-resource.
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct AddGroupUserRequest {
+    #[builder(into)]
+    pub user_id: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct GroupUser {
+    pub id: String,
+    pub email: Option<String>,
+    pub name: String,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ListGroupUsersRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub after: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<SortOrder>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ListGroupUsersResponse {
+    pub object: String,
+    pub data: Vec<GroupUser>,
+    pub first_id: Option<String>,
+    pub last_id: Option<String>,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct RemoveGroupUserResponse {
+    pub deleted: bool,
+    pub object: String,
+}
