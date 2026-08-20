@@ -19,13 +19,19 @@ impl<'a> Audio<'a> {
         Self { openai }
     }
 
-    /// Generates audio from the input text.
-    pub async fn create_speech(&self, req: &audio::CreateSpeechRequest) -> OpenAIResponse<()> {
+    /// Generates audio from the input text, writes it to a file in the system temp
+    /// directory, and returns the path it was written to.
+    pub async fn create_speech(
+        &self,
+        req: &audio::CreateSpeechRequest,
+    ) -> OpenAIResponse<std::path::PathBuf> {
         let format = req.response_format.clone().unwrap_or_default();
         let random_filename = generate_random_string(16);
+        let path = std::env::temp_dir().join(format!("{random_filename}.{format}"));
         self.openai
-            .post_with_file_response("/audio/speech", req, &format!("{random_filename}.{format}"))
-            .await
+            .post_with_file_response("/audio/speech", req, &path)
+            .await?;
+        Ok(path)
     }
 
     /// Transcribes audio into the input language, response is `application/json`.
@@ -312,6 +318,39 @@ mod tests {
             .build();
 
         client.audio().create_speech(&req).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn create_speech_writes_binary_response_byte_for_byte() {
+        let mock_server = MockServer::start().await;
+        // Deliberately invalid UTF-8: 0xFF/0xFE are never valid lead bytes, and 0xC3 followed
+        // by 0x28 is an invalid continuation sequence. A lossy `.text()` decode would replace
+        // these with U+FFFD, corrupting the file; a correct byte-for-byte write must not.
+        let audio_bytes: Vec<u8> = vec![0xFF, 0xFE, 0x00, 0x01, 0xC3, 0x28, 0x4D, 0x50, 0x33];
+
+        Mock::given(method("POST"))
+            .and(path("/audio/speech"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(audio_bytes.clone()))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateSpeechRequest::builder()
+            .model(TtsModel::Tts1)
+            .input("hello")
+            .voice(Voice::Alloy)
+            .build();
+
+        let written_path = client.audio().create_speech(&req).await.unwrap();
+
+        let written_bytes = std::fs::read(&written_path).unwrap();
+        assert_eq!(written_bytes, audio_bytes);
+        assert!(
+            written_path.starts_with(std::env::temp_dir()),
+            "expected {written_path:?} to be written under the system temp dir, not the crate root"
+        );
+
+        std::fs::remove_file(&written_path).unwrap();
     }
 
     #[tokio::test]

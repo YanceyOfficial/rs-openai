@@ -217,23 +217,26 @@ impl OpenAI {
         Self::resolve_raw_bytes_response(request).await
     }
 
+    /// Writes the raw response body to `filename` byte-for-byte. Uses `.bytes()`, not
+    /// `.text()` — the response may be genuinely binary (e.g. TTS audio output), and a
+    /// UTF-8 text decode would silently corrupt any byte sequence that isn't valid UTF-8.
     async fn resolve_file_response(
         request: reqwest_middleware::RequestBuilder,
-        filename: &str,
+        filename: &std::path::Path,
     ) -> OpenAIResponse<()> {
         let response = request.send().await?;
         let status = response.status();
-        let text = response.text().await?;
+        let bytes = response.bytes().await?;
 
         if !status.is_success() {
             let api_error: ApiErrorResponse =
-                serde_json::from_slice(text.as_ref()).map_err(OpenAIError::JSONDeserialize)?;
+                serde_json::from_slice(bytes.as_ref()).map_err(OpenAIError::JSONDeserialize)?;
 
             return Err(OpenAIError::ApiError(api_error));
         }
 
         let mut file = File::create(filename)?;
-        io::copy(&mut text.as_bytes(), &mut file)?;
+        io::copy(&mut bytes.as_ref(), &mut file)?;
 
         Ok(())
     }
@@ -301,7 +304,7 @@ impl OpenAI {
         &self,
         route: &str,
         json: &T,
-        filename: &str,
+        filename: &std::path::Path,
     ) -> OpenAIResponse<()>
     where
         T: Serialize,

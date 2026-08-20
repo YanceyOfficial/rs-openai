@@ -42,10 +42,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let res = client.files().retrieve("YOUR_FILE_ID").await?;
     println!("{:?}", res);
 
-    // retrieve_content
-    // TODO: Since free accounts cannot download fine-tune training files, I have to verify this api until purchase a Plus.
+    // retrieve_content -- returns the raw file bytes (Vec<u8>), not a String, since a
+    // file's content is arbitrary bytes and not necessarily valid UTF-8 text.
     let res = client.files().retrieve_content("YOUR_FILE_ID").await?;
-    println!("{:?}", res);
+    println!("{} bytes", res.len());
 
     Ok(())
 }

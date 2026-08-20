@@ -62,16 +62,16 @@ impl<'a> Files<'a> {
         self.openai.get(&format!("/files/{file_id}"), &()).await
     }
 
-    /// Returns the contents of the specified file.
+    /// Downloads the contents of the specified file, byte-for-byte. Uses a binary-safe
+    /// request path (not JSON deserialization), since a file's content can be arbitrary
+    /// bytes, not necessarily valid UTF-8 or JSON.
     ///
     /// # Path parameters
     ///
     /// - `file_id` - The ID of the file to use for this request
-    ///
-    /// TODO: Since free accounts cannot download fine-tune training files, I have to verify this api until purchase a Plus.
-    pub async fn retrieve_content(&self, file_id: &str) -> OpenAIResponse<String> {
+    pub async fn retrieve_content(&self, file_id: &str) -> OpenAIResponse<Vec<u8>> {
         self.openai
-            .get(&format!("/files/{file_id}/content"), &())
+            .get_raw_bytes(&format!("/files/{file_id}/content"))
             .await
     }
 }
@@ -197,6 +197,27 @@ mod tests {
                 .windows(self.0.len())
                 .any(|window| window == self.0)
         }
+    }
+
+    #[tokio::test]
+    async fn retrieve_content_returns_raw_bytes_byte_for_byte() {
+        let mock_server = MockServer::start().await;
+        // Deliberately invalid UTF-8 -- a file's content is arbitrary bytes, not
+        // necessarily text. The old implementation went through a JSON-string
+        // deserializer, which would fail entirely on a raw, unwrapped response body
+        // like this one, regardless of UTF-8 validity.
+        let content: Vec<u8> = vec![0xFF, 0xFE, 0x00, 0x01, 0xC3, 0x28];
+
+        Mock::given(method("GET"))
+            .and(path("/files/file-123/content"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(content.clone()))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let result = client.files().retrieve_content("file-123").await.unwrap();
+
+        assert_eq!(result, content);
     }
 
     #[tokio::test]
