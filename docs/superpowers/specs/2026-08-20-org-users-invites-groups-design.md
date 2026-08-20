@@ -23,7 +23,7 @@ Second of 4 sub-slices for the Organization/admin scaffold (see `docs/superpower
 - `OrganizationUserProjects`: `object: String` (always `"list"`), `data: Vec<OrganizationUserProjectsData>`.
 - `OrganizationUser` (response, used uniformly for retrieve/update/list): `id: String`, `added_at: i64`, `object: String` (always `"organization.user"`), `api_key_last_used_at: Option<i64>`, `created: Option<i64>`, `developer_persona: Option<String>`, `email: Option<String>`, `is_default: Option<bool>`, `is_scale_tier_authorized_purchaser: Option<bool>`, `is_scim_managed: Option<bool>`, `is_service_account: Option<bool>`, `name: Option<String>`, `projects: Option<OrganizationUserProjects>`, `role: Option<String>` (`"owner"` or `"reader"`, confirmed a plain string in the source, not an enum), `technical_level: Option<String>`, `user: Option<OrganizationUserNested>`.
 - `UpdateOrganizationUserRequest`: `developer_persona: Option<String>`, `role: Option<String>`, `role_id: Option<String>`, `technical_level: Option<String>` — all optional (confirmed: a partial-update PATCH-style body sent as POST, matching the crate's existing `Update*Request` convention of all-optional fields).
-- `ListOrganizationUsersRequest`: `after: Option<String>`, `emails: Option<Vec<String>>`, `limit: Option<u32>`.
+- `ListOrganizationUsersRequest`: `after: Option<String>`, `limit: Option<u32>` — the confirmed source also has an `emails: Vec<String>` filter, but it's deferred here (see Non-goals) since `serde_urlencoded` (this crate's query-serialization backend, confirmed via `client.rs`'s `get()` using `reqwest`'s `.query()`) cannot serialize a `Vec<String>` field at all, empirically verified in a scratch project: `serde_urlencoded::to_string` on a struct with a `Vec<String>` field returns `Err(Custom("unsupported value"))`, not just a differently-formatted query string. This is the same class of unconfirmed-compound-query-param risk sub-slice 1 flagged and deferred for audit logs' array filters — now concretely confirmed as a real limitation, not just a hypothetical one.
 - `ListOrganizationUsersResponse`/`DeleteOrganizationUserResponse` (`{id, deleted, object}`, `object` always `"organization.user.deleted"`): the crate's universal list/delete-response shapes.
 - **Invites**: `OrganizationInvites::create()` (`POST /organization/invites`), `::list()` (`GET /organization/invites`), `OrganizationInvite::retrieve()` (`GET /organization/invites/{invite_id}`), `::delete()` (`DELETE /organization/invites/{invite_id}`).
 - `InviteProject`: `id: String`, `role: String` (`"member"` or `"owner"`, plain string).
@@ -47,6 +47,7 @@ Second of 4 sub-slices for the Organization/admin scaffold (see `docs/superpower
 
 ## Non-goals (explicit, deferred to later slices)
 
+- **Users' `emails` list filter** — deferred pending a real fix to this crate's query-serialization pipeline (it currently cannot serialize any `Vec<String>` query field, confirmed empirically; not specific to this endpoint). `ListOrganizationUsersRequest` ships with only `after`/`limit`, matching every other `List*Request` in this crate.
 - **Top-level Roles** (custom role definitions: create/retrieve/update/list/delete), **Users.Roles** (assigning/listing/revoking a user's roles), and **Groups.Roles** (assigning/listing/revoking a group's roles) — a separable concern (custom permission definitions and assignments) from core people/group management. The existing scaffold's `OrganizationUserRoles`/`OrganizationGroupRoles`-equivalent accessors and top-level `roles()`/`role()` stay as honest, unimplemented stubs.
 - **The rest of Organization/admin** (usage, projects + its sub-tree) — sub-slices 3-4, not this one.
 
@@ -134,9 +135,6 @@ pub struct ListOrganizationUsersRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub after: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub emails: Option<Vec<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
@@ -345,7 +343,7 @@ pub struct RemoveGroupUserResponse {
 
 ## Testing
 
-`wiremock` tests covering: Users — `retrieve` deserializing the nested `user`/`projects` sub-objects; `update` serializing only the provided optional fields; `list` serializing `emails` as a repeated query param (a new pattern for this crate's query pipeline — confirmed-safe since it's a flat `Vec<String>` on a GET, not the audit-log array-filter case deferred in sub-slice 1 for being combined with other unconfirmed shapes) and deserializing a paginated response; `delete`. Invites — `create` serializing `projects` and deserializing a full `Invite`; a minimal `create` test with `projects` omitted; `list`; `retrieve`; `delete`. Groups — `create`; `retrieve`; `update` deserializing into the distinct `UpdateGroupResponse` shape (proving the asymmetry is real, not accidentally reusing `Group`); `list` serializing `order`; `delete`. Groups.Users — `create` (add a member); `list`; `retrieve`; `delete` deserializing `RemoveGroupUserResponse` and confirming no `id` field is expected.
+`wiremock` tests covering: Users — `retrieve` deserializing the nested `user`/`projects` sub-objects; `update` serializing only the provided optional fields; `list` serializing `after`/`limit` and deserializing a paginated response; `delete`. Invites — `create` serializing `projects` and deserializing a full `Invite`; a minimal `create` test with `projects` omitted; `list`; `retrieve`; `delete`. Groups — `create`; `retrieve`; `update` deserializing into the distinct `UpdateGroupResponse` shape (proving the asymmetry is real, not accidentally reusing `Group`); `list` serializing `order`; `delete`. Groups.Users — `create` (add a member); `list`; `retrieve`; `delete` deserializing `RemoveGroupUserResponse` and confirming no `id` field is expected.
 
 ## Versioning
 
