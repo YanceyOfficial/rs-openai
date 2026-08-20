@@ -1,6 +1,9 @@
 //! Organization projects (`/organization/projects`) -- see
 //! docs/superpowers/specs/2026-08-20-org-projects-design.md.
 
+pub mod api_keys;
+pub mod rate_limits;
+
 use bon::Builder;
 use serde::{Deserialize, Serialize};
 
