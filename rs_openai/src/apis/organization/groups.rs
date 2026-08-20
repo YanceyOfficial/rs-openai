@@ -61,6 +61,86 @@ impl<'a> OrganizationGroup<'a> {
     pub fn users(&self) -> OrganizationGroupUsers<'a> {
         OrganizationGroupUsers::new(self.openai, self.id.clone())
     }
+
+    /// Scoped accessor for this group's assigned roles.
+    pub fn roles(&self) -> OrganizationGroupRoles<'a> {
+        OrganizationGroupRoles::new(self.openai, self.id.clone())
+    }
+}
+
+pub struct OrganizationGroupRoles<'a> {
+    openai: &'a OpenAI,
+    group_id: String,
+}
+
+impl<'a> OrganizationGroupRoles<'a> {
+    pub(crate) fn new(openai: &'a OpenAI, group_id: String) -> Self {
+        Self { openai, group_id }
+    }
+
+    pub async fn create(
+        &self,
+        req: &groups::AssignGroupRoleRequest,
+    ) -> OpenAIResponse<groups::AssignGroupRoleResponse> {
+        self.openai
+            .post(
+                &format!("/organization/groups/{}/roles", self.group_id),
+                req,
+            )
+            .await
+    }
+
+    pub async fn list(
+        &self,
+        req: &groups::ListGroupRolesRequest,
+    ) -> OpenAIResponse<groups::ListGroupRolesResponse> {
+        self.openai
+            .get(
+                &format!("/organization/groups/{}/roles", self.group_id),
+                req,
+            )
+            .await
+    }
+
+    pub fn role(&self, id: impl Into<String>) -> OrganizationGroupRole<'a> {
+        OrganizationGroupRole::new(self.openai, self.group_id.clone(), id.into())
+    }
+}
+
+pub struct OrganizationGroupRole<'a> {
+    openai: &'a OpenAI,
+    group_id: String,
+    id: String,
+}
+
+impl<'a> OrganizationGroupRole<'a> {
+    pub(crate) fn new(openai: &'a OpenAI, group_id: String, id: String) -> Self {
+        Self {
+            openai,
+            group_id,
+            id,
+        }
+    }
+
+    pub async fn retrieve(
+        &self,
+    ) -> OpenAIResponse<crate::interfaces::organization::users::RoleAssignmentDetail> {
+        self.openai
+            .get(
+                &format!("/organization/groups/{}/roles/{}", self.group_id, self.id),
+                &(),
+            )
+            .await
+    }
+
+    pub async fn delete(&self) -> OpenAIResponse<groups::RemoveGroupRoleResponse> {
+        self.openai
+            .delete(
+                &format!("/organization/groups/{}/roles/{}", self.group_id, self.id),
+                &(),
+            )
+            .await
+    }
 }
 
 pub struct OrganizationGroupUsers<'a> {
@@ -146,8 +226,8 @@ impl<'a> OrganizationGroupUser<'a> {
 mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::organization::groups::{
-        AddGroupUserRequest, CreateGroupRequest, ListGroupUsersRequest, ListGroupsRequest,
-        UpdateGroupRequest,
+        AddGroupUserRequest, AssignGroupRoleRequest, CreateGroupRequest, ListGroupRolesRequest,
+        ListGroupUsersRequest, ListGroupsRequest, UpdateGroupRequest,
     };
     use wiremock::matchers::{body_json, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -398,5 +478,143 @@ mod tests {
         assert!(result.deleted);
         // RemoveGroupUserResponse has no `id` field -- this test compiling and
         // passing is itself the proof that the asymmetry is modeled correctly.
+    }
+
+    #[tokio::test]
+    async fn group_roles_create_deserializes_distinct_group_summary_shape() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/organization/groups/group_1/roles"))
+            .and(body_json(serde_json::json!({"role_id": "role_1"})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "group": {
+                    "id": "group_1",
+                    "created_at": 1700000000_i64,
+                    "name": "Engineering",
+                    "object": "group",
+                    "scim_managed": false
+                },
+                "object": "group.role",
+                "role": {
+                    "id": "role_1",
+                    "name": "Custom Role",
+                    "object": "role",
+                    "permissions": ["api.model.request"],
+                    "predefined_role": false,
+                    "resource_type": "api.organization"
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let req = AssignGroupRoleRequest::builder().role_id("role_1").build();
+        let result = client
+            .organization()
+            .group("group_1")
+            .roles()
+            .create(&req)
+            .await
+            .unwrap();
+
+        assert_eq!(result.group.id, "group_1");
+        assert!(!result.group.scim_managed);
+        // RoleAssignmentGroupSummary has no `group_type` field and uses
+        // `scim_managed` (not `is_scim_managed`) -- this test compiling and
+        // passing proves it stayed distinct from `groups::Group`.
+        assert_eq!(result.role.id, "role_1");
+    }
+
+    #[tokio::test]
+    async fn group_roles_list_deserializes_shared_role_assignment_detail() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/groups/group_1/roles"))
+            .and(query_param("limit", "5"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [{
+                    "id": "role_1",
+                    "name": "Custom Role",
+                    "permissions": ["api.model.request"],
+                    "predefined_role": false,
+                    "resource_type": "api.organization"
+                }],
+                "first_id": "role_1",
+                "last_id": "role_1",
+                "has_more": false
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let req = ListGroupRolesRequest::builder().limit(5).build();
+        let result = client
+            .organization()
+            .group("group_1")
+            .roles()
+            .list(&req)
+            .await
+            .unwrap();
+
+        assert_eq!(result.data.len(), 1);
+        assert_eq!(result.data[0].name, "Custom Role");
+    }
+
+    #[tokio::test]
+    async fn group_role_retrieve_deserializes_shared_role_assignment_detail() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/organization/groups/group_1/roles/role_1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "role_1",
+                "name": "Custom Role",
+                "permissions": ["api.model.request"],
+                "predefined_role": false,
+                "resource_type": "api.organization"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let result = client
+            .organization()
+            .group("group_1")
+            .roles()
+            .role("role_1")
+            .retrieve()
+            .await
+            .unwrap();
+
+        assert_eq!(result.name, "Custom Role");
+    }
+
+    #[tokio::test]
+    async fn group_role_delete_deserializes_confirmation_without_id() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/organization/groups/group_1/roles/role_1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "deleted": true,
+                "object": "group.role.deleted"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("test-key").with_base_url(mock_server.uri());
+        let result = client
+            .organization()
+            .group("group_1")
+            .roles()
+            .role("role_1")
+            .delete()
+            .await
+            .unwrap();
+
+        assert!(result.deleted);
     }
 }
