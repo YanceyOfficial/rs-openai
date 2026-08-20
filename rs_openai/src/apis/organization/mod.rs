@@ -44,7 +44,7 @@ impl<'a> Organization<'a> {
         admin_api_keys::OrganizationAdminApiKey::new(self.openai, id.into())
     }
 
-    /// Scoped accessor for organization usage reporting. Not yet implemented.
+    /// Scoped accessor for organization usage reporting.
     pub fn usage(&self) -> usage::OrganizationUsage<'a> {
         usage::OrganizationUsage::new(self.openai)
     }

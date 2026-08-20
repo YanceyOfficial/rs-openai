@@ -247,6 +247,18 @@ impl OpenAI {
         Self::resolve_response(request).await
     }
 
+    pub(crate) async fn get_with_pairs<T>(
+        &self,
+        route: &str,
+        pairs: &[(String, String)],
+    ) -> OpenAIResponse<T>
+    where
+        T: DeserializeOwned + Debug,
+    {
+        let request = self.openai_request(Method::GET, route)?.query(pairs);
+        Self::resolve_response(request).await
+    }
+
     pub(crate) async fn post<T, F>(&self, route: &str, json: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,
