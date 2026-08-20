@@ -1,6 +1,7 @@
 //! ChatKit threads: `GET /chatkit/threads` list, `GET .../{thread_id}` retrieve,
-//! `DELETE .../{thread_id}` delete. `GET .../{thread_id}/items` list items still not
-//! implemented — see docs/superpowers/specs/2026-08-14-chatkit-design.md.
+//! `DELETE .../{thread_id}` delete, `GET .../{thread_id}/items` list items -- see
+//! docs/superpowers/specs/2026-08-14-chatkit-design.md and
+//! docs/superpowers/specs/2026-08-20-chatkit-thread-items-design.md.
 
 use crate::client::OpenAI;
 use crate::interfaces::chatkit;
@@ -48,13 +49,12 @@ impl<'a> ChatKitThread<'a> {
             .await
     }
 
-    /// Scoped accessor for this thread's items. Not yet implemented.
+    /// Scoped accessor for this thread's items.
     pub fn items(&self) -> ChatKitThreadItems<'a> {
         ChatKitThreadItems::new(self.openai, self.id.clone())
     }
 }
 
-#[allow(dead_code)]
 pub struct ChatKitThreadItems<'a> {
     openai: &'a OpenAI,
     thread_id: String,
@@ -63,6 +63,15 @@ pub struct ChatKitThreadItems<'a> {
 impl<'a> ChatKitThreadItems<'a> {
     pub(crate) fn new(openai: &'a OpenAI, thread_id: String) -> Self {
         Self { openai, thread_id }
+    }
+
+    pub async fn list_items(
+        &self,
+        req: &chatkit::ListChatKitThreadItemsRequest,
+    ) -> OpenAIResponse<chatkit::ListChatKitThreadItemsResponse> {
+        self.openai
+            .chatkit_get(&format!("/chatkit/threads/{}/items", self.thread_id), req)
+            .await
     }
 }
 
@@ -176,5 +185,86 @@ mod tests {
         let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
         let res = client.chatkit().thread("thread_9").delete().await.unwrap();
         assert!(res.deleted);
+    }
+
+    #[tokio::test]
+    async fn list_items_dispatches_tagged_union_to_correct_variants() {
+        use crate::interfaces::chatkit::{ChatKitThreadItem, ListChatKitThreadItemsRequest};
+
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/chatkit/threads/thread_9/items"))
+            .and(header("OpenAI-Beta", "chatkit_beta=v1"))
+            .and(query_param("limit", "10"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [
+                    {
+                        "id": "item_1",
+                        "type": "chatkit.user_message",
+                        "object": "chatkit.thread_item",
+                        "attachments": [],
+                        "content": [{"type": "input_text", "text": "hello"}],
+                        "created_at": 1700000000_i64,
+                        "inference_options": null,
+                        "thread_id": "thread_9"
+                    },
+                    {
+                        "id": "item_2",
+                        "type": "chatkit.assistant_message",
+                        "object": "chatkit.thread_item",
+                        "content": [{"text": "hi there", "annotations": []}],
+                        "created_at": 1700000100_i64,
+                        "thread_id": "thread_9"
+                    },
+                    {
+                        "id": "item_3",
+                        "type": "chatkit.task_group",
+                        "object": "chatkit.thread_item",
+                        "created_at": 1700000200_i64,
+                        "tasks": [{"heading": "Step 1", "summary": null, "task_type": "custom"}],
+                        "thread_id": "thread_9"
+                    }
+                ],
+                "first_id": "item_1",
+                "last_id": "item_3",
+                "has_more": false
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = ListChatKitThreadItemsRequest::builder().limit(10).build();
+        let res = client
+            .chatkit()
+            .thread("thread_9")
+            .items()
+            .list_items(&req)
+            .await
+            .unwrap();
+
+        assert_eq!(res.data.len(), 3);
+        match &res.data[0] {
+            ChatKitThreadItem::UserMessage { id, content, .. } => {
+                assert_eq!(id, "item_1");
+                assert_eq!(content.len(), 1);
+            }
+            other => panic!("expected UserMessage, got {other:?}"),
+        }
+        match &res.data[1] {
+            ChatKitThreadItem::AssistantMessage { id, content, .. } => {
+                assert_eq!(id, "item_2");
+                assert_eq!(content[0].text, "hi there");
+            }
+            other => panic!("expected AssistantMessage, got {other:?}"),
+        }
+        match &res.data[2] {
+            ChatKitThreadItem::TaskGroup { id, tasks, .. } => {
+                assert_eq!(id, "item_3");
+                assert_eq!(tasks[0].heading.as_deref(), Some("Step 1"));
+            }
+            other => panic!("expected TaskGroup, got {other:?}"),
+        }
     }
 }
