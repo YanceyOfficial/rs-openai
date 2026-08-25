@@ -1,20 +1,26 @@
 //! Organization-level administration: audit logs, admin API keys, usage, groups, invites,
-//! projects, roles, and users. A distinct "admin tier", separate from the "call the model"
-//! surface the rest of this crate exposes. Every sub-resource is now implemented, at both
-//! org and project scope -- see
+//! projects, roles, users, certificates, data retention, spend alerts, spend limit, hosted
+//! tool permissions, and model permissions. A distinct "admin tier", separate from the "call
+//! the model" surface the rest of this crate exposes. Every sub-resource is now implemented,
+//! at both org and project scope where applicable -- see
 //! docs/superpowers/specs/2026-08-19-org-admin-api-keys-audit-logs-design.md,
 //! docs/superpowers/specs/2026-08-20-org-users-invites-groups-design.md,
 //! docs/superpowers/specs/2026-08-20-org-usage-design.md,
 //! docs/superpowers/specs/2026-08-20-org-projects-design.md,
-//! docs/superpowers/specs/2026-08-20-org-roles-design.md, and
-//! docs/superpowers/specs/2026-08-20-org-project-roles-design.md.
+//! docs/superpowers/specs/2026-08-20-org-roles-design.md,
+//! docs/superpowers/specs/2026-08-20-org-project-roles-design.md, and
+//! docs/superpowers/specs/2026-08-25-org-billing-compliance-design.md.
 
 pub mod admin_api_keys;
 pub mod audit_logs;
+pub mod certificates;
+pub mod data_retention;
 pub mod groups;
 pub mod invites;
 pub mod projects;
 pub mod roles;
+pub mod spend_alerts;
+pub mod spend_limit;
 pub mod usage;
 pub mod users;
 
@@ -100,5 +106,35 @@ impl<'a> Organization<'a> {
     /// Scoped accessor for a specific organization user.
     pub fn user(&self, id: impl Into<String>) -> users::OrganizationUser<'a> {
         users::OrganizationUser::new(self.openai, id.into())
+    }
+
+    /// Scoped accessor for organization certificates.
+    pub fn certificates(&self) -> certificates::OrganizationCertificates<'a> {
+        certificates::OrganizationCertificates::new(self.openai)
+    }
+
+    /// Scoped accessor for a specific organization certificate.
+    pub fn certificate(&self, id: impl Into<String>) -> certificates::OrganizationCertificate<'a> {
+        certificates::OrganizationCertificate::new(self.openai, id.into())
+    }
+
+    /// Scoped accessor for organization data retention controls.
+    pub fn data_retention(&self) -> data_retention::OrganizationDataRetention<'a> {
+        data_retention::OrganizationDataRetention::new(self.openai)
+    }
+
+    /// Scoped accessor for organization spend alerts.
+    pub fn spend_alerts(&self) -> spend_alerts::OrganizationSpendAlerts<'a> {
+        spend_alerts::OrganizationSpendAlerts::new(self.openai)
+    }
+
+    /// Scoped accessor for a specific organization spend alert.
+    pub fn spend_alert(&self, id: impl Into<String>) -> spend_alerts::OrganizationSpendAlert<'a> {
+        spend_alerts::OrganizationSpendAlert::new(self.openai, id.into())
+    }
+
+    /// Scoped accessor for the organization's hard spend limit.
+    pub fn spend_limit(&self) -> spend_limit::OrganizationSpendLimit<'a> {
+        spend_limit::OrganizationSpendLimit::new(self.openai)
     }
 }

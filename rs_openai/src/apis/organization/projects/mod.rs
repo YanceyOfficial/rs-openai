@@ -1,14 +1,24 @@
 //! A project-scoped view of organization resources: API keys, groups, rate limits, service
-//! accounts, and users, all scoped to one project -- see
+//! accounts, users, certificates, data retention, spend alerts, spend limit, hosted tool
+//! permissions, and model permissions, all scoped to one project -- see
 //! docs/superpowers/specs/2026-08-20-org-projects-design.md. Project-scoped role
 //! assignment (Groups.Roles/Users.Roles, both confirmed to route WITHOUT the usual
 //! `/organization` prefix) is implemented too -- see
-//! docs/superpowers/specs/2026-08-20-org-project-roles-design.md.
+//! docs/superpowers/specs/2026-08-20-org-project-roles-design.md. Certificates/DataRetention/
+//! SpendAlerts/SpendLimit/HostedToolPermissions/ModelPermissions (unlike Groups.Roles/
+//! Users.Roles) DO carry the usual `/organization` prefix -- see
+//! docs/superpowers/specs/2026-08-25-org-billing-compliance-design.md.
 
 pub mod api_keys;
+pub mod certificates;
+pub mod data_retention;
 pub mod groups;
+pub mod hosted_tool_permissions;
+pub mod model_permissions;
 pub mod rate_limits;
 pub mod service_accounts;
+pub mod spend_alerts;
+pub mod spend_limit;
 pub mod users;
 
 use crate::client::OpenAI;
@@ -115,6 +125,49 @@ impl<'a> OrganizationProject<'a> {
     /// Scoped accessor for a specific project user.
     pub fn user(&self, id: impl Into<String>) -> users::OrganizationProjectUser<'a> {
         users::OrganizationProjectUser::new(self.openai, self.id.clone(), id.into())
+    }
+
+    /// Scoped accessor for this project's certificates.
+    pub fn certificates(&self) -> certificates::OrganizationProjectCertificates<'a> {
+        certificates::OrganizationProjectCertificates::new(self.openai, self.id.clone())
+    }
+
+    /// Scoped accessor for this project's data retention controls.
+    pub fn data_retention(&self) -> data_retention::OrganizationProjectDataRetention<'a> {
+        data_retention::OrganizationProjectDataRetention::new(self.openai, self.id.clone())
+    }
+
+    /// Scoped accessor for this project's spend alerts.
+    pub fn spend_alerts(&self) -> spend_alerts::OrganizationProjectSpendAlerts<'a> {
+        spend_alerts::OrganizationProjectSpendAlerts::new(self.openai, self.id.clone())
+    }
+
+    /// Scoped accessor for a specific project spend alert.
+    pub fn spend_alert(
+        &self,
+        id: impl Into<String>,
+    ) -> spend_alerts::OrganizationProjectSpendAlert<'a> {
+        spend_alerts::OrganizationProjectSpendAlert::new(self.openai, self.id.clone(), id.into())
+    }
+
+    /// Scoped accessor for this project's hard spend limit.
+    pub fn spend_limit(&self) -> spend_limit::OrganizationProjectSpendLimit<'a> {
+        spend_limit::OrganizationProjectSpendLimit::new(self.openai, self.id.clone())
+    }
+
+    /// Scoped accessor for this project's hosted tool permissions.
+    pub fn hosted_tool_permissions(
+        &self,
+    ) -> hosted_tool_permissions::OrganizationProjectHostedToolPermissions<'a> {
+        hosted_tool_permissions::OrganizationProjectHostedToolPermissions::new(
+            self.openai,
+            self.id.clone(),
+        )
+    }
+
+    /// Scoped accessor for this project's model permissions.
+    pub fn model_permissions(&self) -> model_permissions::OrganizationProjectModelPermissions<'a> {
+        model_permissions::OrganizationProjectModelPermissions::new(self.openai, self.id.clone())
     }
 }
 

@@ -3,6 +3,8 @@
 
 pub mod api_keys;
 pub mod groups;
+pub mod hosted_tool_permissions;
+pub mod model_permissions;
 pub mod rate_limits;
 pub mod service_accounts;
 pub mod users;
