@@ -1,5 +1,6 @@
-//! Sora video generation. Core CRUD + content download only this round -- input_reference,
-//! characters, extensions, and edits are not yet implemented -- see
+//! Sora video generation. Core CRUD + content download only -- input_reference, characters,
+//! extend, remix, and edit are deliberately unimplemented, since the whole API sunsets
+//! **2026-09-24** (see `apis::videos`'s module doc for the confirming source) -- see
 //! docs/superpowers/specs/2026-08-18-videos-design.md.
 
 use bon::Builder;

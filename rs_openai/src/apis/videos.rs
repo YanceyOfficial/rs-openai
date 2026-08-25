@@ -5,6 +5,11 @@ use crate::interfaces::videos;
 pub use crate::interfaces::videos::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 
+/// The Sora Video API is deprecated and sunsets **2026-09-24** (confirmed via every method
+/// in OpenAI's own SDK carrying a `@deprecated` notice with this exact date). This module
+/// receives no further feature work -- its deferred pieces (`input_reference`, `characters`,
+/// `extend`, `remix`, `edit`) are deliberately not implemented, matching the crate's existing
+/// treatment of the equally-sunsetting Assistants API (`apis::assistants`).
 pub struct Videos<'a> {
     openai: &'a OpenAI,
 }
