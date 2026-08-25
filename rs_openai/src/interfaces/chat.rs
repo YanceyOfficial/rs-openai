@@ -373,6 +373,7 @@ pub struct ChatStreamResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum SortOrder {
     Asc,
     Desc,
