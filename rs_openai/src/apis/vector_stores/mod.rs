@@ -1,6 +1,7 @@
-//! Semantic search over uploaded files, used by the Responses API's `file_search` tool. Core
-//! surface only this round: CRUD + search, plus a basic file-attach lifecycle -- see
-//! docs/superpowers/specs/2026-08-12-vector-stores-design.md.
+//! Semantic search over uploaded files, used by the Responses API's `file_search` tool. Covers
+//! CRUD + search, the file-attach lifecycle (including update/content), and file batches -- see
+//! docs/superpowers/specs/2026-08-12-vector-stores-design.md and
+//! docs/superpowers/specs/2026-08-20-vector-stores-extensions-design.md.
 
 pub mod file_batches;
 pub mod files;
@@ -24,7 +25,7 @@ impl<'a> VectorStores<'a> {
         &self,
         req: &vector_stores::CreateVectorStoreRequest,
     ) -> OpenAIResponse<vector_stores::VectorStore> {
-        self.openai.post("/vector_stores", req).await
+        self.openai.vector_stores_post("/vector_stores", req).await
     }
 
     /// Lists vector stores.
@@ -32,7 +33,7 @@ impl<'a> VectorStores<'a> {
         &self,
         req: &vector_stores::ListVectorStoresRequest,
     ) -> OpenAIResponse<vector_stores::ListVectorStoresResponse> {
-        self.openai.get("/vector_stores", req).await
+        self.openai.vector_stores_get("/vector_stores", req).await
     }
 }
 
@@ -49,7 +50,7 @@ impl<'a> VectorStore<'a> {
     /// Retrieves a vector store by ID.
     pub async fn retrieve(&self) -> OpenAIResponse<vector_stores::VectorStore> {
         self.openai
-            .get(&format!("/vector_stores/{}", self.id), &())
+            .vector_stores_get(&format!("/vector_stores/{}", self.id), &())
             .await
     }
 
@@ -59,14 +60,14 @@ impl<'a> VectorStore<'a> {
         req: &vector_stores::UpdateVectorStoreRequest,
     ) -> OpenAIResponse<vector_stores::VectorStore> {
         self.openai
-            .post(&format!("/vector_stores/{}", self.id), req)
+            .vector_stores_post(&format!("/vector_stores/{}", self.id), req)
             .await
     }
 
     /// Deletes a vector store.
     pub async fn delete(&self) -> OpenAIResponse<vector_stores::DeleteVectorStoreResponse> {
         self.openai
-            .delete(&format!("/vector_stores/{}", self.id), &())
+            .vector_stores_delete(&format!("/vector_stores/{}", self.id), &())
             .await
     }
 
@@ -76,7 +77,7 @@ impl<'a> VectorStore<'a> {
         req: &vector_stores::VectorStoreSearchRequest,
     ) -> OpenAIResponse<vector_stores::VectorStoreSearchResponse> {
         self.openai
-            .post(&format!("/vector_stores/{}/search", self.id), req)
+            .vector_stores_post(&format!("/vector_stores/{}/search", self.id), req)
             .await
     }
 
@@ -85,8 +86,7 @@ impl<'a> VectorStore<'a> {
         files::VectorStoreFiles::new(self.openai, self.id.clone())
     }
 
-    /// Scoped accessor for batch file-attach operations on this vector store. Not yet
-    /// implemented.
+    /// Scoped accessor for batch file-attach operations on this vector store.
     pub fn file_batches(&self) -> file_batches::VectorStoreFileBatches<'a> {
         file_batches::VectorStoreFileBatches::new(self.openai, self.id.clone())
     }
@@ -98,10 +98,10 @@ mod tests {
     use crate::interfaces::chat::SortOrder;
     use crate::interfaces::vector_stores::{
         ChunkingStrategy, CreateVectorStoreRequest, ListVectorStoresRequest,
-        StaticChunkingStrategy, UpdateVectorStoreRequest, VectorStoreSearchQuery,
-        VectorStoreSearchRequest,
+        StaticChunkingStrategy, UpdateVectorStoreRequest, VectorStoreSearchFilter,
+        VectorStoreSearchQuery, VectorStoreSearchRequest,
     };
-    use wiremock::matchers::{body_json, method, path};
+    use wiremock::matchers::{body_json, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[test]
@@ -142,6 +142,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/vector_stores"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .and(body_json(serde_json::json!({
                 "name": "Support docs",
                 "file_ids": ["file-abc123"]
@@ -182,6 +183,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/vector_stores"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
                 "error": {
                     "message": "name must be a string",
@@ -211,6 +213,7 @@ mod tests {
 
         Mock::given(method("GET"))
             .and(path("/vector_stores"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "object": "list",
                 "data": [{
@@ -254,6 +257,7 @@ mod tests {
 
         Mock::given(method("GET"))
             .and(path("/vector_stores/vs_456"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "vs_456",
                 "object": "vector_store",
@@ -284,6 +288,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/vector_stores/vs_456"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .and(body_json(serde_json::json!({"name": "Renamed"})))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "vs_456",
@@ -316,6 +321,7 @@ mod tests {
 
         Mock::given(method("DELETE"))
             .and(path("/vector_stores/does-not-exist"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
                 "error": {
                     "message": "No vector store found",
@@ -345,6 +351,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/vector_stores/vs_456/search"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .and(body_json(serde_json::json!({"query": "refund policy"})))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "object": "vector_store.search_results.page",
@@ -382,6 +389,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/vector_stores/vs_456/search"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .and(body_json(serde_json::json!({
                 "query": ["refund policy", "cancellation policy"]
             })))
@@ -405,5 +413,52 @@ mod tests {
 
         let res = client.vector_store("vs_456").search(&req).await.unwrap();
         assert_eq!(res.search_query.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn search_serializes_nested_compound_filter() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/vector_stores/vs_456/search"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
+            .and(body_json(serde_json::json!({
+                "query": "refund policy",
+                "filters": {
+                    "type": "and",
+                    "filters": [
+                        {"type": "eq", "key": "category", "value": "billing"},
+                        {"type": "gte", "key": "year", "value": 2020}
+                    ]
+                }
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "vector_store.search_results.page",
+                "search_query": ["refund policy"],
+                "data": [],
+                "has_more": false,
+                "next_page": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = VectorStoreSearchRequest::builder()
+            .query(VectorStoreSearchQuery::Single("refund policy".to_string()))
+            .filters(VectorStoreSearchFilter::And {
+                filters: vec![
+                    VectorStoreSearchFilter::Eq {
+                        key: "category".to_string(),
+                        value: serde_json::json!("billing"),
+                    },
+                    VectorStoreSearchFilter::Gte {
+                        key: "year".to_string(),
+                        value: serde_json::json!(2020),
+                    },
+                ],
+            })
+            .build();
+
+        client.vector_store("vs_456").search(&req).await.unwrap();
     }
 }

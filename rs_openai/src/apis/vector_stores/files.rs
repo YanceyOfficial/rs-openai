@@ -25,7 +25,7 @@ impl<'a> VectorStoreFiles<'a> {
         req: &vector_stores::CreateVectorStoreFileRequest,
     ) -> OpenAIResponse<vector_stores::VectorStoreFile> {
         self.openai
-            .post(
+            .vector_stores_post(
                 &format!("/vector_stores/{}/files", self.vector_store_id),
                 req,
             )
@@ -38,7 +38,7 @@ impl<'a> VectorStoreFiles<'a> {
         req: &vector_stores::ListVectorStoreFilesRequest,
     ) -> OpenAIResponse<vector_stores::ListVectorStoreFilesResponse> {
         self.openai
-            .get(
+            .vector_stores_get(
                 &format!("/vector_stores/{}/files", self.vector_store_id),
                 req,
             )
@@ -71,7 +71,7 @@ impl<'a> VectorStoreFile<'a> {
     /// Retrieves a vector store file by ID.
     pub async fn retrieve(&self) -> OpenAIResponse<vector_stores::VectorStoreFile> {
         self.openai
-            .get(
+            .vector_stores_get(
                 &format!(
                     "/vector_stores/{}/files/{}",
                     self.vector_store_id, self.file_id
@@ -81,12 +81,43 @@ impl<'a> VectorStoreFile<'a> {
             .await
     }
 
+    /// Updates a vector store file's attributes. `attributes` is always serialized
+    /// (even as `null`), since the real API requires the field to be present in the
+    /// request body to clear it.
+    pub async fn update(
+        &self,
+        req: &vector_stores::UpdateVectorStoreFileRequest,
+    ) -> OpenAIResponse<vector_stores::VectorStoreFile> {
+        self.openai
+            .vector_stores_post(
+                &format!(
+                    "/vector_stores/{}/files/{}",
+                    self.vector_store_id, self.file_id
+                ),
+                req,
+            )
+            .await
+    }
+
     /// Deletes a vector store file (detaches it -- does not delete the underlying File object).
     pub async fn delete(&self) -> OpenAIResponse<vector_stores::DeleteVectorStoreFileResponse> {
         self.openai
-            .delete(
+            .vector_stores_delete(
                 &format!(
                     "/vector_stores/{}/files/{}",
+                    self.vector_store_id, self.file_id
+                ),
+                &(),
+            )
+            .await
+    }
+
+    /// Retrieves the parsed contents of a vector store file.
+    pub async fn content(&self) -> OpenAIResponse<vector_stores::VectorStoreFileContentResponse> {
+        self.openai
+            .vector_stores_get(
+                &format!(
+                    "/vector_stores/{}/files/{}/content",
                     self.vector_store_id, self.file_id
                 ),
                 &(),
@@ -100,9 +131,9 @@ mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::chat::SortOrder;
     use crate::interfaces::vector_stores::{
-        CreateVectorStoreFileRequest, ListVectorStoreFilesRequest,
+        CreateVectorStoreFileRequest, ListVectorStoreFilesRequest, UpdateVectorStoreFileRequest,
     };
-    use wiremock::matchers::{body_json, method, path};
+    use wiremock::matchers::{body_json, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[tokio::test]
@@ -111,6 +142,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/vector_stores/vs_456/files"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .and(body_json(serde_json::json!({"file_id": "file-abc123"})))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "vsf_1",
@@ -150,6 +182,7 @@ mod tests {
 
         Mock::given(method("GET"))
             .and(path("/vector_stores/vs_456/files"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "object": "list",
                 "data": [{
@@ -190,6 +223,7 @@ mod tests {
 
         Mock::given(method("GET"))
             .and(path("/vector_stores/vs_456/files/vsf_2"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "vsf_2",
                 "object": "vector_store.file",
@@ -226,6 +260,7 @@ mod tests {
 
         Mock::given(method("DELETE"))
             .and(path("/vector_stores/vs_456/files/does-not-exist"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
             .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
                 "error": {
                     "message": "No file found",
@@ -249,5 +284,72 @@ mod tests {
             err,
             crate::shared::response_wrapper::OpenAIError::ApiError(_)
         ));
+    }
+
+    #[tokio::test]
+    async fn update_serializes_attributes_including_explicit_null() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/vector_stores/vs_456/files/vsf_1"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
+            .and(body_json(serde_json::json!({"attributes": null})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "vsf_1",
+                "object": "vector_store.file",
+                "created_at": 1700000000_i64,
+                "usage_bytes": 512,
+                "vector_store_id": "vs_456",
+                "status": "completed",
+                "last_error": null,
+                "chunking_strategy": {"type": "auto"},
+                "attributes": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = UpdateVectorStoreFileRequest::builder()
+            .maybe_attributes(None)
+            .build();
+        let res = client
+            .vector_store("vs_456")
+            .files()
+            .file("vsf_1")
+            .update(&req)
+            .await
+            .unwrap();
+        assert_eq!(res.id, "vsf_1");
+    }
+
+    #[tokio::test]
+    async fn content_deserializes_paginated_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/vector_stores/vs_456/files/vsf_1/content"))
+            .and(header("OpenAI-Beta", "assistants=v2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [{"type": "text", "text": "Refunds are processed within 5 days."}],
+                "has_more": false,
+                "next_page": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let res = client
+            .vector_store("vs_456")
+            .files()
+            .file("vsf_1")
+            .content()
+            .await
+            .unwrap();
+        assert_eq!(res.data.len(), 1);
+        assert_eq!(
+            res.data[0].text.as_deref(),
+            Some("Refunds are processed within 5 days.")
+        );
     }
 }
