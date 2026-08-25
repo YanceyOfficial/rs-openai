@@ -1,6 +1,7 @@
-//! Evaluation definitions for grading model outputs against a defined criteria set. Runs are
-//! not yet implemented (their request/response shape was not confirmed by research) -- see
-//! docs/superpowers/specs/2026-08-14-evals-design.md.
+//! Evaluation definitions for grading model outputs against a defined criteria set, plus
+//! their Runs and Runs' Output Items sub-resources -- see
+//! docs/superpowers/specs/2026-08-14-evals-design.md and
+//! docs/superpowers/specs/2026-08-20-evals-runs-design.md.
 
 use bon::Builder;
 use serde::{Deserialize, Serialize};
@@ -263,4 +264,197 @@ pub struct DeleteEvalResponse {
     pub id: String,
     pub object: String,
     pub deleted: bool,
+}
+
+// Runs sub-resource, appended here (matching this crate's established precedent of
+// colocating a sub-resource's types in the parent's flat interfaces file when the
+// parent module isn't already split into a directory) -- see
+// docs/superpowers/specs/2026-08-20-evals-runs-design.md.
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct CreateEvalRunRequest {
+    pub data_source: serde_json::Value,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalApiError {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalRunPerModelUsage {
+    pub cached_tokens: i64,
+    pub completion_tokens: i64,
+    pub invocation_count: i64,
+    #[serde(rename = "model_name")]
+    pub run_model_name: String,
+    pub prompt_tokens: i64,
+    pub total_tokens: i64,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalRunPerTestingCriteriaResult {
+    pub failed: i64,
+    pub passed: i64,
+    pub testing_criteria: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalRunResultCounts {
+    pub errored: i64,
+    pub failed: i64,
+    pub passed: i64,
+    pub total: i64,
+}
+
+/// Used uniformly for create/retrieve/list/cancel -- confirmed byte-identical across
+/// all four operations' response types in the source.
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalRun {
+    pub id: String,
+    pub created_at: i64,
+    pub data_source: serde_json::Value,
+    pub error: EvalApiError,
+    pub eval_id: String,
+    pub metadata: Option<serde_json::Value>,
+    pub model: String,
+    pub name: String,
+    pub object: String,
+    pub per_model_usage: Vec<EvalRunPerModelUsage>,
+    pub per_testing_criteria_results: Vec<EvalRunPerTestingCriteriaResult>,
+    pub report_url: String,
+    pub result_counts: EvalRunResultCounts,
+    pub status: String,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ListEvalRunsRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub after: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<crate::interfaces::chat::SortOrder>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ListEvalRunsResponse {
+    pub object: String,
+    pub data: Vec<EvalRun>,
+    pub first_id: Option<String>,
+    pub last_id: Option<String>,
+    pub has_more: bool,
+}
+
+/// Confirmed asymmetry vs. every other delete-response type in this crate: the ID
+/// field is named `run_id`, not `id`.
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct DeleteEvalRunResponse {
+    pub deleted: Option<bool>,
+    pub object: Option<String>,
+    pub run_id: Option<String>,
+}
+
+// Output Items sub-resource (nested under Runs), appended here too.
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalRunOutputItemResult {
+    pub name: String,
+    pub passed: bool,
+    pub score: f64,
+    pub sample: Option<serde_json::Value>,
+    #[serde(rename = "type")]
+    pub kind: Option<String>,
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalRunOutputItemSampleInput {
+    pub content: String,
+    pub role: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalRunOutputItemSampleOutput {
+    pub content: Option<String>,
+    pub role: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalRunOutputItemSampleUsage {
+    pub cached_tokens: i64,
+    pub completion_tokens: i64,
+    pub prompt_tokens: i64,
+    pub total_tokens: i64,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalRunOutputItemSample {
+    pub error: EvalApiError,
+    pub finish_reason: String,
+    pub input: Vec<EvalRunOutputItemSampleInput>,
+    pub max_completion_tokens: i64,
+    pub model: String,
+    pub output: Vec<EvalRunOutputItemSampleOutput>,
+    pub seed: i64,
+    pub temperature: f64,
+    pub top_p: f64,
+    pub usage: EvalRunOutputItemSampleUsage,
+}
+
+/// Used uniformly for retrieve/list -- confirmed identical shape.
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct EvalRunOutputItem {
+    pub id: String,
+    pub created_at: i64,
+    pub datasource_item: serde_json::Value,
+    pub datasource_item_id: i64,
+    pub eval_id: String,
+    pub object: String,
+    pub results: Vec<EvalRunOutputItemResult>,
+    pub run_id: String,
+    pub sample: EvalRunOutputItemSample,
+    pub status: String,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ListEvalRunOutputItemsRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub after: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<crate::interfaces::chat::SortOrder>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ListEvalRunOutputItemsResponse {
+    pub object: String,
+    pub data: Vec<EvalRunOutputItem>,
+    pub first_id: Option<String>,
+    pub last_id: Option<String>,
+    pub has_more: bool,
 }

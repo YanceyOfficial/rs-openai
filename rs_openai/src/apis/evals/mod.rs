@@ -58,13 +58,12 @@ impl<'a> Eval<'a> {
             .await
     }
 
-    /// Scoped accessor for this eval's runs. Not yet implemented -- the run's request/response
-    /// shape was not confirmed by research; see the design spec's Non-goals.
+    /// Scoped accessor for this eval's runs.
     pub fn runs(&self) -> runs::EvalRuns<'a> {
         runs::EvalRuns::new(self.openai, self.id.clone())
     }
 
-    /// Scoped accessor for a specific run of this eval. Not yet implemented -- see `runs()`.
+    /// Scoped accessor for a specific run of this eval.
     pub fn run(&self, run_id: impl Into<String>) -> runs::EvalRun<'a> {
         runs::EvalRun::new(self.openai, self.id.clone(), run_id.into())
     }
