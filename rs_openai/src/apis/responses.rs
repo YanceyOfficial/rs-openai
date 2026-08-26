@@ -962,6 +962,92 @@ mod tests {
     }
 
     #[test]
+    fn response_stream_event_image_generation_call_lifecycle_deserializes() {
+        for (json_type, expected) in [
+            (
+                "response.image_generation_call.in_progress",
+                "ImageGenerationCallInProgress",
+            ),
+            (
+                "response.image_generation_call.generating",
+                "ImageGenerationCallGenerating",
+            ),
+            (
+                "response.image_generation_call.completed",
+                "ImageGenerationCallCompleted",
+            ),
+        ] {
+            let value = serde_json::json!({
+                "type": json_type,
+                "item_id": "ig_1",
+                "output_index": 0,
+                "sequence_number": 9
+            });
+
+            let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+            let debug = format!("{event:?}");
+            assert!(
+                debug.starts_with(expected),
+                "expected {expected}, got {debug}"
+            );
+            match event {
+                ResponseStreamEvent::ImageGenerationCallInProgress {
+                    item_id,
+                    sequence_number,
+                    ..
+                }
+                | ResponseStreamEvent::ImageGenerationCallGenerating {
+                    item_id,
+                    sequence_number,
+                    ..
+                }
+                | ResponseStreamEvent::ImageGenerationCallCompleted {
+                    item_id,
+                    sequence_number,
+                    ..
+                } => {
+                    assert_eq!(item_id, "ig_1");
+                    assert_eq!(sequence_number, 9);
+                }
+                other => panic!("expected an ImageGenerationCall* variant, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn response_stream_event_image_generation_call_partial_image_deserializes() {
+        let value = serde_json::json!({
+            "type": "response.image_generation_call.partial_image",
+            "item_id": "ig_1",
+            "output_index": 0,
+            "partial_image_b64": "base64stuff",
+            "partial_image_index": 0,
+            "sequence_number": 10,
+            "background": "transparent",
+            "output_format": "png",
+            "quality": "high",
+            "size": "1024x1024"
+        });
+
+        let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+        match event {
+            ResponseStreamEvent::ImageGenerationCallPartialImage {
+                partial_image_b64,
+                partial_image_index,
+                background,
+                output_format,
+                ..
+            } => {
+                assert_eq!(partial_image_b64, "base64stuff");
+                assert_eq!(partial_image_index, 0);
+                assert_eq!(background.as_deref(), Some("transparent"));
+                assert_eq!(output_format.as_deref(), Some("png"));
+            }
+            other => panic!("expected ImageGenerationCallPartialImage, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn response_stream_event_error_deserializes() {
         let value = serde_json::json!({
             "type": "error",

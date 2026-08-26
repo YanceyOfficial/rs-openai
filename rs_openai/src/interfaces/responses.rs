@@ -921,13 +921,12 @@ pub struct ListInputItemsResponse {
 }
 
 /// A single Server-Sent Event from a streamed `Responses::create_with_stream` call. Covers
-/// lifecycle + text + function-calling + file_search + web_search events -- see
-/// docs/superpowers/specs/2026-08-11-responses-streaming-design.md,
-/// docs/superpowers/specs/2026-08-26-responses-streaming-file-search-design.md, and
-/// docs/superpowers/specs/2026-08-26-responses-streaming-web-search-design.md. The full
-/// union is 60 confirmed variants (content_part, refusal, reasoning, audio, and per-tool
-/// events for image_generation/mcp/code_interpreter/shell/custom tools) -- deliberately
-/// being added one tool type at a time in separate slices rather than in bulk.
+/// lifecycle + text + function-calling + file_search + web_search + image_generation events
+/// -- see docs/superpowers/specs/2026-08-11-responses-streaming-design.md and the later
+/// specs under docs/superpowers/specs/ prefixed `responses-streaming-`. The full union is 60
+/// confirmed variants (content_part, refusal, reasoning, audio, and per-tool events for
+/// mcp/code_interpreter/shell/custom tools) -- deliberately being added one tool type at a
+/// time in separate slices rather than in bulk.
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum ResponseStreamEvent {
@@ -1048,6 +1047,44 @@ pub enum ResponseStreamEvent {
     /// Emitted when a web search call is completed.
     #[serde(rename = "response.web_search_call.completed")]
     WebSearchCallCompleted {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted when an image generation tool call is in progress.
+    #[serde(rename = "response.image_generation_call.in_progress")]
+    ImageGenerationCallInProgress {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted while an image generation tool call is actively generating (intermediate).
+    #[serde(rename = "response.image_generation_call.generating")]
+    ImageGenerationCallGenerating {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted when a partial image is available during image generation streaming.
+    #[serde(rename = "response.image_generation_call.partial_image")]
+    ImageGenerationCallPartialImage {
+        item_id: String,
+        output_index: u32,
+        partial_image_b64: String,
+        partial_image_index: u32,
+        sequence_number: u64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        background: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        output_format: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        quality: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        size: Option<String>,
+    },
+    /// Emitted when an image generation tool call has completed (final image available).
+    #[serde(rename = "response.image_generation_call.completed")]
+    ImageGenerationCallCompleted {
         item_id: String,
         output_index: u32,
         sequence_number: u64,
