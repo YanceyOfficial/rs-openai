@@ -669,6 +669,10 @@ pub struct ResponseIncompleteDetails {
     pub reason: String,
 }
 
+/// Extensible tagged union, reused both for `ResponseOutputMessage.content` and for the
+/// `content_part.added`/`.done` stream events' `part` field -- both confirmed to share the
+/// same `type`-tagged shape (`output_text`/`refusal`/`reasoning_text`), matching this
+/// project's established extensible-tagged-union design (`ResponseTool`/`ResponseOutputItem`).
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseOutputContent {
@@ -678,6 +682,9 @@ pub enum ResponseOutputContent {
     },
     Refusal {
         refusal: String,
+    },
+    ReasoningText {
+        text: String,
     },
 }
 
@@ -1002,15 +1009,29 @@ pub struct ListInputItemsResponse {
     pub has_more: bool,
 }
 
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ResponseLogprobTopLogprob {
+    pub token: Option<String>,
+    pub logprob: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct ResponseLogprob {
+    pub token: String,
+    pub logprob: f64,
+    pub top_logprobs: Option<Vec<ResponseLogprobTopLogprob>>,
+}
+
 /// A single Server-Sent Event from a streamed `Responses::create_with_stream` call. Covers
-/// lifecycle + text + function-calling events, plus the full streaming lifecycle for every
-/// tool type this crate implements (file_search, web_search, image_generation, mcp,
-/// code_interpreter) -- see docs/superpowers/specs/2026-08-11-responses-streaming-design.md
-/// and the later specs under docs/superpowers/specs/ prefixed `responses-streaming-`. The
-/// full union is 60 confirmed variants; the remaining ~20 (content_part, refusal, reasoning,
-/// audio, and events for shell/custom/computer_use tools -- this crate doesn't implement
-/// programmatic shell/custom tools, and computer_use has no per-item streaming events of its
-/// own) are deliberately deferred.
+/// lifecycle + text + function-calling events, the full streaming lifecycle for every tool
+/// type this crate implements (file_search, web_search, image_generation, mcp,
+/// code_interpreter), content_part and refusal events -- see
+/// docs/superpowers/specs/2026-08-11-responses-streaming-design.md and the later specs under
+/// docs/superpowers/specs/ prefixed `responses-streaming-`. The full union is 60 confirmed
+/// variants; the remaining ~16 (reasoning text/summary delta+done, audio, and events for
+/// shell/custom/computer_use tools -- this crate doesn't implement programmatic shell/custom
+/// tools, and computer_use has no per-item streaming events of its own) are deliberately
+/// deferred.
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum ResponseStreamEvent {
@@ -1064,6 +1085,12 @@ pub enum ResponseStreamEvent {
         output_index: u32,
         content_index: u32,
         delta: String,
+        /// Confirmed via source to always be present (an empty array when logprobs weren't
+        /// requested via `include: ["message.output_text.logprobs"]`) -- `#[serde(default)]`
+        /// keeps this crate's own pre-existing test fixtures (written before this field was
+        /// modeled) deserializing unchanged.
+        #[serde(default)]
+        logprobs: Vec<ResponseLogprob>,
         #[serde(skip_serializing_if = "Option::is_none")]
         sequence_number: Option<u64>,
     },
@@ -1073,8 +1100,46 @@ pub enum ResponseStreamEvent {
         output_index: u32,
         content_index: u32,
         text: String,
+        #[serde(default)]
+        logprobs: Vec<ResponseLogprob>,
         #[serde(skip_serializing_if = "Option::is_none")]
         sequence_number: Option<u64>,
+    },
+    /// Emitted when a new content part is added.
+    #[serde(rename = "response.content_part.added")]
+    ContentPartAdded {
+        content_index: u32,
+        item_id: String,
+        output_index: u32,
+        part: ResponseOutputContent,
+        sequence_number: u64,
+    },
+    /// Emitted when a content part is done.
+    #[serde(rename = "response.content_part.done")]
+    ContentPartDone {
+        content_index: u32,
+        item_id: String,
+        output_index: u32,
+        part: ResponseOutputContent,
+        sequence_number: u64,
+    },
+    /// Emitted for a partial refusal text.
+    #[serde(rename = "response.refusal.delta")]
+    RefusalDelta {
+        content_index: u32,
+        delta: String,
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted when refusal text is finalized.
+    #[serde(rename = "response.refusal.done")]
+    RefusalDone {
+        content_index: u32,
+        item_id: String,
+        output_index: u32,
+        refusal: String,
+        sequence_number: u64,
     },
     #[serde(rename = "response.function_call_arguments.delta")]
     FunctionCallArgumentsDelta {

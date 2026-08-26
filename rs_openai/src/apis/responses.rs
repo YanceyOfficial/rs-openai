@@ -839,6 +839,116 @@ mod tests {
     }
 
     #[test]
+    fn response_stream_event_output_text_done_deserializes_logprobs() {
+        let value = serde_json::json!({
+            "type": "response.output_text.done",
+            "item_id": "msg_1",
+            "output_index": 0,
+            "content_index": 0,
+            "text": "Hello",
+            "logprobs": [{
+                "token": "Hello",
+                "logprob": -0.1,
+                "top_logprobs": [{"token": "Hello", "logprob": -0.1}]
+            }],
+            "sequence_number": 3
+        });
+
+        let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+        match event {
+            ResponseStreamEvent::OutputTextDone { logprobs, .. } => {
+                assert_eq!(logprobs.len(), 1);
+                assert_eq!(logprobs[0].token, "Hello");
+                assert_eq!(logprobs[0].top_logprobs.as_ref().unwrap().len(), 1);
+            }
+            other => panic!("expected OutputTextDone, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_stream_event_content_part_added_and_done_deserialize() {
+        for event_type in ["response.content_part.added", "response.content_part.done"] {
+            let value = serde_json::json!({
+                "type": event_type,
+                "content_index": 0,
+                "item_id": "msg_1",
+                "output_index": 0,
+                "part": {"type": "output_text", "text": "", "annotations": []},
+                "sequence_number": 4
+            });
+
+            let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+            match event {
+                ResponseStreamEvent::ContentPartAdded { part, .. }
+                | ResponseStreamEvent::ContentPartDone { part, .. } => match part {
+                    crate::interfaces::responses::ResponseOutputContent::OutputText {
+                        text,
+                        ..
+                    } => assert_eq!(text, ""),
+                    other => panic!("expected OutputText, got {other:?}"),
+                },
+                other => panic!("expected ContentPartAdded/Done, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn response_stream_event_content_part_carries_reasoning_text_variant() {
+        let value = serde_json::json!({
+            "type": "response.content_part.added",
+            "content_index": 0,
+            "item_id": "reasoning_1",
+            "output_index": 0,
+            "part": {"type": "reasoning_text", "text": "thinking..."},
+            "sequence_number": 5
+        });
+
+        let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+        match event {
+            ResponseStreamEvent::ContentPartAdded { part, .. } => match part {
+                crate::interfaces::responses::ResponseOutputContent::ReasoningText { text } => {
+                    assert_eq!(text, "thinking...");
+                }
+                other => panic!("expected ReasoningText, got {other:?}"),
+            },
+            other => panic!("expected ContentPartAdded, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_stream_event_refusal_delta_and_done_deserialize() {
+        let delta_value = serde_json::json!({
+            "type": "response.refusal.delta",
+            "content_index": 0,
+            "delta": "I cannot",
+            "item_id": "msg_1",
+            "output_index": 0,
+            "sequence_number": 6
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(delta_value).unwrap();
+        match event {
+            ResponseStreamEvent::RefusalDelta { delta, .. } => assert_eq!(delta, "I cannot"),
+            other => panic!("expected RefusalDelta, got {other:?}"),
+        }
+
+        let done_value = serde_json::json!({
+            "type": "response.refusal.done",
+            "content_index": 0,
+            "item_id": "msg_1",
+            "output_index": 0,
+            "refusal": "I cannot help with that.",
+            "sequence_number": 7
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(done_value).unwrap();
+        match event {
+            ResponseStreamEvent::RefusalDone { refusal, .. } => {
+                assert_eq!(refusal, "I cannot help with that.");
+            }
+            other => panic!("expected RefusalDone, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn response_stream_event_function_call_arguments_delta_deserializes() {
         let value = serde_json::json!({
             "type": "response.function_call_arguments.delta",
