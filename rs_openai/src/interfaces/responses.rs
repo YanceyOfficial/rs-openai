@@ -921,12 +921,14 @@ pub struct ListInputItemsResponse {
 }
 
 /// A single Server-Sent Event from a streamed `Responses::create_with_stream` call. Covers
-/// lifecycle + text + function-calling + file_search + web_search + image_generation + mcp
-/// events -- see docs/superpowers/specs/2026-08-11-responses-streaming-design.md and the
-/// later specs under docs/superpowers/specs/ prefixed `responses-streaming-`. The full union
-/// is 60 confirmed variants (content_part, refusal, reasoning, audio, and per-tool events
-/// for code_interpreter/shell/custom tools) -- deliberately being added one tool type at a
-/// time in separate slices rather than in bulk.
+/// lifecycle + text + function-calling events, plus the full streaming lifecycle for every
+/// tool type this crate implements (file_search, web_search, image_generation, mcp,
+/// code_interpreter) -- see docs/superpowers/specs/2026-08-11-responses-streaming-design.md
+/// and the later specs under docs/superpowers/specs/ prefixed `responses-streaming-`. The
+/// full union is 60 confirmed variants; the remaining ~20 (content_part, refusal, reasoning,
+/// audio, and events for shell/custom/computer_use tools -- this crate doesn't implement
+/// programmatic shell/custom tools, and computer_use has no per-item streaming events of its
+/// own) are deliberately deferred.
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum ResponseStreamEvent {
@@ -1143,6 +1145,43 @@ pub enum ResponseStreamEvent {
     /// Emitted when listing available MCP tools has failed.
     #[serde(rename = "response.mcp_list_tools.failed")]
     McpListToolsFailed {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted when a code interpreter call is in progress.
+    #[serde(rename = "response.code_interpreter_call.in_progress")]
+    CodeInterpreterCallInProgress {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted while the code interpreter is actively interpreting the code snippet.
+    #[serde(rename = "response.code_interpreter_call.interpreting")]
+    CodeInterpreterCallInterpreting {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted for a partial code snippet streamed by the code interpreter.
+    #[serde(rename = "response.code_interpreter_call_code.delta")]
+    CodeInterpreterCallCodeDelta {
+        item_id: String,
+        output_index: u32,
+        delta: String,
+        sequence_number: u64,
+    },
+    /// Emitted when the code interpreter's code snippet is finalized.
+    #[serde(rename = "response.code_interpreter_call_code.done")]
+    CodeInterpreterCallCodeDone {
+        item_id: String,
+        output_index: u32,
+        code: String,
+        sequence_number: u64,
+    },
+    /// Emitted when a code interpreter call has completed.
+    #[serde(rename = "response.code_interpreter_call.completed")]
+    CodeInterpreterCallCompleted {
         item_id: String,
         output_index: u32,
         sequence_number: u64,

@@ -1110,6 +1110,71 @@ mod tests {
     }
 
     #[test]
+    fn response_stream_event_code_interpreter_call_lifecycle_deserializes() {
+        for (json_type, expected) in [
+            (
+                "response.code_interpreter_call.in_progress",
+                "CodeInterpreterCallInProgress",
+            ),
+            (
+                "response.code_interpreter_call.interpreting",
+                "CodeInterpreterCallInterpreting",
+            ),
+            (
+                "response.code_interpreter_call.completed",
+                "CodeInterpreterCallCompleted",
+            ),
+        ] {
+            let value = serde_json::json!({
+                "type": json_type,
+                "item_id": "ci_1",
+                "output_index": 0,
+                "sequence_number": 14
+            });
+
+            let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+            let debug = format!("{event:?}");
+            assert!(
+                debug.starts_with(expected),
+                "expected {expected}, got {debug}"
+            );
+        }
+    }
+
+    #[test]
+    fn response_stream_event_code_interpreter_call_code_delta_and_done_deserialize() {
+        let delta_value = serde_json::json!({
+            "type": "response.code_interpreter_call_code.delta",
+            "item_id": "ci_1",
+            "output_index": 0,
+            "delta": "import pandas",
+            "sequence_number": 15
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(delta_value).unwrap();
+        match event {
+            ResponseStreamEvent::CodeInterpreterCallCodeDelta { delta, .. } => {
+                assert_eq!(delta, "import pandas");
+            }
+            other => panic!("expected CodeInterpreterCallCodeDelta, got {other:?}"),
+        }
+
+        let done_value = serde_json::json!({
+            "type": "response.code_interpreter_call_code.done",
+            "item_id": "ci_1",
+            "output_index": 0,
+            "code": "import pandas as pd",
+            "sequence_number": 16
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(done_value).unwrap();
+        match event {
+            ResponseStreamEvent::CodeInterpreterCallCodeDone { code, .. } => {
+                assert_eq!(code, "import pandas as pd");
+            }
+            other => panic!("expected CodeInterpreterCallCodeDone, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn response_stream_event_error_deserializes() {
         let value = serde_json::json!({
             "type": "error",
