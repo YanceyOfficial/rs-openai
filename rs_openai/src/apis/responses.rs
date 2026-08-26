@@ -1,11 +1,13 @@
 //! Model responses — OpenAI's now-recommended primary API, superseding Chat Completions and
-//! (eventually) Assistants. Covers core CRUD/lifecycle, streaming, all 7 confirmed tool types
-//! (function/file_search/web_search/image_generation/mcp/computer_use/code_interpreter), the
-//! `conversation` param, multimodal (text/image/file) input, and the `include` param (on
-//! create/retrieve/list_input_items) -- see docs/superpowers/specs/2026-08-07-responses-core-
-//! design.md and later specs under docs/superpowers/specs/ prefixed `responses-`. Remaining
-//! gaps: per-tool-type streaming events beyond text/function-call, `return_token_budget`, and
-//! mcp's deferred `connector_id`/`tunnel_id`/`allowed_callers`/`McpToolFilter`.
+//! (eventually) Assistants. Covers core CRUD/lifecycle, streaming (including per-tool-type
+//! events for every implemented tool type), all 7 confirmed tool types (function/file_search/
+//! web_search/image_generation/mcp/computer_use/code_interpreter, with mcp's full connection
+//! surface -- server_url/connector_id/tunnel_id, allowed_callers, and the McpToolFilter form
+//! of allowed_tools), the `conversation` param, multimodal (text/image/file) input, and the
+//! `include` param (on create/retrieve/list_input_items) -- see
+//! docs/superpowers/specs/2026-08-07-responses-core-design.md and later specs under
+//! docs/superpowers/specs/ prefixed `responses-`. Remaining gaps: the ~20 unmodeled stream
+//! event variants (content_part, refusal, reasoning, audio, shell/custom-tool events).
 
 use crate::client::OpenAI;
 use crate::interfaces::responses;
@@ -112,16 +114,16 @@ mod tests {
     use crate::interfaces::responses::{
         ComputerAction, ComputerActionButton, ComputerCallOutputScreenshot, ComputerEnvironment,
         ComputerSafetyCheck, CreateResponseRequest, FileSearchRankingOptions, ImageDetail,
-        ImageGenerationAction, ListInputItemsRequest, McpApprovalFilter, McpApprovalMode,
-        McpRequireApproval, McpToolNameFilter, ResponseCodeInterpreterAutoContainer,
-        ResponseCodeInterpreterContainer, ResponseCodeInterpreterTool,
-        ResponseComputerUsePreviewTool, ResponseConversationParam, ResponseFileSearchTool,
-        ResponseFunctionTool, ResponseImageGenerationTool, ResponseIncludable, ResponseInput,
-        ResponseInputContent, ResponseInputFile, ResponseInputImage, ResponseInputItem,
-        ResponseInputRole, ResponseInputText, ResponseMcpTool, ResponseOutputItem,
-        ResponseStreamEvent, ResponseTool, ResponseToolChoice, ResponseToolChoiceFunctionName,
-        ResponseToolChoiceMode, ResponseWebSearchTool, RetrieveResponseRequest, WebSearchAction,
-        WebSearchContextSize, WebSearchUserLocation,
+        ImageGenerationAction, ListInputItemsRequest, McpAllowedCaller, McpAllowedTools,
+        McpApprovalFilter, McpApprovalMode, McpConnectorId, McpRequireApproval, McpToolFilter,
+        ResponseCodeInterpreterAutoContainer, ResponseCodeInterpreterContainer,
+        ResponseCodeInterpreterTool, ResponseComputerUsePreviewTool, ResponseConversationParam,
+        ResponseFileSearchTool, ResponseFunctionTool, ResponseImageGenerationTool,
+        ResponseIncludable, ResponseInput, ResponseInputContent, ResponseInputFile,
+        ResponseInputImage, ResponseInputItem, ResponseInputRole, ResponseInputText,
+        ResponseMcpTool, ResponseOutputItem, ResponseStreamEvent, ResponseTool, ResponseToolChoice,
+        ResponseToolChoiceFunctionName, ResponseToolChoiceMode, ResponseWebSearchTool,
+        RetrieveResponseRequest, WebSearchAction, WebSearchContextSize, WebSearchUserLocation,
     };
     use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path, query_param};
@@ -2112,8 +2114,9 @@ mod tests {
                 .server_label("github")
                 .server_url("https://mcp.example.com/github")
                 .require_approval(McpRequireApproval::Filter(McpApprovalFilter {
-                    never: Some(McpToolNameFilter {
-                        tool_names: vec!["read_file".to_string()],
+                    never: Some(McpToolFilter {
+                        read_only: None,
+                        tool_names: Some(vec!["read_file".to_string()]),
                     }),
                     always: None,
                 }))
@@ -2127,6 +2130,108 @@ mod tests {
 
         let res = client.responses().create(&req).await.unwrap();
         assert_eq!(res.id, "resp_8");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_mcp_tool_with_connector_id_and_allowed_callers() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "List my files",
+                "tools": [{
+                    "type": "mcp",
+                    "server_label": "dropbox",
+                    "connector_id": "connector_dropbox",
+                    "allowed_callers": ["direct", "programmatic"],
+                    "allowed_tools": {"read_only": true, "tool_names": ["list_files"]}
+                }]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_9",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let tool = ResponseTool::Mcp(
+            ResponseMcpTool::builder()
+                .server_label("dropbox")
+                .connector_id(McpConnectorId::Dropbox)
+                .allowed_callers(vec![
+                    McpAllowedCaller::Direct,
+                    McpAllowedCaller::Programmatic,
+                ])
+                .allowed_tools(McpAllowedTools::Filter(McpToolFilter {
+                    read_only: Some(true),
+                    tool_names: Some(vec!["list_files".to_string()]),
+                }))
+                .build(),
+        );
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("List my files".to_string()))
+            .tools(vec![tool])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_9");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_mcp_tool_with_tunnel_id_and_no_server_url() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "Ping the tunnel",
+                "tools": [{
+                    "type": "mcp",
+                    "server_label": "internal",
+                    "tunnel_id": "tunnel_abc123"
+                }]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_10",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let tool = ResponseTool::Mcp(
+            ResponseMcpTool::builder()
+                .server_label("internal")
+                .tunnel_id("tunnel_abc123")
+                .build(),
+        );
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text("Ping the tunnel".to_string()))
+            .tools(vec![tool])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_10");
     }
 
     #[tokio::test]

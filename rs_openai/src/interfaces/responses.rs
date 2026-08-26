@@ -301,18 +301,26 @@ pub enum McpApprovalMode {
     Always,
 }
 
-#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
-pub struct McpToolNameFilter {
-    pub tool_names: Vec<String>,
+/// Confirmed via source (`total=False` TypedDict): BOTH fields are optional. Reused for
+/// `require_approval`'s `always`/`never` filters AND `allowed_tools`' filter form -- both
+/// confirmed identical shape. Renamed from `McpToolNameFilter` (which was missing
+/// `read_only` and wrongly required `tool_names`) -- a deliberate breaking change.
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct McpToolFilter {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read_only: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_names: Option<Vec<String>>,
 }
 
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
 pub struct McpApprovalFilter {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub never: Option<McpToolNameFilter>,
+    pub never: Option<McpToolFilter>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub always: Option<McpToolNameFilter>,
+    pub always: Option<McpToolFilter>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -322,13 +330,83 @@ pub enum McpRequireApproval {
     Filter(McpApprovalFilter),
 }
 
+/// `allowed_tools` is either a plain list of tool names, or a filter object -- confirmed via
+/// source (`McpAllowedTools: TypeAlias = Union[SequenceNotStr[str], McpAllowedToolsMcpToolFilter]`).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum McpAllowedTools {
+    Names(Vec<String>),
+    Filter(McpToolFilter),
+}
+
+impl From<Vec<String>> for McpAllowedTools {
+    fn from(names: Vec<String>) -> Self {
+        Self::Names(names)
+    }
+}
+
+/// Identifier for a service connector (e.g. Dropbox, Gmail) as an alternative to a raw
+/// `server_url`. Each variant is spelled out explicitly since the wire values don't follow
+/// a uniform snake_case-from-PascalCase conversion (e.g. `connector_googlecalendar`, not
+/// `connector_google_calendar`).
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+pub enum McpConnectorId {
+    #[serde(rename = "connector_dropbox")]
+    #[strum(serialize = "connector_dropbox")]
+    Dropbox,
+    #[serde(rename = "connector_gmail")]
+    #[strum(serialize = "connector_gmail")]
+    Gmail,
+    #[serde(rename = "connector_googlecalendar")]
+    #[strum(serialize = "connector_googlecalendar")]
+    GoogleCalendar,
+    #[serde(rename = "connector_googledrive")]
+    #[strum(serialize = "connector_googledrive")]
+    GoogleDrive,
+    #[serde(rename = "connector_microsoftteams")]
+    #[strum(serialize = "connector_microsoftteams")]
+    MicrosoftTeams,
+    #[serde(rename = "connector_outlookcalendar")]
+    #[strum(serialize = "connector_outlookcalendar")]
+    OutlookCalendar,
+    #[serde(rename = "connector_outlookemail")]
+    #[strum(serialize = "connector_outlookemail")]
+    OutlookEmail,
+    #[serde(rename = "connector_sharepoint")]
+    #[strum(serialize = "connector_sharepoint")]
+    SharePoint,
+}
+
+/// The tool invocation context(s) allowed to call this MCP tool.
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum McpAllowedCaller {
+    Direct,
+    Programmatic,
+}
+
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
 pub struct ResponseMcpTool {
     #[builder(into)]
     pub server_label: String,
 
+    /// One of `server_url`, `connector_id`, or `tunnel_id` must be provided -- confirmed
+    /// via source; not enforced client-side, matching this crate's convention of not
+    /// re-implementing server-side "one of" validation. Was previously a required `String`;
+    /// changed to `Option<String>` to allow the connector/tunnel alternatives -- a
+    /// deliberate breaking change, though `#[builder(into)]` keeps existing
+    /// `.server_url("...")` call sites source-compatible.
     #[builder(into)]
-    pub server_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_url: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connector_id: Option<McpConnectorId>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tunnel_id: Option<String>,
 
     #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -344,8 +422,12 @@ pub struct ResponseMcpTool {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub require_approval: Option<McpRequireApproval>,
 
+    #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub allowed_tools: Option<Vec<String>>,
+    pub allowed_tools: Option<McpAllowedTools>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_callers: Option<Vec<McpAllowedCaller>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
