@@ -463,6 +463,37 @@ pub struct ResponseTextConfig {
     pub format: Option<crate::interfaces::chat::ChatResponseFormat>,
 }
 
+/// Additional output data a caller can request beyond the default response shape.
+/// `strum`/`serde` renames use dotted values (not valid Rust snake_case), so each variant
+/// is spelled out explicitly rather than via a blanket `rename_all`.
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+pub enum ResponseIncludable {
+    #[serde(rename = "file_search_call.results")]
+    #[strum(serialize = "file_search_call.results")]
+    FileSearchCallResults,
+    #[serde(rename = "web_search_call.results")]
+    #[strum(serialize = "web_search_call.results")]
+    WebSearchCallResults,
+    #[serde(rename = "web_search_call.action.sources")]
+    #[strum(serialize = "web_search_call.action.sources")]
+    WebSearchCallActionSources,
+    #[serde(rename = "message.input_image.image_url")]
+    #[strum(serialize = "message.input_image.image_url")]
+    MessageInputImageImageUrl,
+    #[serde(rename = "computer_call_output.output.image_url")]
+    #[strum(serialize = "computer_call_output.output.image_url")]
+    ComputerCallOutputOutputImageUrl,
+    #[serde(rename = "code_interpreter_call.outputs")]
+    #[strum(serialize = "code_interpreter_call.outputs")]
+    CodeInterpreterCallOutputs,
+    #[serde(rename = "reasoning.encrypted_content")]
+    #[strum(serialize = "reasoning.encrypted_content")]
+    ReasoningEncryptedContent,
+    #[serde(rename = "message.output_text.logprobs")]
+    #[strum(serialize = "message.output_text.logprobs")]
+    MessageOutputTextLogprobs,
+}
+
 #[derive(Builder, Debug, Serialize, Clone)]
 pub struct CreateResponseRequest {
     #[builder(into)]
@@ -525,6 +556,12 @@ pub struct CreateResponseRequest {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conversation: Option<ResponseConversationParam>,
+
+    /// Additional output data to include (e.g. file/web search results, image URLs,
+    /// reasoning content). A JSON body field, unlike `retrieve`/`list_input_items`'s
+    /// same-named query param -- no `Vec<String>`-in-query workaround needed here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<Vec<ResponseIncludable>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
@@ -819,17 +856,59 @@ pub struct DeleteResponseResponse {
     pub deleted: bool,
 }
 
-#[derive(Builder, Debug, Serialize, Clone)]
+/// Retrieves a response. `include_obfuscation`/`starting_after` (streaming-resume params,
+/// confirmed via source) are deliberately out of scope -- this crate's `retrieve()` always
+/// does a plain non-streaming fetch, with no support for resuming an in-flight stream.
+#[derive(Builder, Debug, Clone, Default)]
+pub struct RetrieveResponseRequest {
+    pub include: Option<Vec<ResponseIncludable>>,
+}
+
+impl RetrieveResponseRequest {
+    pub(crate) fn to_query_pairs(&self) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        if let Some(values) = &self.include {
+            for v in values {
+                pairs.push(("include".to_string(), v.to_string()));
+            }
+        }
+        pairs
+    }
+}
+
+/// `include` (a `Vec<ResponseIncludable>` query param) needs `to_query_pairs()` rather than
+/// the generic `get()` path, matching the established `Vec<String>`-in-query workaround.
+#[derive(Builder, Debug, Clone, Default)]
 pub struct ListInputItemsRequest {
     #[builder(into)]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<Vec<ResponseIncludable>>,
+
     pub limit: Option<u32>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub order: Option<crate::interfaces::chat::SortOrder>,
+}
+
+impl ListInputItemsRequest {
+    pub(crate) fn to_query_pairs(&self) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        if let Some(v) = &self.after {
+            pairs.push(("after".to_string(), v.clone()));
+        }
+        if let Some(values) = &self.include {
+            for v in values {
+                pairs.push(("include".to_string(), v.to_string()));
+            }
+        }
+        if let Some(v) = self.limit {
+            pairs.push(("limit".to_string(), v.to_string()));
+        }
+        if let Some(v) = &self.order {
+            pairs.push(("order".to_string(), v.to_string()));
+        }
+        pairs
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]

@@ -1,11 +1,11 @@
 //! Model responses — OpenAI's now-recommended primary API, superseding Chat Completions and
 //! (eventually) Assistants. Covers core CRUD/lifecycle, streaming, all 7 confirmed tool types
 //! (function/file_search/web_search/image_generation/mcp/computer_use/code_interpreter), the
-//! `conversation` param, and multimodal (text/image/file) input -- see
-//! docs/superpowers/specs/2026-08-07-responses-core-design.md and later specs under
-//! docs/superpowers/specs/ prefixed `responses-`. Remaining gaps: per-tool-type streaming
-//! events beyond text/function-call, the `include` param, `return_token_budget`, and mcp's
-//! deferred `connector_id`/`tunnel_id`/`allowed_callers`/`McpToolFilter`.
+//! `conversation` param, multimodal (text/image/file) input, and the `include` param (on
+//! create/retrieve/list_input_items) -- see docs/superpowers/specs/2026-08-07-responses-core-
+//! design.md and later specs under docs/superpowers/specs/ prefixed `responses-`. Remaining
+//! gaps: per-tool-type streaming events beyond text/function-call, `return_token_budget`, and
+//! mcp's deferred `connector_id`/`tunnel_id`/`allowed_callers`/`McpToolFilter`.
 
 use crate::client::OpenAI;
 use crate::interfaces::responses;
@@ -66,9 +66,12 @@ impl<'a> Response<'a> {
     }
 
     /// Retrieves a model response by ID.
-    pub async fn retrieve(&self) -> OpenAIResponse<responses::Response> {
+    pub async fn retrieve(
+        &self,
+        req: &responses::RetrieveResponseRequest,
+    ) -> OpenAIResponse<responses::Response> {
         self.openai
-            .get(&format!("/responses/{}", self.id), &())
+            .get_with_pairs(&format!("/responses/{}", self.id), &req.to_query_pairs())
             .await
     }
 
@@ -92,7 +95,10 @@ impl<'a> Response<'a> {
         req: &responses::ListInputItemsRequest,
     ) -> OpenAIResponse<responses::ListInputItemsResponse> {
         self.openai
-            .get(&format!("/responses/{}/input_items", self.id), req)
+            .get_with_pairs(
+                &format!("/responses/{}/input_items", self.id),
+                &req.to_query_pairs(),
+            )
             .await
     }
 }
@@ -110,14 +116,15 @@ mod tests {
         McpRequireApproval, McpToolNameFilter, ResponseCodeInterpreterAutoContainer,
         ResponseCodeInterpreterContainer, ResponseCodeInterpreterTool,
         ResponseComputerUsePreviewTool, ResponseConversationParam, ResponseFileSearchTool,
-        ResponseFunctionTool, ResponseImageGenerationTool, ResponseInput, ResponseInputContent,
-        ResponseInputFile, ResponseInputImage, ResponseInputItem, ResponseInputRole,
-        ResponseInputText, ResponseMcpTool, ResponseOutputItem, ResponseStreamEvent, ResponseTool,
-        ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
-        ResponseWebSearchTool, WebSearchAction, WebSearchContextSize, WebSearchUserLocation,
+        ResponseFunctionTool, ResponseImageGenerationTool, ResponseIncludable, ResponseInput,
+        ResponseInputContent, ResponseInputFile, ResponseInputImage, ResponseInputItem,
+        ResponseInputRole, ResponseInputText, ResponseMcpTool, ResponseOutputItem,
+        ResponseStreamEvent, ResponseTool, ResponseToolChoice, ResponseToolChoiceFunctionName,
+        ResponseToolChoiceMode, ResponseWebSearchTool, RetrieveResponseRequest, WebSearchAction,
+        WebSearchContextSize, WebSearchUserLocation,
     };
     use futures::StreamExt;
-    use wiremock::matchers::{body_json, method, path};
+    use wiremock::matchers::{body_json, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[test]
@@ -353,6 +360,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_serializes_include_field() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/responses"))
+            .and(body_json(serde_json::json!({
+                "model": "gpt-5-mini",
+                "input": "What's the capital of France?",
+                "include": ["file_search_call.results", "reasoning.encrypted_content"]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_123",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateResponseRequest::builder()
+            .model("gpt-5-mini")
+            .input(ResponseInput::Text(
+                "What's the capital of France?".to_string(),
+            ))
+            .include(vec![
+                ResponseIncludable::FileSearchCallResults,
+                ResponseIncludable::ReasoningEncryptedContent,
+            ])
+            .build();
+
+        let res = client.responses().create(&req).await.unwrap();
+        assert_eq!(res.id, "resp_123");
+    }
+
+    #[tokio::test]
     async fn create_serializes_message_array_input_with_tool_and_tool_choice() {
         let mock_server = MockServer::start().await;
 
@@ -518,7 +566,37 @@ mod tests {
             .await;
 
         let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
-        let res = client.response("resp_789").retrieve().await.unwrap();
+        let req = RetrieveResponseRequest::builder().build();
+        let res = client.response("resp_789").retrieve(&req).await.unwrap();
+        assert_eq!(res.id, "resp_789");
+    }
+
+    #[tokio::test]
+    async fn retrieve_sends_include_query_params() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/responses/resp_789"))
+            .and(query_param("include", "message.output_text.logprobs"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "resp_789",
+                "object": "response",
+                "created_at": 1700000000_i64,
+                "status": "completed",
+                "error": null,
+                "incomplete_details": null,
+                "model": "gpt-5-mini",
+                "output": [],
+                "usage": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = RetrieveResponseRequest::builder()
+            .include(vec![ResponseIncludable::MessageOutputTextLogprobs])
+            .build();
+        let res = client.response("resp_789").retrieve(&req).await.unwrap();
         assert_eq!(res.id, "resp_789");
     }
 
@@ -616,6 +694,38 @@ mod tests {
             other => panic!("expected FunctionCallOutput, got {other:?}"),
         }
         assert!(!res.has_more);
+    }
+
+    #[tokio::test]
+    async fn list_input_items_sends_include_query_param() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/responses/resp_789/input_items"))
+            .and(query_param("include", "file_search_call.results"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [],
+                "first_id": null,
+                "last_id": null,
+                "has_more": false
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = ListInputItemsRequest::builder()
+            .include(vec![
+                ResponseIncludable::FileSearchCallResults,
+                ResponseIncludable::ReasoningEncryptedContent,
+            ])
+            .build();
+        let res = client
+            .response("resp_789")
+            .list_input_items(&req)
+            .await
+            .unwrap();
+        assert!(res.data.is_empty());
     }
 
     #[tokio::test]
