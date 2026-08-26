@@ -921,9 +921,12 @@ pub struct ListInputItemsResponse {
 }
 
 /// A single Server-Sent Event from a streamed `Responses::create_with_stream` call. Covers
-/// only the events relevant to this crate's current (text + function-calling only) type
-/// surface — see docs/superpowers/specs/2026-08-11-responses-streaming-design.md for the
-/// full list of deferred event families (content_part, refusal, other tool types, reasoning).
+/// lifecycle + text + function-calling + file_search events -- see
+/// docs/superpowers/specs/2026-08-11-responses-streaming-design.md and
+/// docs/superpowers/specs/2026-08-26-responses-streaming-file-search-design.md. The full
+/// union is 60 confirmed variants (content_part, refusal, reasoning, audio, and per-tool
+/// events for web_search/image_generation/mcp/code_interpreter/shell/custom tools) --
+/// deliberately being added one tool type at a time in separate slices rather than in bulk.
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum ResponseStreamEvent {
@@ -1004,6 +1007,28 @@ pub enum ResponseStreamEvent {
         arguments: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         sequence_number: Option<u64>,
+    },
+    /// Emitted when a file search call is initiated. `sequence_number` is required here
+    /// (confirmed via source), unlike the lifecycle events above where it's optional.
+    #[serde(rename = "response.file_search_call.in_progress")]
+    FileSearchCallInProgress {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted while a file search call is actively searching.
+    #[serde(rename = "response.file_search_call.searching")]
+    FileSearchCallSearching {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted when a file search call has completed (results found).
+    #[serde(rename = "response.file_search_call.completed")]
+    FileSearchCallCompleted {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
     },
     #[serde(rename = "error")]
     Error {

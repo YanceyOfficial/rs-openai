@@ -856,6 +856,59 @@ mod tests {
     }
 
     #[test]
+    fn response_stream_event_file_search_call_lifecycle_deserializes() {
+        for (json_type, expected) in [
+            (
+                "response.file_search_call.in_progress",
+                "FileSearchCallInProgress",
+            ),
+            (
+                "response.file_search_call.searching",
+                "FileSearchCallSearching",
+            ),
+            (
+                "response.file_search_call.completed",
+                "FileSearchCallCompleted",
+            ),
+        ] {
+            let value = serde_json::json!({
+                "type": json_type,
+                "item_id": "fs_1",
+                "output_index": 0,
+                "sequence_number": 5
+            });
+
+            let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+            let debug = format!("{event:?}");
+            assert!(
+                debug.starts_with(expected),
+                "expected {expected}, got {debug}"
+            );
+            match event {
+                ResponseStreamEvent::FileSearchCallInProgress {
+                    item_id,
+                    sequence_number,
+                    ..
+                }
+                | ResponseStreamEvent::FileSearchCallSearching {
+                    item_id,
+                    sequence_number,
+                    ..
+                }
+                | ResponseStreamEvent::FileSearchCallCompleted {
+                    item_id,
+                    sequence_number,
+                    ..
+                } => {
+                    assert_eq!(item_id, "fs_1");
+                    assert_eq!(sequence_number, 5);
+                }
+                other => panic!("expected a FileSearchCall* variant, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
     fn response_stream_event_error_deserializes() {
         let value = serde_json::json!({
             "type": "error",
