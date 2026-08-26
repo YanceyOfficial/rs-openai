@@ -18,6 +18,98 @@ pub enum ResponseInputRole {
     Developer,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ImageDetail {
+    Low,
+    High,
+    Auto,
+    Original,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ResponseInputText {
+    #[builder(into)]
+    pub text: String,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ResponseInputImage {
+    pub detail: ImageDetail,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ResponseInputFile {
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_data: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_url: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+}
+
+/// A single content part of a multimodal message. Text/image/file only this round -- audio
+/// input (`ResponseInputAudioParam` in the source SDK) is deliberately deferred, matching
+/// this crate's standing pattern of scoping large unions down to the well-documented common
+/// cases.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ResponseInputContent {
+    InputText(ResponseInputText),
+    InputImage(ResponseInputImage),
+    InputFile(ResponseInputFile),
+}
+
+/// A message's `content` is either a plain string (the common case) or a list of content
+/// parts for multimodal (text/image/file) input -- confirmed via source
+/// (`EasyInputMessageParam.content: Union[str, ResponseInputMessageContentListParam]`).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum ResponseInputMessageContent {
+    Text(String),
+    Items(Vec<ResponseInputContent>),
+}
+
+impl From<String> for ResponseInputMessageContent {
+    fn from(text: String) -> Self {
+        Self::Text(text)
+    }
+}
+
+impl From<&str> for ResponseInputMessageContent {
+    fn from(text: &str) -> Self {
+        Self::Text(text.to_string())
+    }
+}
+
+impl From<Vec<ResponseInputContent>> for ResponseInputMessageContent {
+    fn from(items: Vec<ResponseInputContent>) -> Self {
+        Self::Items(items)
+    }
+}
+
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
 pub struct ComputerCallOutputScreenshot {
     #[builder(into)]
@@ -37,7 +129,7 @@ pub struct ComputerCallOutputScreenshot {
 pub enum ResponseInputItem {
     Message {
         role: ResponseInputRole,
-        content: String,
+        content: ResponseInputMessageContent,
     },
     FunctionCallOutput {
         call_id: String,

@@ -1,7 +1,11 @@
 //! Model responses — OpenAI's now-recommended primary API, superseding Chat Completions and
-//! (eventually) Assistants. Core surface only this round: plain-text input/output and
-//! function-calling, non-streaming — see
-//! docs/superpowers/specs/2026-08-07-responses-core-design.md.
+//! (eventually) Assistants. Covers core CRUD/lifecycle, streaming, all 7 confirmed tool types
+//! (function/file_search/web_search/image_generation/mcp/computer_use/code_interpreter), the
+//! `conversation` param, and multimodal (text/image/file) input -- see
+//! docs/superpowers/specs/2026-08-07-responses-core-design.md and later specs under
+//! docs/superpowers/specs/ prefixed `responses-`. Remaining gaps: per-tool-type streaming
+//! events beyond text/function-call, the `include` param, `return_token_budget`, and mcp's
+//! deferred `connector_id`/`tunnel_id`/`allowed_callers`/`McpToolFilter`.
 
 use crate::client::OpenAI;
 use crate::interfaces::responses;
@@ -101,13 +105,14 @@ mod tests {
     use crate::interfaces::images::{Background, ImageSize, Quality};
     use crate::interfaces::responses::{
         ComputerAction, ComputerActionButton, ComputerCallOutputScreenshot, ComputerEnvironment,
-        ComputerSafetyCheck, CreateResponseRequest, FileSearchRankingOptions,
+        ComputerSafetyCheck, CreateResponseRequest, FileSearchRankingOptions, ImageDetail,
         ImageGenerationAction, ListInputItemsRequest, McpApprovalFilter, McpApprovalMode,
         McpRequireApproval, McpToolNameFilter, ResponseCodeInterpreterAutoContainer,
         ResponseCodeInterpreterContainer, ResponseCodeInterpreterTool,
         ResponseComputerUsePreviewTool, ResponseConversationParam, ResponseFileSearchTool,
-        ResponseFunctionTool, ResponseImageGenerationTool, ResponseInput, ResponseInputItem,
-        ResponseInputRole, ResponseMcpTool, ResponseOutputItem, ResponseStreamEvent, ResponseTool,
+        ResponseFunctionTool, ResponseImageGenerationTool, ResponseInput, ResponseInputContent,
+        ResponseInputFile, ResponseInputImage, ResponseInputItem, ResponseInputRole,
+        ResponseInputText, ResponseMcpTool, ResponseOutputItem, ResponseStreamEvent, ResponseTool,
         ResponseToolChoice, ResponseToolChoiceFunctionName, ResponseToolChoiceMode,
         ResponseWebSearchTool, WebSearchAction, WebSearchContextSize, WebSearchUserLocation,
     };
@@ -119,13 +124,54 @@ mod tests {
     fn response_input_item_message_serializes_with_type_tag() {
         let item = ResponseInputItem::Message {
             role: ResponseInputRole::User,
-            content: "hello".to_string(),
+            content: "hello".into(),
         };
 
         let json = serde_json::to_value(&item).unwrap();
         assert_eq!(
             json,
             serde_json::json!({"type": "message", "role": "user", "content": "hello"})
+        );
+    }
+
+    #[test]
+    fn response_input_item_message_serializes_multimodal_content_list() {
+        let item = ResponseInputItem::Message {
+            role: ResponseInputRole::User,
+            content: vec![
+                ResponseInputContent::InputText(
+                    ResponseInputText::builder()
+                        .text("What's in this image?")
+                        .build(),
+                ),
+                ResponseInputContent::InputImage(
+                    ResponseInputImage::builder()
+                        .detail(ImageDetail::Auto)
+                        .image_url("https://example.com/cat.png")
+                        .build(),
+                ),
+                ResponseInputContent::InputFile(
+                    ResponseInputFile::builder()
+                        .filename("report.pdf")
+                        .file_data("base64stuff")
+                        .build(),
+                ),
+            ]
+            .into(),
+        };
+
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "type": "message",
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": "What's in this image?"},
+                    {"type": "input_image", "detail": "auto", "image_url": "https://example.com/cat.png"},
+                    {"type": "input_file", "filename": "report.pdf", "file_data": "base64stuff"}
+                ]
+            })
         );
     }
 
@@ -361,7 +407,7 @@ mod tests {
             .model("gpt-5-mini")
             .input(ResponseInput::Items(vec![ResponseInputItem::Message {
                 role: ResponseInputRole::User,
-                content: "What's the weather in Boston?".to_string(),
+                content: "What's the weather in Boston?".into(),
             }]))
             .tools(vec![tool])
             .tool_choice(ResponseToolChoice::Mode(ResponseToolChoiceMode::Auto))
@@ -570,6 +616,54 @@ mod tests {
             other => panic!("expected FunctionCallOutput, got {other:?}"),
         }
         assert!(!res.has_more);
+    }
+
+    #[tokio::test]
+    async fn list_input_items_deserializes_multimodal_message_item() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/responses/resp_789/input_items"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "object": "list",
+                "data": [{
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": "Describe this image"},
+                        {"type": "input_image", "detail": "high", "file_id": "file-abc123"}
+                    ]
+                }],
+                "first_id": "item_1",
+                "last_id": "item_1",
+                "has_more": false
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = ListInputItemsRequest::builder().build();
+        let res = client
+            .response("resp_789")
+            .list_input_items(&req)
+            .await
+            .unwrap();
+
+        match &res.data[0] {
+            ResponseInputItem::Message { content, .. } => match content {
+                crate::interfaces::responses::ResponseInputMessageContent::Items(items) => {
+                    assert_eq!(items.len(), 2);
+                    match &items[1] {
+                        ResponseInputContent::InputImage(img) => {
+                            assert_eq!(img.file_id.as_deref(), Some("file-abc123"));
+                        }
+                        other => panic!("expected InputImage, got {other:?}"),
+                    }
+                }
+                other => panic!("expected multimodal Items content, got {other:?}"),
+            },
+            other => panic!("expected Message, got {other:?}"),
+        }
     }
 
     #[test]

@@ -183,7 +183,7 @@ mod tests {
         let req = CreateConversationRequest::builder()
             .items(vec![ResponseInputItem::Message {
                 role: ResponseInputRole::User,
-                content: "hi".to_string(),
+                content: "hi".into(),
             }])
             .build();
 
@@ -328,7 +328,7 @@ mod tests {
         let req = AddConversationItemsRequest::builder()
             .items(vec![ResponseInputItem::Message {
                 role: ResponseInputRole::User,
-                content: "hi".to_string(),
+                content: "hi".into(),
             }])
             .build();
         let res = client
