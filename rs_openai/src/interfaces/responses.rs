@@ -921,11 +921,11 @@ pub struct ListInputItemsResponse {
 }
 
 /// A single Server-Sent Event from a streamed `Responses::create_with_stream` call. Covers
-/// lifecycle + text + function-calling + file_search + web_search + image_generation events
-/// -- see docs/superpowers/specs/2026-08-11-responses-streaming-design.md and the later
-/// specs under docs/superpowers/specs/ prefixed `responses-streaming-`. The full union is 60
-/// confirmed variants (content_part, refusal, reasoning, audio, and per-tool events for
-/// mcp/code_interpreter/shell/custom tools) -- deliberately being added one tool type at a
+/// lifecycle + text + function-calling + file_search + web_search + image_generation + mcp
+/// events -- see docs/superpowers/specs/2026-08-11-responses-streaming-design.md and the
+/// later specs under docs/superpowers/specs/ prefixed `responses-streaming-`. The full union
+/// is 60 confirmed variants (content_part, refusal, reasoning, audio, and per-tool events
+/// for code_interpreter/shell/custom tools) -- deliberately being added one tool type at a
 /// time in separate slices rather than in bulk.
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type")]
@@ -1085,6 +1085,64 @@ pub enum ResponseStreamEvent {
     /// Emitted when an image generation tool call has completed (final image available).
     #[serde(rename = "response.image_generation_call.completed")]
     ImageGenerationCallCompleted {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted when an MCP tool call is in progress.
+    #[serde(rename = "response.mcp_call.in_progress")]
+    McpCallInProgress {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted for a partial update to an MCP tool call's arguments.
+    #[serde(rename = "response.mcp_call_arguments.delta")]
+    McpCallArgumentsDelta {
+        item_id: String,
+        output_index: u32,
+        delta: String,
+        sequence_number: u64,
+    },
+    /// Emitted when an MCP tool call's arguments are finalized.
+    #[serde(rename = "response.mcp_call_arguments.done")]
+    McpCallArgumentsDone {
+        item_id: String,
+        output_index: u32,
+        arguments: String,
+        sequence_number: u64,
+    },
+    /// Emitted when an MCP tool call has completed successfully.
+    #[serde(rename = "response.mcp_call.completed")]
+    McpCallCompleted {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted when an MCP tool call has failed.
+    #[serde(rename = "response.mcp_call.failed")]
+    McpCallFailed {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted while retrieving the list of available MCP tools.
+    #[serde(rename = "response.mcp_list_tools.in_progress")]
+    McpListToolsInProgress {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted when the list of available MCP tools has been successfully retrieved.
+    #[serde(rename = "response.mcp_list_tools.completed")]
+    McpListToolsCompleted {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted when listing available MCP tools has failed.
+    #[serde(rename = "response.mcp_list_tools.failed")]
+    McpListToolsFailed {
         item_id: String,
         output_index: u32,
         sequence_number: u64,

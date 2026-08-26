@@ -1048,6 +1048,68 @@ mod tests {
     }
 
     #[test]
+    fn response_stream_event_mcp_call_lifecycle_deserializes() {
+        for (json_type, expected) in [
+            ("response.mcp_call.in_progress", "McpCallInProgress"),
+            ("response.mcp_call.completed", "McpCallCompleted"),
+            ("response.mcp_call.failed", "McpCallFailed"),
+            (
+                "response.mcp_list_tools.in_progress",
+                "McpListToolsInProgress",
+            ),
+            ("response.mcp_list_tools.completed", "McpListToolsCompleted"),
+            ("response.mcp_list_tools.failed", "McpListToolsFailed"),
+        ] {
+            let value = serde_json::json!({
+                "type": json_type,
+                "item_id": "mcp_1",
+                "output_index": 0,
+                "sequence_number": 11
+            });
+
+            let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+            let debug = format!("{event:?}");
+            assert!(
+                debug.starts_with(expected),
+                "expected {expected}, got {debug}"
+            );
+        }
+    }
+
+    #[test]
+    fn response_stream_event_mcp_call_arguments_delta_and_done_deserialize() {
+        let delta_value = serde_json::json!({
+            "type": "response.mcp_call_arguments.delta",
+            "item_id": "mcp_1",
+            "output_index": 0,
+            "delta": "{\"query\":",
+            "sequence_number": 12
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(delta_value).unwrap();
+        match event {
+            ResponseStreamEvent::McpCallArgumentsDelta { delta, .. } => {
+                assert_eq!(delta, "{\"query\":");
+            }
+            other => panic!("expected McpCallArgumentsDelta, got {other:?}"),
+        }
+
+        let done_value = serde_json::json!({
+            "type": "response.mcp_call_arguments.done",
+            "item_id": "mcp_1",
+            "output_index": 0,
+            "arguments": "{\"query\":\"weather\"}",
+            "sequence_number": 13
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(done_value).unwrap();
+        match event {
+            ResponseStreamEvent::McpCallArgumentsDone { arguments, .. } => {
+                assert_eq!(arguments, "{\"query\":\"weather\"}");
+            }
+            other => panic!("expected McpCallArgumentsDone, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn response_stream_event_error_deserializes() {
         let value = serde_json::json!({
             "type": "error",
