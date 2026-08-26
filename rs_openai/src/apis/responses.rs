@@ -909,6 +909,59 @@ mod tests {
     }
 
     #[test]
+    fn response_stream_event_web_search_call_lifecycle_deserializes() {
+        for (json_type, expected) in [
+            (
+                "response.web_search_call.in_progress",
+                "WebSearchCallInProgress",
+            ),
+            (
+                "response.web_search_call.searching",
+                "WebSearchCallSearching",
+            ),
+            (
+                "response.web_search_call.completed",
+                "WebSearchCallCompleted",
+            ),
+        ] {
+            let value = serde_json::json!({
+                "type": json_type,
+                "item_id": "ws_1",
+                "output_index": 0,
+                "sequence_number": 7
+            });
+
+            let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+            let debug = format!("{event:?}");
+            assert!(
+                debug.starts_with(expected),
+                "expected {expected}, got {debug}"
+            );
+            match event {
+                ResponseStreamEvent::WebSearchCallInProgress {
+                    item_id,
+                    sequence_number,
+                    ..
+                }
+                | ResponseStreamEvent::WebSearchCallSearching {
+                    item_id,
+                    sequence_number,
+                    ..
+                }
+                | ResponseStreamEvent::WebSearchCallCompleted {
+                    item_id,
+                    sequence_number,
+                    ..
+                } => {
+                    assert_eq!(item_id, "ws_1");
+                    assert_eq!(sequence_number, 7);
+                }
+                other => panic!("expected a WebSearchCall* variant, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
     fn response_stream_event_error_deserializes() {
         let value = serde_json::json!({
             "type": "error",
