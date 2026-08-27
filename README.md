@@ -31,25 +31,26 @@ rs_openai = { version = "0.7.0" }
 - [x] Models
 - [x] Moderations
 - [x] Uploads
+- [x] Responses — OpenAI's now-recommended primary API (core CRUD/lifecycle, SSE streaming for every implemented tool type, function/file_search/web_search/image_generation/mcp/computer_use/code_interpreter tools, the `conversation` param, multimodal text/image/file input, the `include` param)
+- [x] Conversations (including the `items` sub-resource)
+- [x] Vector Stores (including File Batches and typed search filters)
+- [x] ChatKit (Beta)
+- [x] Containers (core CRUD + file attachment by `file_id`; raw multipart file upload and `skills` container attachment not yet implemented)
+- [x] Evals + Graders (including Runs and Output Items)
+- [x] Videos (Sora) — core CRUD + content download; further Sora features are not planned, since OpenAI is sunsetting the Sora API on 2026-09-24 (confirmed via a deprecation notice on every method in OpenAI's own SDK)
+- [x] Webhooks
+- [x] Organization / admin tier (audit logs, admin API keys, usage, groups, invites, roles, users, projects, certificates, data retention, spend alerts/limit, hosted tool permissions, model permissions)
+- [x] Skills (including versions)
 - [x] Automatic retries with exponential backoff
 
-### Deprecated (sunsets 2026-08-26, per OpenAI)
+### Deprecated (sunset 2026-08-26, per OpenAI)
 
-- [x] Assistants, Threads, Messages, Runs — still functional, but OpenAI recommends migrating to the Responses + Conversations APIs below
+- [x] Assistants, Threads, Messages, Runs — still functional, but OpenAI recommends migrating to the Responses + Conversations APIs above
 
-### Scaffolded, not yet implemented
+### Known gaps
 
-Module wired in with accessor structs, but no request/response types or endpoint logic yet:
-
-- [ ] Responses — OpenAI's now-recommended primary API
-- [ ] Conversations
-- [ ] Vector Stores
-- [ ] ChatKit (Beta)
-- [ ] Containers
-- [ ] Evals + Graders
-- [ ] Videos
-- [ ] Webhooks
-- [ ] Organization / admin tier (audit logs, admin API keys, usage, groups, invites, roles, users, projects)
+- [ ] Containers: `skills` container attachment, raw multipart file upload into a container (file attachment by `file_id` is implemented)
+- [ ] Responses: a handful of niche streaming event variants (reasoning text/summary, audio, and shell/custom-tool events for tool types this crate doesn't implement)
 
 ### Not planned
 

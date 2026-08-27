@@ -18,6 +18,7 @@ pub mod moderations;
 pub mod organization;
 pub mod responses;
 pub mod runs;
+pub mod skills;
 pub mod threads;
 pub mod uploads;
 pub mod vector_stores;
