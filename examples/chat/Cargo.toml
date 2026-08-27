@@ -6,6 +6,6 @@ publish = false
 
 [dependencies]
 dotenvy = { workspace = true }
-rs_openai = { path = "../../rs_openai" }
+rs_openai = { path = "../../rs_openai", version = "0.8.0" }
 tokio = { workspace = true }
 futures = { workspace = true }
