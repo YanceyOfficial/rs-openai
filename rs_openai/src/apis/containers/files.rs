@@ -1,9 +1,11 @@
 //! A container's files (`/containers/{container_id}/files`), including binary content
-//! retrieve — see docs/superpowers/specs/2026-08-14-containers-design.md.
+//! retrieve — see docs/superpowers/specs/2026-08-14-containers-design.md and
+//! docs/superpowers/specs/2026-08-28-containers-skills-raw-upload-design.md.
 
 use crate::client::OpenAI;
 use crate::interfaces::containers;
 use crate::shared::response_wrapper::OpenAIResponse;
+use reqwest::multipart::{Form, Part};
 
 pub struct ContainerFiles<'a> {
     openai: &'a OpenAI,
@@ -18,14 +20,28 @@ impl<'a> ContainerFiles<'a> {
         }
     }
 
-    /// Attaches an already-uploaded file (by `file_id`) to this container.
+    /// Attaches a file to this container, either an already-uploaded file (by `file_id`,
+    /// sent as a plain JSON body) or raw file bytes (sent as multipart, one `file` part).
     pub async fn create(
         &self,
         req: &containers::CreateContainerFileRequest,
     ) -> OpenAIResponse<containers::ContainerFile> {
-        self.openai
-            .post(&format!("/containers/{}/files", self.container_id), req)
-            .await
+        let route = format!("/containers/{}/files", self.container_id);
+        match &req.source {
+            containers::ContainerFileSource::FileId(file_id) => {
+                self.openai
+                    .post(&route, &serde_json::json!({"file_id": file_id}))
+                    .await
+            }
+            containers::ContainerFileSource::Upload(file) => {
+                let part = Part::stream(file.buffer.clone())
+                    .file_name(file.filename.clone())
+                    .mime_str("application/octet-stream")
+                    .expect("\"application/octet-stream\" is always a valid mime type");
+                let form = Form::new().part("file", part);
+                self.openai.post_form(&route, form).await
+            }
+        }
     }
 
     /// Lists this container's files.
@@ -93,9 +109,24 @@ impl<'a> ContainerFile<'a> {
 #[cfg(test)]
 mod tests {
     use crate::client::OpenAI;
-    use crate::interfaces::containers::{CreateContainerFileRequest, ListContainerFilesRequest};
+    use crate::interfaces::containers::{
+        ContainerFileSource, CreateContainerFileRequest, ListContainerFilesRequest,
+    };
+    use crate::shared::types::File;
     use wiremock::matchers::{body_json, method, path, query_param};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
+    use wiremock::{Mock, MockServer, Request, ResponseTemplate};
+
+    fn sample_container_file_json() -> serde_json::Value {
+        serde_json::json!({
+            "id": "cfile_1",
+            "bytes": 1024,
+            "container_id": "cntr_1",
+            "created_at": 1700000000_i64,
+            "object": "container.file",
+            "path": "/mnt/data/file_abc.csv",
+            "source": "user"
+        })
+    }
 
     #[tokio::test]
     async fn create_serializes_file_id_and_deserializes_response() {
@@ -104,21 +135,13 @@ mod tests {
         Mock::given(method("POST"))
             .and(path("/containers/cntr_1/files"))
             .and(body_json(serde_json::json!({"file_id": "file_abc"})))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "id": "cfile_1",
-                "bytes": 1024,
-                "container_id": "cntr_1",
-                "created_at": 1700000000_i64,
-                "object": "container.file",
-                "path": "/mnt/data/file_abc.csv",
-                "source": "user"
-            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(sample_container_file_json()))
             .mount(&mock_server)
             .await;
 
         let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
         let req = CreateContainerFileRequest::builder()
-            .file_id("file_abc")
+            .source(ContainerFileSource::FileId("file_abc".to_string()))
             .build();
 
         let res = client
@@ -130,6 +153,46 @@ mod tests {
         assert_eq!(res.id, "cfile_1");
         assert_eq!(res.container_id, "cntr_1");
         assert_eq!(res.source, "user");
+    }
+
+    struct ContainsInBody(&'static [u8]);
+
+    impl wiremock::Match for ContainsInBody {
+        fn matches(&self, request: &Request) -> bool {
+            request
+                .body
+                .windows(self.0.len())
+                .any(|window| window == self.0)
+        }
+    }
+
+    #[tokio::test]
+    async fn create_sends_raw_bytes_as_multipart_file_part() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/containers/cntr_1/files"))
+            .and(ContainsInBody(br#"name="file""#))
+            .and(ContainsInBody(&[1, 2, 3, 4]))
+            .respond_with(ResponseTemplate::new(200).set_body_json(sample_container_file_json()))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateContainerFileRequest::builder()
+            .source(ContainerFileSource::Upload(File {
+                buffer: vec![1, 2, 3, 4],
+                filename: "notes.csv".to_string(),
+            }))
+            .build();
+
+        let res = client
+            .container("cntr_1")
+            .files()
+            .create(&req)
+            .await
+            .unwrap();
+        assert_eq!(res.id, "cfile_1");
     }
 
     #[tokio::test]

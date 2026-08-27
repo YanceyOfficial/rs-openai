@@ -69,7 +69,8 @@ mod tests {
     use crate::client::OpenAI;
     use crate::interfaces::containers::{
         ContainerExpiresAfter, ContainerExpiresAfterAnchor, ContainerMemoryLimit,
-        ContainerNetworkPolicy, CreateContainerRequest, ListContainersRequest,
+        ContainerNetworkPolicy, ContainerSkill, CreateContainerRequest, InlineSkillSource,
+        ListContainersRequest,
     };
     use wiremock::matchers::{body_json, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -135,6 +136,89 @@ mod tests {
         let res = client.containers().create(&req).await.unwrap();
         assert_eq!(res.id, "cntr_1");
         assert_eq!(res.status, "running");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_skill_reference() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/containers"))
+            .and(body_json(serde_json::json!({
+                "name": "my-container",
+                "skills": [{"type": "skill_reference", "skill_id": "skill_1", "version": "2"}]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "cntr_4",
+                "created_at": 1700000000_i64,
+                "name": "my-container",
+                "object": "container",
+                "status": "running",
+                "expires_after": null,
+                "last_active_at": null,
+                "memory_limit": null,
+                "network_policy": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateContainerRequest::builder()
+            .name("my-container")
+            .skills(vec![ContainerSkill::SkillReference {
+                skill_id: "skill_1".to_string(),
+                version: Some("2".to_string()),
+            }])
+            .build();
+
+        let res = client.containers().create(&req).await.unwrap();
+        assert_eq!(res.id, "cntr_4");
+    }
+
+    #[tokio::test]
+    async fn create_serializes_inline_skill() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/containers"))
+            .and(body_json(serde_json::json!({
+                "name": "my-container",
+                "skills": [{
+                    "type": "inline",
+                    "description": "Formats spreadsheets",
+                    "name": "spreadsheet-formatter",
+                    "source": {"data": "base64stuff", "media_type": "application/zip"}
+                }]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "cntr_5",
+                "created_at": 1700000000_i64,
+                "name": "my-container",
+                "object": "container",
+                "status": "running",
+                "expires_after": null,
+                "last_active_at": null,
+                "memory_limit": null,
+                "network_policy": null
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(mock_server.uri());
+        let req = CreateContainerRequest::builder()
+            .name("my-container")
+            .skills(vec![ContainerSkill::Inline {
+                description: "Formats spreadsheets".to_string(),
+                name: "spreadsheet-formatter".to_string(),
+                source: InlineSkillSource::builder()
+                    .data("base64stuff")
+                    .media_type("application/zip")
+                    .build(),
+            }])
+            .build();
+
+        let res = client.containers().create(&req).await.unwrap();
+        assert_eq!(res.id, "cntr_5");
     }
 
     #[tokio::test]

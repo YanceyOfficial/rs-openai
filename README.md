@@ -35,7 +35,7 @@ rs_openai = { version = "0.8.0" }
 - [x] Conversations (including the `items` sub-resource)
 - [x] Vector Stores (including File Batches and typed search filters)
 - [x] ChatKit (Beta)
-- [x] Containers (core CRUD + file attachment by `file_id`; raw multipart file upload and `skills` container attachment not yet implemented)
+- [x] Containers (core CRUD, file attachment by `file_id` or raw multipart upload, `skills` container attachment)
 - [x] Evals + Graders (including Runs and Output Items)
 - [x] Videos (Sora) — core CRUD + content download; further Sora features are not planned, since OpenAI is sunsetting the Sora API on 2026-09-24 (confirmed via a deprecation notice on every method in OpenAI's own SDK)
 - [x] Webhooks
@@ -49,7 +49,6 @@ rs_openai = { version = "0.8.0" }
 
 ### Known gaps
 
-- [ ] Containers: `skills` container attachment, raw multipart file upload into a container (file attachment by `file_id` is implemented)
 - [ ] Responses: a handful of niche streaming event variants (reasoning text/summary, audio, and shell/custom-tool events for tool types this crate doesn't implement)
 
 ### Not planned

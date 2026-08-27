@@ -51,6 +51,37 @@ pub enum ContainerNetworkPolicy {
     },
 }
 
+/// Base64-encoded inline skill payload. `media_type` is always `"application/zip"` per
+/// source -- modeled as a plain settable `String` rather than hardcoded, matching this
+/// crate's convention for currently-single-valued-but-technically-open fields (e.g.
+/// `SpendAlert`'s `currency`/`interval`).
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct InlineSkillSource {
+    #[builder(into)]
+    pub data: String,
+
+    #[builder(into)]
+    pub media_type: String,
+}
+
+/// A skill attached to a container, either by reference to an existing `/v1/skills` skill
+/// or provided inline -- confirmed via source (`Skill: TypeAlias = Union[SkillReferenceParam,
+/// InlineSkillParam]`).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ContainerSkill {
+    SkillReference {
+        skill_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        version: Option<String>,
+    },
+    Inline {
+        description: String,
+        name: String,
+        source: InlineSkillSource,
+    },
+}
+
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
 pub struct CreateContainerRequest {
     #[builder(into)]
@@ -67,6 +98,9 @@ pub struct CreateContainerRequest {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network_policy: Option<ContainerNetworkPolicy>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skills: Option<Vec<ContainerSkill>>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -115,10 +149,19 @@ pub struct DeleteContainerResponse {
     pub deleted: bool,
 }
 
-#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+/// Either an already-uploaded file referenced by ID, or raw file bytes to upload directly --
+/// confirmed via source (`file: FileTypes | Omit`, `file_id: str | Omit`, mutually
+/// exclusive; the SDK sends a JSON body for `file_id` and a multipart body for `file`).
+#[derive(Debug, Serialize, Clone)]
+#[serde(untagged)]
+pub enum ContainerFileSource {
+    FileId(String),
+    Upload(crate::shared::types::File),
+}
+
+#[derive(Builder, Debug, Serialize, Clone)]
 pub struct CreateContainerFileRequest {
-    #[builder(into)]
-    pub file_id: String,
+    pub source: ContainerFileSource,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
