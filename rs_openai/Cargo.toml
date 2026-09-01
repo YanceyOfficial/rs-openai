@@ -28,6 +28,9 @@ strum = { version = "0.26.3", features = ["derive"] }
 thiserror = "2"
 tokio = { workspace = true }
 tokio-stream = "0.1.12"
+# native-tls to match reqwest's existing default TLS backend (avoids pulling in a second,
+# different TLS stack via rustls just for the Realtime WebSocket connection).
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
 rand = "0.8.5"
 bon = "3.9.3"
 base64 = "0.23"

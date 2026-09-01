@@ -29,6 +29,12 @@ pub enum OpenAIError {
     /// Error reading or writing a file (e.g. saving a text-to-speech response)
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+    /// Error establishing or operating a Realtime API WebSocket connection. Stringified
+    /// rather than `#[from] tokio_tungstenite::tungstenite::Error` to match this crate's
+    /// existing convention for `StreamError` (avoids coupling the public error type to a
+    /// specific transport crate's error representation).
+    #[error("websocket error: {0}")]
+    WebSocket(String),
 }
 
 #[derive(Debug, Deserialize)]

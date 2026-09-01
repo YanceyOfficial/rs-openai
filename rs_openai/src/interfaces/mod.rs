@@ -15,6 +15,7 @@ pub mod messages;
 pub mod models;
 pub mod moderations;
 pub mod organization;
+pub mod realtime;
 pub mod responses;
 pub mod runs;
 pub mod skills;

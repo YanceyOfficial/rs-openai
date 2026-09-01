@@ -1,7 +1,7 @@
 use crate::apis::{
     assistants, audio, batch, chat, chatkit, completions, containers, conversations, embeddings,
     evals, files, fine_tuning, graders, images, messages, models, moderations, organization,
-    responses, runs, skills, threads, uploads, vector_stores, videos, webhooks,
+    realtime, responses, runs, skills, threads, uploads, vector_stores, videos, webhooks,
 };
 use crate::shared::response_wrapper::{ApiErrorResponse, OpenAIError, OpenAIResponse};
 use futures::{Stream, stream::StreamExt};
@@ -79,6 +79,20 @@ impl OpenAI {
     pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
         self.base_url = base_url.into();
         self
+    }
+
+    /// Exposed for `apis::realtime::connection`, which lives outside the `client` module
+    /// and needs the raw API key to build the WebSocket handshake's `Authorization` header
+    /// (the same header every REST call already sends).
+    pub(crate) fn api_key(&self) -> &str {
+        &self.api_key
+    }
+
+    /// Exposed for `apis::realtime::connection`'s URL construction (swaps `http`/`https` for
+    /// `ws`/`wss` on the same base URL every other request already uses -- including in
+    /// tests, which already override this to point at a mock server).
+    pub(crate) fn base_url(&self) -> &str {
+        &self.base_url
     }
 
     fn headers(&self) -> Result<HeaderMap, OpenAIError> {
@@ -566,6 +580,10 @@ impl OpenAI {
 
     pub fn organization(&self) -> organization::Organization<'_> {
         organization::Organization::new(self)
+    }
+
+    pub fn realtime(&self) -> realtime::Realtime<'_> {
+        realtime::Realtime::new(self)
     }
 
     pub fn responses(&self) -> responses::Responses<'_> {
