@@ -255,6 +255,35 @@ impl OpenAI {
         Ok(())
     }
 
+    /// Same shape as `resolve_response`, but for endpoints that return HTTP 204 No Content on
+    /// success (e.g. Realtime `calls` actions) -- does not attempt to parse a body on success,
+    /// since an empty byte slice isn't valid JSON (not even `null`) and `resolve_response`'s
+    /// unconditional `serde_json::from_slice` would fail on it.
+    async fn resolve_no_content_response(
+        request: reqwest_middleware::RequestBuilder,
+    ) -> OpenAIResponse<()> {
+        let response = request.send().await?;
+        let status = response.status();
+        let bytes = response.bytes().await?;
+
+        if !status.is_success() {
+            let api_error: ApiErrorResponse =
+                serde_json::from_slice(bytes.as_ref()).map_err(OpenAIError::JSONDeserialize)?;
+
+            return Err(OpenAIError::ApiError(api_error));
+        }
+
+        Ok(())
+    }
+
+    pub(crate) async fn post_no_content<F>(&self, route: &str, json: &F) -> OpenAIResponse<()>
+    where
+        F: Serialize,
+    {
+        let request = self.openai_request(Method::POST, route)?.json(json);
+        Self::resolve_no_content_response(request).await
+    }
+
     pub(crate) async fn get<T, F>(&self, route: &str, query: &F) -> OpenAIResponse<T>
     where
         T: DeserializeOwned + Debug,

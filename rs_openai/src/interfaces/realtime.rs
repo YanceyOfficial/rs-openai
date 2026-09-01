@@ -1,16 +1,19 @@
 //! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output; Phase C:
-//! function calling + MCP tools in-session) -- see
+//! function calling + MCP tools in-session; Phase D: SIP call management) -- see
 //! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md,
-//! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md, and
-//! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md. A persistent,
-//! stateful, full-duplex WebSocket connection, unlike every other module in this crate (all
-//! plain HTTP request/response, even SSE streaming). Covers connection setup, session
-//! config, conversation items, response lifecycle, audio input/output (including VAD turn
-//! detection), and function-calling/MCP tool configuration + tool-call items/events. SIP
-//! calls, ephemeral tokens, transcription/translation session types, and auto-reconnect are
-//! deliberately out of scope. `output_audio_buffer.*` events are WebRTC/SIP-only (confirmed
-//! via source) and are permanently out of scope for this WebSocket-only implementation, not
-//! merely deferred.
+//! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md,
+//! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md, and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md. The WebSocket
+//! session (Phases A-C) is a persistent, stateful, full-duplex connection, unlike every other
+//! module in this crate (all plain HTTP request/response, even SSE streaming) -- covers
+//! connection setup, session config, conversation items, response lifecycle, audio
+//! input/output (including VAD turn detection), and function-calling/MCP tool configuration +
+//! tool-call items/events. Phase D's `calls` resource, by contrast, is plain REST (SIP call
+//! accept/hangup/refer/reject, plus WebRTC call bootstrapping) and fits this crate's ordinary
+//! `interfaces`/`apis` + `wiremock` pattern directly. Ephemeral tokens, transcription/
+//! translation session types, and auto-reconnect are deliberately out of scope.
+//! `output_audio_buffer.*` events are WebRTC/SIP-only (confirmed via source) and are
+//! permanently out of scope for the WebSocket session, not merely deferred.
 
 use bon::Builder;
 use serde::{Deserialize, Serialize};
@@ -833,4 +836,47 @@ pub enum RealtimeServerEvent {
 pub struct RealtimeConversation {
     pub id: Option<String>,
     pub object: Option<String>,
+}
+
+/// Request body for `POST /realtime/calls` (WebRTC call bootstrapping -- the app relays an
+/// SDP offer/answer exchange since browsers can't set an `Authorization` header directly
+/// against OpenAI). NOT `Serialize`/`Deserialize` -- consumed directly by a dedicated
+/// multipart-form builder, matching `RealtimeConnectRequest`'s precedent of a plain
+/// `Builder`-only type for a non-JSON transport.
+#[derive(Builder, Debug, Clone)]
+pub struct CreateCallRequest {
+    #[builder(into)]
+    pub sdp: String,
+    pub session: Option<RealtimeSessionConfig>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone)]
+pub struct ReferCallRequest {
+    #[builder(into)]
+    pub target_uri: String,
+}
+
+/// Confirmed via source: defaults server-side to `603` (Decline) when `status_code` is
+/// omitted.
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct RejectCallRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_code: Option<i32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RealtimeCallSipHeader {
+    pub name: String,
+    pub value: String,
+}
+
+/// The typed shape of `crate::interfaces::webhooks::WebhookEvent.data` when
+/// `WebhookEvent.kind == "realtime.call.incoming"` -- the only way to learn a `call_id`
+/// exists for an inbound SIP call, since `Calls` has no `list`/`retrieve`. `WebhookEvent`
+/// itself needs no changes (already a fully generic envelope); deserialize its `data` field
+/// into this type once `kind` is confirmed.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RealtimeCallIncomingEventData {
+    pub call_id: String,
+    pub sip_headers: Vec<RealtimeCallSipHeader>,
 }

@@ -1,15 +1,18 @@
 //! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output; Phase C:
-//! function calling + MCP tools in-session) -- see
+//! function calling + MCP tools in-session; Phase D: SIP call management) -- see
 //! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md,
-//! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md, and
-//! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md.
+//! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md,
+//! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md, and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md.
 
+pub mod calls;
 pub mod connection;
 
 use crate::client::OpenAI;
 use crate::interfaces::realtime;
 pub use crate::interfaces::realtime::*;
 use crate::shared::response_wrapper::OpenAIResponse;
+pub use calls::{RealtimeCall, RealtimeCalls};
 pub use connection::RealtimeConnection;
 
 pub struct Realtime<'a> {
@@ -32,6 +35,16 @@ impl<'a> Realtime<'a> {
             req.model.as_deref(),
         )
         .await
+    }
+
+    /// Scoped accessor for creating new Realtime calls (WebRTC).
+    pub fn calls(&self) -> RealtimeCalls<'a> {
+        RealtimeCalls::new(self.openai)
+    }
+
+    /// Scoped accessor for managing an existing Realtime call (SIP accept/hangup/refer/reject).
+    pub fn call(&self, call_id: impl Into<String>) -> RealtimeCall<'a> {
+        RealtimeCall::new(self.openai, call_id.into())
     }
 }
 
@@ -878,5 +891,28 @@ mod tests {
         assert_eq!(json["tools"][0]["type"], "function");
         assert_eq!(json["tools"][0]["name"], "get_weather");
         assert_eq!(json["tool_choice"], "auto");
+    }
+
+    /// The typed shape of `WebhookEvent.data` when `kind == "realtime.call.incoming"` --
+    /// confirms this crate's convenience type matches the real webhook payload shape.
+    #[test]
+    fn realtime_call_incoming_event_data_round_trips() {
+        use crate::interfaces::realtime::RealtimeCallIncomingEventData;
+
+        let json = serde_json::json!({
+            "call_id": "rtc_1",
+            "sip_headers": [
+                {"name": "From", "value": "sip:+14155550123@example.com"},
+                {"name": "To", "value": "sip:+14155550124@example.com"}
+            ]
+        });
+
+        let data: RealtimeCallIncomingEventData = serde_json::from_value(json).unwrap();
+        assert_eq!(data.call_id, "rtc_1");
+        assert_eq!(data.sip_headers.len(), 2);
+        assert_eq!(data.sip_headers[0].name, "From");
+
+        let round_tripped = serde_json::to_value(&data).unwrap();
+        assert_eq!(round_tripped["call_id"], "rtc_1");
     }
 }
