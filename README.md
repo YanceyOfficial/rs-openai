@@ -41,7 +41,7 @@ rs_openai = { version = "0.8.0" }
 - [x] Webhooks
 - [x] Organization / admin tier (audit logs, admin API keys, usage, groups, invites, roles, users, projects, certificates, data retention, spend alerts/limit, hosted tool permissions, model permissions)
 - [x] Skills (including versions)
-- [x] Realtime API (Phase A: core text-only WebSocket session -- connect, session config, conversation items, response lifecycle. Audio, function calling, MCP tools, SIP calls, and auto-reconnect are separate future phases)
+- [x] Realtime API (Phases A+B: core text-only WebSocket session plus audio input/output, incl. VAD turn detection. Function calling, MCP tools, SIP calls, ephemeral tokens, transcription/translation session types, and auto-reconnect are separate future phases)
 - [x] Automatic retries with exponential backoff
 
 ### Deprecated (sunset 2026-08-26, per OpenAI)
