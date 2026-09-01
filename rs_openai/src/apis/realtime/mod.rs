@@ -1,5 +1,6 @@
-//! Realtime API (Phase A: core text-only voice session) -- see
-//! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md.
+//! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output) -- see
+//! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md.
 
 pub mod connection;
 
@@ -341,6 +342,96 @@ mod tests {
                 }),
                 "RateLimitsUpdated",
             ),
+            (
+                serde_json::json!({
+                    "type": "input_audio_buffer.committed",
+                    "event_id": "evt_19",
+                    "item_id": "item_1"
+                }),
+                "InputAudioBufferCommitted",
+            ),
+            (
+                serde_json::json!({
+                    "type": "input_audio_buffer.cleared",
+                    "event_id": "evt_20"
+                }),
+                "InputAudioBufferCleared",
+            ),
+            (
+                serde_json::json!({
+                    "type": "input_audio_buffer.speech_started",
+                    "audio_start_ms": 120,
+                    "event_id": "evt_21",
+                    "item_id": "item_1"
+                }),
+                "InputAudioBufferSpeechStarted",
+            ),
+            (
+                serde_json::json!({
+                    "type": "input_audio_buffer.speech_stopped",
+                    "audio_end_ms": 980,
+                    "event_id": "evt_22",
+                    "item_id": "item_1"
+                }),
+                "InputAudioBufferSpeechStopped",
+            ),
+            (
+                serde_json::json!({
+                    "type": "input_audio_buffer.timeout_triggered",
+                    "audio_end_ms": 5000,
+                    "audio_start_ms": 3000,
+                    "event_id": "evt_23",
+                    "item_id": "item_1"
+                }),
+                "InputAudioBufferTimeoutTriggered",
+            ),
+            (
+                serde_json::json!({
+                    "type": "response.output_audio.delta",
+                    "content_index": 0,
+                    "delta": "YmFzZTY0",
+                    "event_id": "evt_24",
+                    "item_id": "item_1",
+                    "output_index": 0,
+                    "response_id": "resp_1"
+                }),
+                "ResponseAudioDelta",
+            ),
+            (
+                serde_json::json!({
+                    "type": "response.output_audio.done",
+                    "content_index": 0,
+                    "event_id": "evt_25",
+                    "item_id": "item_1",
+                    "output_index": 0,
+                    "response_id": "resp_1"
+                }),
+                "ResponseAudioDone",
+            ),
+            (
+                serde_json::json!({
+                    "type": "response.output_audio_transcript.delta",
+                    "content_index": 0,
+                    "delta": "Hel",
+                    "event_id": "evt_26",
+                    "item_id": "item_1",
+                    "output_index": 0,
+                    "response_id": "resp_1"
+                }),
+                "ResponseAudioTranscriptDelta",
+            ),
+            (
+                serde_json::json!({
+                    "type": "response.output_audio_transcript.done",
+                    "content_index": 0,
+                    "event_id": "evt_27",
+                    "item_id": "item_1",
+                    "output_index": 0,
+                    "response_id": "resp_1",
+                    "transcript": "Hello."
+                }),
+                "ResponseAudioTranscriptDone",
+            ),
         ];
 
         for (value, expected_variant) in cases {
@@ -351,5 +442,127 @@ mod tests {
                 "expected {expected_variant}, got {debug}"
             );
         }
+    }
+
+    #[test]
+    fn input_audio_buffer_events_serialize() {
+        let append = RealtimeClientEvent::InputAudioBufferAppend {
+            event_id: None,
+            audio: "YmFzZTY0".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&append).unwrap(),
+            serde_json::json!({"type": "input_audio_buffer.append", "audio": "YmFzZTY0"})
+        );
+
+        let commit = RealtimeClientEvent::InputAudioBufferCommit { event_id: None };
+        assert_eq!(
+            serde_json::to_value(&commit).unwrap(),
+            serde_json::json!({"type": "input_audio_buffer.commit"})
+        );
+
+        let clear = RealtimeClientEvent::InputAudioBufferClear { event_id: None };
+        assert_eq!(
+            serde_json::to_value(&clear).unwrap(),
+            serde_json::json!({"type": "input_audio_buffer.clear"})
+        );
+    }
+
+    #[test]
+    fn realtime_audio_format_tagged_variants_serialize() {
+        use crate::interfaces::realtime::RealtimeAudioFormat;
+
+        assert_eq!(
+            serde_json::to_value(RealtimeAudioFormat::AudioPcm { rate: Some(24000) }).unwrap(),
+            serde_json::json!({"type": "audio/pcm", "rate": 24000})
+        );
+        assert_eq!(
+            serde_json::to_value(RealtimeAudioFormat::AudioPcmu).unwrap(),
+            serde_json::json!({"type": "audio/pcmu"})
+        );
+        assert_eq!(
+            serde_json::to_value(RealtimeAudioFormat::AudioPcma).unwrap(),
+            serde_json::json!({"type": "audio/pcma"})
+        );
+    }
+
+    #[test]
+    fn realtime_turn_detection_tagged_variants_round_trip() {
+        use crate::interfaces::realtime::RealtimeTurnDetection;
+
+        let server_vad = RealtimeTurnDetection::ServerVad {
+            create_response: Some(true),
+            idle_timeout_ms: None,
+            interrupt_response: Some(true),
+            prefix_padding_ms: Some(300),
+            silence_duration_ms: Some(500),
+            threshold: Some(0.5),
+        };
+        let json = serde_json::to_value(&server_vad).unwrap();
+        assert_eq!(json["type"], "server_vad");
+        assert_eq!(json["prefix_padding_ms"], 300);
+        let parsed: RealtimeTurnDetection = serde_json::from_value(json).unwrap();
+        assert!(matches!(parsed, RealtimeTurnDetection::ServerVad { .. }));
+
+        let semantic_vad = RealtimeTurnDetection::SemanticVad {
+            create_response: Some(true),
+            eagerness: Some("high".to_string()),
+            interrupt_response: None,
+        };
+        let json = serde_json::to_value(&semantic_vad).unwrap();
+        assert_eq!(json["type"], "semantic_vad");
+        assert_eq!(json["eagerness"], "high");
+    }
+
+    #[test]
+    fn session_config_serializes_audio_block() {
+        use crate::interfaces::realtime::{
+            RealtimeAudioConfig, RealtimeAudioConfigInput, RealtimeAudioFormat,
+            RealtimeAudioOutputConfig, RealtimeNoiseReduction, RealtimeTurnDetection,
+        };
+
+        let session = RealtimeSessionConfig::builder()
+            .r#type("realtime")
+            .audio(
+                RealtimeAudioConfig::builder()
+                    .input(
+                        RealtimeAudioConfigInput::builder()
+                            .format(RealtimeAudioFormat::AudioPcm { rate: Some(24000) })
+                            .noise_reduction(
+                                RealtimeNoiseReduction::builder()
+                                    .r#type("near_field")
+                                    .build(),
+                            )
+                            .turn_detection(RealtimeTurnDetection::ServerVad {
+                                create_response: Some(true),
+                                idle_timeout_ms: None,
+                                interrupt_response: Some(true),
+                                prefix_padding_ms: None,
+                                silence_duration_ms: None,
+                                threshold: None,
+                            })
+                            .build(),
+                    )
+                    .output(
+                        RealtimeAudioOutputConfig::builder()
+                            .format(RealtimeAudioFormat::AudioPcm { rate: Some(24000) })
+                            .voice(serde_json::json!("marin"))
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build();
+
+        let json = serde_json::to_value(&session).unwrap();
+        assert_eq!(json["audio"]["input"]["format"]["type"], "audio/pcm");
+        assert_eq!(
+            json["audio"]["input"]["noise_reduction"]["type"],
+            "near_field"
+        );
+        assert_eq!(
+            json["audio"]["input"]["turn_detection"]["type"],
+            "server_vad"
+        );
+        assert_eq!(json["audio"]["output"]["voice"], "marin");
     }
 }

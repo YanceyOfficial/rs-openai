@@ -1,5 +1,6 @@
 //! The live WebSocket connection to the Realtime API -- see
-//! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md.
+//! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md.
 
 use crate::interfaces::realtime::{RealtimeClientEvent, RealtimeServerEvent};
 use crate::shared::response_wrapper::{OpenAIError, OpenAIResponse};
@@ -278,5 +279,38 @@ mod tests {
             event.is_none(),
             "expected None after clean close, got {event:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn send_transmits_input_audio_buffer_append_over_real_socket() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let (msg_tx, msg_rx) = tokio::sync::oneshot::channel();
+        let base_url = spawn_test_server(tx, move |mut ws| {
+            Box::pin(async move {
+                if let Some(Ok(Message::Text(text))) = ws.next().await {
+                    let _ = msg_tx.send(text.to_string());
+                }
+            })
+        })
+        .await;
+
+        let client = OpenAI::new("sk-test").with_base_url(base_url);
+        let req = RealtimeConnectRequest::builder().build();
+        let mut conn = client.realtime().connect(&req).await.unwrap();
+
+        conn.send(&RealtimeClientEvent::InputAudioBufferAppend {
+            event_id: None,
+            audio: "YmFzZTY0YXVkaW9jaHVuaw==".to_string(),
+        })
+        .await
+        .unwrap();
+
+        let received = tokio::time::timeout(std::time::Duration::from_secs(5), msg_rx)
+            .await
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_str(&received).unwrap();
+        assert_eq!(value["type"], "input_audio_buffer.append");
+        assert_eq!(value["audio"], "YmFzZTY0YXVkaW9jaHVuaw==");
     }
 }
