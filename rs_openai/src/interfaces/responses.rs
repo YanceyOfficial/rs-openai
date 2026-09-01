@@ -505,15 +505,13 @@ pub enum ResponseToolChoiceMode {
     Required,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ResponseToolChoiceFunctionName {
-    pub name: String,
-}
-
 /// Controls which (if any) tool is called by the model. Either a plain mode string
-/// (`"none"`/`"auto"`/`"required"`) or an object forcing one specific function. Mirrors
-/// `crate::interfaces::chat::ToolChoice`'s shape exactly, but kept as a distinct type since
-/// the two APIs document this parameter separately.
+/// (`"none"`/`"auto"`/`"required"`) or an object forcing one specific function. Confirmed via
+/// source (`ToolChoiceFunctionParam`) that Responses' shape is FLAT (`{type, name}`), unlike
+/// Chat Completions' `crate::interfaces::chat::ToolChoice`, which nests `name` inside a
+/// `function` object -- the two APIs document this parameter differently despite the
+/// superficially similar name. `Specific` previously wrongly nested `name` under a `function`
+/// object (copied from Chat's shape) -- a real, confirmed pre-existing bug, fixed here.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum ResponseToolChoice {
@@ -521,7 +519,7 @@ pub enum ResponseToolChoice {
     Specific {
         #[serde(rename = "type")]
         kind: String,
-        function: ResponseToolChoiceFunctionName,
+        name: String,
     },
 }
 

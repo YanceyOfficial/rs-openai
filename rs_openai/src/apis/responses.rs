@@ -122,8 +122,8 @@ mod tests {
         ResponseIncludable, ResponseInput, ResponseInputContent, ResponseInputFile,
         ResponseInputImage, ResponseInputItem, ResponseInputRole, ResponseInputText,
         ResponseMcpTool, ResponseOutputItem, ResponseStreamEvent, ResponseTool, ResponseToolChoice,
-        ResponseToolChoiceFunctionName, ResponseToolChoiceMode, ResponseWebSearchTool,
-        RetrieveResponseRequest, WebSearchAction, WebSearchContextSize, WebSearchUserLocation,
+        ResponseToolChoiceMode, ResponseWebSearchTool, RetrieveResponseRequest, WebSearchAction,
+        WebSearchContextSize, WebSearchUserLocation,
     };
     use futures::StreamExt;
     use wiremock::matchers::{body_json, method, path, query_param};
@@ -291,15 +291,13 @@ mod tests {
     fn response_tool_choice_serializes_specific_function_as_object() {
         let choice = ResponseToolChoice::Specific {
             kind: "function".to_string(),
-            function: ResponseToolChoiceFunctionName {
-                name: "get_weather".to_string(),
-            },
+            name: "get_weather".to_string(),
         };
 
         let json = serde_json::to_value(&choice).unwrap();
         assert_eq!(
             json,
-            serde_json::json!({"type": "function", "function": {"name": "get_weather"}})
+            serde_json::json!({"type": "function", "name": "get_weather"})
         );
     }
 
