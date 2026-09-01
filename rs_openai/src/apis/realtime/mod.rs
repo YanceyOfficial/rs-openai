@@ -1,6 +1,8 @@
-//! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output) -- see
-//! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md and
-//! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md.
+//! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output; Phase C:
+//! function calling + MCP tools in-session) -- see
+//! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md,
+//! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md, and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md.
 
 pub mod connection;
 
@@ -37,7 +39,8 @@ impl<'a> Realtime<'a> {
 mod tests {
     use crate::interfaces::realtime::{
         ConversationContentPart, ConversationItem, ConversationMessageItem, RealtimeClientEvent,
-        RealtimeResponseCreateParams, RealtimeServerEvent, RealtimeSessionConfig,
+        RealtimeResponseCreateParams, RealtimeServerEvent, RealtimeSessionConfig, RealtimeTool,
+        RealtimeToolChoice,
     };
 
     #[test]
@@ -167,6 +170,7 @@ mod tests {
                 ConversationItem::Message(ConversationMessageItem::Assistant { .. }) => {
                     assert_eq!(json_role, "assistant")
                 }
+                other => panic!("expected a Message variant, got {other:?}"),
             }
             // Round-trip: re-serializing must reproduce an equivalent object (same tags).
             let round_tripped = serde_json::to_value(&item).unwrap();
@@ -432,6 +436,104 @@ mod tests {
                 }),
                 "ResponseAudioTranscriptDone",
             ),
+            (
+                serde_json::json!({
+                    "type": "response.function_call_arguments.delta",
+                    "call_id": "call_1",
+                    "delta": "{\"loc",
+                    "event_id": "evt_28",
+                    "item_id": "item_1",
+                    "output_index": 0,
+                    "response_id": "resp_1"
+                }),
+                "ResponseFunctionCallArgumentsDelta",
+            ),
+            (
+                serde_json::json!({
+                    "type": "response.function_call_arguments.done",
+                    "arguments": "{\"location\":\"SF\"}",
+                    "call_id": "call_1",
+                    "event_id": "evt_29",
+                    "item_id": "item_1",
+                    "name": "get_weather",
+                    "output_index": 0,
+                    "response_id": "resp_1"
+                }),
+                "ResponseFunctionCallArgumentsDone",
+            ),
+            (
+                serde_json::json!({
+                    "type": "response.mcp_call_arguments.delta",
+                    "delta": "{\"q",
+                    "event_id": "evt_30",
+                    "item_id": "item_1",
+                    "output_index": 0,
+                    "response_id": "resp_1"
+                }),
+                "ResponseMcpCallArgumentsDelta",
+            ),
+            (
+                serde_json::json!({
+                    "type": "response.mcp_call_arguments.done",
+                    "arguments": "{\"q\":\"rust\"}",
+                    "event_id": "evt_31",
+                    "item_id": "item_1",
+                    "output_index": 0,
+                    "response_id": "resp_1"
+                }),
+                "ResponseMcpCallArgumentsDone",
+            ),
+            (
+                serde_json::json!({
+                    "type": "response.mcp_call.in_progress",
+                    "event_id": "evt_32",
+                    "item_id": "item_1",
+                    "output_index": 0
+                }),
+                "ResponseMcpCallInProgress",
+            ),
+            (
+                serde_json::json!({
+                    "type": "response.mcp_call.completed",
+                    "event_id": "evt_33",
+                    "item_id": "item_1",
+                    "output_index": 0
+                }),
+                "ResponseMcpCallCompleted",
+            ),
+            (
+                serde_json::json!({
+                    "type": "response.mcp_call.failed",
+                    "event_id": "evt_34",
+                    "item_id": "item_1",
+                    "output_index": 0
+                }),
+                "ResponseMcpCallFailed",
+            ),
+            (
+                serde_json::json!({
+                    "type": "mcp_list_tools.in_progress",
+                    "event_id": "evt_35",
+                    "item_id": "item_1"
+                }),
+                "McpListToolsInProgress",
+            ),
+            (
+                serde_json::json!({
+                    "type": "mcp_list_tools.completed",
+                    "event_id": "evt_36",
+                    "item_id": "item_1"
+                }),
+                "McpListToolsCompleted",
+            ),
+            (
+                serde_json::json!({
+                    "type": "mcp_list_tools.failed",
+                    "event_id": "evt_37",
+                    "item_id": "item_1"
+                }),
+                "McpListToolsFailed",
+            ),
         ];
 
         for (value, expected_variant) in cases {
@@ -564,5 +666,217 @@ mod tests {
             "server_vad"
         );
         assert_eq!(json["audio"]["output"]["voice"], "marin");
+    }
+
+    #[test]
+    fn conversation_item_new_variants_round_trip() {
+        use crate::interfaces::realtime::{
+            RealtimeConversationItemFunctionCall, RealtimeConversationItemFunctionCallOutput,
+            RealtimeMcpApprovalRequest, RealtimeMcpApprovalResponse, RealtimeMcpListTools,
+            RealtimeMcpServerTool, RealtimeMcpToolCall, RealtimeMcpToolCallError,
+        };
+
+        let cases = [
+            (
+                ConversationItem::FunctionCall(RealtimeConversationItemFunctionCall {
+                    arguments: "{}".to_string(),
+                    name: "get_weather".to_string(),
+                    id: None,
+                    call_id: Some("call_1".to_string()),
+                    object: None,
+                    status: None,
+                }),
+                "function_call",
+            ),
+            (
+                ConversationItem::FunctionCallOutput(RealtimeConversationItemFunctionCallOutput {
+                    call_id: "call_1".to_string(),
+                    output: "72F".to_string(),
+                    id: None,
+                    object: None,
+                    status: None,
+                }),
+                "function_call_output",
+            ),
+            (
+                ConversationItem::McpApprovalResponse(RealtimeMcpApprovalResponse {
+                    id: "mcpr_1".to_string(),
+                    approval_request_id: "mcpar_1".to_string(),
+                    approve: true,
+                    reason: None,
+                }),
+                "mcp_approval_response",
+            ),
+            (
+                ConversationItem::McpListTools(RealtimeMcpListTools {
+                    server_label: "search".to_string(),
+                    tools: vec![RealtimeMcpServerTool {
+                        input_schema: serde_json::json!({"type": "object"}),
+                        name: "search".to_string(),
+                        annotations: None,
+                        description: None,
+                    }],
+                    id: None,
+                }),
+                "mcp_list_tools",
+            ),
+            (
+                ConversationItem::McpToolCall(RealtimeMcpToolCall {
+                    id: "mcp_1".to_string(),
+                    arguments: "{}".to_string(),
+                    name: "search".to_string(),
+                    server_label: "search".to_string(),
+                    approval_request_id: None,
+                    error: Some(RealtimeMcpToolCallError::ToolExecutionError {
+                        message: "boom".to_string(),
+                    }),
+                    output: None,
+                }),
+                "mcp_call",
+            ),
+            (
+                ConversationItem::McpApprovalRequest(RealtimeMcpApprovalRequest {
+                    id: "mcpar_1".to_string(),
+                    arguments: "{}".to_string(),
+                    name: "search".to_string(),
+                    server_label: "search".to_string(),
+                }),
+                "mcp_approval_request",
+            ),
+        ];
+
+        for (item, expected_type) in cases {
+            let json = serde_json::to_value(&item).unwrap();
+            assert_eq!(json["type"], expected_type, "for item {item:?}");
+            let parsed: ConversationItem = serde_json::from_value(json).unwrap();
+            assert_eq!(format!("{parsed:?}"), format!("{item:?}"));
+        }
+    }
+
+    #[test]
+    fn mcp_tool_call_error_variants_serialize() {
+        use crate::interfaces::realtime::RealtimeMcpToolCallError;
+
+        let protocol = RealtimeMcpToolCallError::ProtocolError {
+            code: -32600,
+            message: "Invalid Request".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&protocol).unwrap(),
+            serde_json::json!({"type": "protocol_error", "code": -32600, "message": "Invalid Request"})
+        );
+
+        let exec = RealtimeMcpToolCallError::ToolExecutionError {
+            message: "boom".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&exec).unwrap(),
+            serde_json::json!({"type": "tool_execution_error", "message": "boom"})
+        );
+
+        let http = RealtimeMcpToolCallError::HttpError {
+            code: 500,
+            message: "Internal Server Error".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&http).unwrap(),
+            serde_json::json!({"type": "http_error", "code": 500, "message": "Internal Server Error"})
+        );
+    }
+
+    #[test]
+    fn realtime_tool_serializes_function_and_mcp_variants() {
+        use crate::interfaces::realtime::RealtimeFunctionTool;
+        use crate::interfaces::responses::ResponseMcpTool;
+
+        let function_tool = RealtimeTool::Function(
+            RealtimeFunctionTool::builder()
+                .name("get_weather")
+                .description("Get the weather")
+                .parameters(serde_json::json!({"type": "object"}))
+                .build(),
+        );
+        let json = serde_json::to_value(&function_tool).unwrap();
+        assert_eq!(json["type"], "function");
+        assert_eq!(json["name"], "get_weather");
+
+        let mcp_tool = RealtimeTool::Mcp(Box::new(
+            ResponseMcpTool::builder()
+                .server_label("search")
+                .server_url("https://example.com/mcp")
+                .build(),
+        ));
+        let json = serde_json::to_value(&mcp_tool).unwrap();
+        assert_eq!(json["type"], "mcp");
+        assert_eq!(json["server_label"], "search");
+    }
+
+    /// The flagged untagged-ordering risk: an MCP tool choice with the optional `name` set
+    /// must deserialize to `Mcp`, not be misparsed as `Function` (which only requires
+    /// `type`+`name` and would silently ignore the extra `server_label`).
+    #[test]
+    fn realtime_tool_choice_mcp_with_name_does_not_misparse_as_function() {
+        let json = serde_json::json!({
+            "type": "mcp",
+            "server_label": "search",
+            "name": "web_search"
+        });
+
+        let choice: RealtimeToolChoice = serde_json::from_value(json).unwrap();
+        match choice {
+            RealtimeToolChoice::Mcp {
+                server_label, name, ..
+            } => {
+                assert_eq!(server_label, "search");
+                assert_eq!(name.as_deref(), Some("web_search"));
+            }
+            other => panic!("expected Mcp, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn realtime_tool_choice_mode_and_function_serialize() {
+        use crate::interfaces::responses::ResponseToolChoiceMode;
+
+        let mode = RealtimeToolChoice::Mode(ResponseToolChoiceMode::Auto);
+        assert_eq!(
+            serde_json::to_value(&mode).unwrap(),
+            serde_json::json!("auto")
+        );
+
+        let function = RealtimeToolChoice::Function {
+            kind: "function".to_string(),
+            name: "get_weather".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&function).unwrap(),
+            serde_json::json!({"type": "function", "name": "get_weather"})
+        );
+
+        let parsed: RealtimeToolChoice = serde_json::from_value(serde_json::json!({
+            "type": "function",
+            "name": "get_weather"
+        }))
+        .unwrap();
+        assert!(matches!(parsed, RealtimeToolChoice::Function { .. }));
+    }
+
+    #[test]
+    fn session_config_serializes_tools_and_tool_choice() {
+        use crate::interfaces::realtime::RealtimeFunctionTool;
+        use crate::interfaces::responses::ResponseToolChoiceMode;
+
+        let session = RealtimeSessionConfig::builder()
+            .r#type("realtime")
+            .tools(vec![RealtimeTool::Function(
+                RealtimeFunctionTool::builder().name("get_weather").build(),
+            )])
+            .tool_choice(RealtimeToolChoice::Mode(ResponseToolChoiceMode::Auto))
+            .build();
+
+        let json = serde_json::to_value(&session).unwrap();
+        assert_eq!(json["tools"][0]["type"], "function");
+        assert_eq!(json["tools"][0]["name"], "get_weather");
+        assert_eq!(json["tool_choice"], "auto");
     }
 }

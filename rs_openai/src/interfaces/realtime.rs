@@ -1,13 +1,16 @@
-//! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output) -- see
-//! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md and
-//! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md. A persistent,
+//! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output; Phase C:
+//! function calling + MCP tools in-session) -- see
+//! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md,
+//! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md, and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md. A persistent,
 //! stateful, full-duplex WebSocket connection, unlike every other module in this crate (all
 //! plain HTTP request/response, even SSE streaming). Covers connection setup, session
-//! config, conversation items, response lifecycle, and audio input/output (including VAD
-//! turn detection). Function calling, MCP tools, SIP calls, ephemeral tokens,
-//! transcription/translation session types, and auto-reconnect are deliberately out of
-//! scope. `output_audio_buffer.*` events are WebRTC/SIP-only (confirmed via source) and are
-//! permanently out of scope for this WebSocket-only implementation, not merely deferred.
+//! config, conversation items, response lifecycle, audio input/output (including VAD turn
+//! detection), and function-calling/MCP tool configuration + tool-call items/events. SIP
+//! calls, ephemeral tokens, transcription/translation session types, and auto-reconnect are
+//! deliberately out of scope. `output_audio_buffer.*` events are WebRTC/SIP-only (confirmed
+//! via source) and are permanently out of scope for this WebSocket-only implementation, not
+//! merely deferred.
 
 use bon::Builder;
 use serde::{Deserialize, Serialize};
@@ -126,9 +129,71 @@ pub struct RealtimeAudioConfig {
     pub output: Option<RealtimeAudioOutputConfig>,
 }
 
+/// A function tool definition. A NEW dedicated type, NOT a reuse of
+/// `crate::interfaces::responses::ResponseFunctionTool` -- confirmed via source these
+/// genuinely differ: Responses' version requires `name`/`parameters` and has a `strict`
+/// field Realtime's version lacks entirely; Realtime's version has all three fields
+/// optional and no `strict`.
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct RealtimeFunctionTool {
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<serde_json::Value>,
+}
+
+/// A tool available to the model -- `type`-tagged 2-variant union. `Mcp` reuses
+/// `crate::interfaces::responses::ResponseMcpTool` directly: confirmed field-by-field
+/// identical to both the session-level and response-level MCP tool config the real API
+/// defines (`server_label`, `allowed_callers`, `allowed_tools`, `authorization`,
+/// `connector_id`, `defer_loading`, `headers`, `require_approval`, `server_description`,
+/// `server_url`, `tunnel_id`), and already derives both `Serialize`/`Deserialize` with no
+/// reachability gaps. Used for both `RealtimeSessionConfig.tools` and
+/// `RealtimeResponseCreateParams.tools` -- confirmed via source both share this identical
+/// two-variant shape.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum RealtimeTool {
+    Function(RealtimeFunctionTool),
+    Mcp(Box<crate::interfaces::responses::ResponseMcpTool>),
+}
+
+/// How the model chooses tools -- an `untagged` 3-variant union. Unlike this crate's prior
+/// untagged unions (safe because variants were JSON-*type*-disjoint, e.g. bare string vs.
+/// object), `Mcp` and `Function` are BOTH objects with overlapping optional fields, and
+/// serde's derived struct-variant deserialization does not reject unknown fields by
+/// default. `Mcp` is declared BEFORE `Function` deliberately: `Mcp` requires `server_label`
+/// (absent from any real `Function` payload), so it correctly fails-and-falls-through for
+/// function payloads, while still matching every valid MCP payload including ones that set
+/// the optional `name` -- if `Function` were tried first, an MCP choice with `name` set
+/// would incorrectly deserialize as `Function`, silently dropping `server_label`. Covered by
+/// a dedicated round-trip test.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum RealtimeToolChoice {
+    Mode(crate::interfaces::responses::ResponseToolChoiceMode),
+    Mcp {
+        #[serde(rename = "type")]
+        kind: String,
+        server_label: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+    },
+    Function {
+        #[serde(rename = "type")]
+        kind: String,
+        name: String,
+    },
+}
+
 /// Deliberately trimmed from the real `RealtimeSessionCreateRequest`'s ~12 fields --
-/// `tools`/`tool_choice`/`tracing`/`reasoning`/`prompt`/`truncation`/`include` deferred to
-/// their respective later phases.
+/// `tracing`/`reasoning`/`prompt`/`truncation`/`include` deferred to a future phase.
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
 pub struct RealtimeSessionConfig {
     #[builder(into)]
@@ -152,6 +217,12 @@ pub struct RealtimeSessionConfig {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio: Option<RealtimeAudioConfig>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<RealtimeTool>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<RealtimeToolChoice>,
 }
 
 /// A single content part of a conversation message. One flat, all-optional struct --
@@ -222,17 +293,168 @@ pub enum ConversationMessageItem {
     },
 }
 
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct RealtimeConversationItemFunctionCall {
+    #[builder(into)]
+    pub arguments: String,
+
+    #[builder(into)]
+    pub name: String,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub call_id: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct RealtimeConversationItemFunctionCallOutput {
+    #[builder(into)]
+    pub call_id: String,
+
+    #[builder(into)]
+    pub output: String,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct RealtimeMcpApprovalResponse {
+    #[builder(into)]
+    pub id: String,
+
+    #[builder(into)]
+    pub approval_request_id: String,
+
+    pub approve: bool,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// A tool available on an MCP server, as listed by `mcp_list_tools`. `input_schema`/
+/// `annotations` kept as raw JSON -- arbitrary nested JSON Schema / free-form object, not
+/// worth a dedicated type.
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct RealtimeMcpServerTool {
+    pub input_schema: serde_json::Value,
+
+    #[builder(into)]
+    pub name: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<serde_json::Value>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct RealtimeMcpListTools {
+    #[builder(into)]
+    pub server_label: String,
+
+    pub tools: Vec<RealtimeMcpServerTool>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+}
+
+/// The error from an MCP tool call, if any -- `type`-tagged 3-variant union. Modeled fully
+/// (not deferred to raw JSON) since it's small and the whole reason `error` exists on
+/// `RealtimeMcpToolCall`.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum RealtimeMcpToolCallError {
+    ProtocolError { code: i64, message: String },
+    ToolExecutionError { message: String },
+    HttpError { code: i64, message: String },
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct RealtimeMcpToolCall {
+    #[builder(into)]
+    pub id: String,
+
+    #[builder(into)]
+    pub arguments: String,
+
+    #[builder(into)]
+    pub name: String,
+
+    #[builder(into)]
+    pub server_label: String,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub approval_request_id: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<RealtimeMcpToolCallError>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+}
+
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct RealtimeMcpApprovalRequest {
+    #[builder(into)]
+    pub id: String,
+
+    #[builder(into)]
+    pub arguments: String,
+
+    #[builder(into)]
+    pub name: String,
+
+    #[builder(into)]
+    pub server_label: String,
+}
+
 /// A single item within a Realtime conversation. A genuinely new pattern for this crate:
 /// a **two-level tagged union**. The real API's system/user/assistant message variants all
 /// share `type: "message"` and are only distinguished by `role` -- confirmed field-by-field
-/// via source. Modeled as an outer `type`-tagged enum (one Phase-A variant, `Message`,
-/// wrapping `ConversationMessageItem`) so serde checks `type` first, then delegates the same
-/// JSON object to `ConversationMessageItem`'s own `role` tag. Deferred variants
-/// (function_call, function_call_output, the 4 MCP item types) belong to Phase C.
+/// via source. Modeled as an outer `type`-tagged enum wrapping `ConversationMessageItem` so
+/// serde checks `type` first, then delegates the same JSON object to
+/// `ConversationMessageItem`'s own `role` tag. Every other variant is a flat, single-level
+/// tag -- this is the complete, confirmed set of 7 top-level item types (`message` +
+/// `function_call` + `function_call_output` + 4 MCP item types).
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ConversationItem {
     Message(ConversationMessageItem),
+    FunctionCall(RealtimeConversationItemFunctionCall),
+    FunctionCallOutput(RealtimeConversationItemFunctionCallOutput),
+    McpApprovalResponse(RealtimeMcpApprovalResponse),
+    McpListTools(RealtimeMcpListTools),
+    #[serde(rename = "mcp_call")]
+    McpToolCall(RealtimeMcpToolCall),
+    McpApprovalRequest(RealtimeMcpApprovalRequest),
 }
 
 #[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
@@ -252,6 +474,12 @@ pub struct RealtimeResponseCreateParams {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio: Option<RealtimeAudioOutputConfigWrapper>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<RealtimeTool>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<RealtimeToolChoice>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -358,8 +586,7 @@ pub enum RealtimeClientEvent {
 /// Every server-to-client event this phase supports. Confirmed via source: the real
 /// `RealtimeServerEvent` union has 41 variants total. `output_audio_buffer.*` events are
 /// permanently out of scope (WebRTC/SIP only). Still deferred to a future phase:
-/// `conversation.item.truncated`, function_call_arguments delta+done, all
-/// `mcp_list_tools.*`/`response.mcp_call.*` events, DTMF, input-audio-transcription events.
+/// `conversation.item.truncated`, DTMF, input-audio-transcription events.
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum RealtimeServerEvent {
@@ -539,6 +766,67 @@ pub enum RealtimeServerEvent {
         response_id: String,
         transcript: String,
     },
+    #[serde(rename = "response.function_call_arguments.delta")]
+    ResponseFunctionCallArgumentsDelta {
+        call_id: String,
+        delta: String,
+        event_id: String,
+        item_id: String,
+        output_index: u32,
+        response_id: String,
+    },
+    #[serde(rename = "response.function_call_arguments.done")]
+    ResponseFunctionCallArgumentsDone {
+        arguments: String,
+        call_id: String,
+        event_id: String,
+        item_id: String,
+        name: String,
+        output_index: u32,
+        response_id: String,
+    },
+    #[serde(rename = "response.mcp_call_arguments.delta")]
+    ResponseMcpCallArgumentsDelta {
+        delta: String,
+        event_id: String,
+        item_id: String,
+        output_index: u32,
+        response_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        obfuscation: Option<String>,
+    },
+    #[serde(rename = "response.mcp_call_arguments.done")]
+    ResponseMcpCallArgumentsDone {
+        arguments: String,
+        event_id: String,
+        item_id: String,
+        output_index: u32,
+        response_id: String,
+    },
+    #[serde(rename = "response.mcp_call.in_progress")]
+    ResponseMcpCallInProgress {
+        event_id: String,
+        item_id: String,
+        output_index: u32,
+    },
+    #[serde(rename = "response.mcp_call.completed")]
+    ResponseMcpCallCompleted {
+        event_id: String,
+        item_id: String,
+        output_index: u32,
+    },
+    #[serde(rename = "response.mcp_call.failed")]
+    ResponseMcpCallFailed {
+        event_id: String,
+        item_id: String,
+        output_index: u32,
+    },
+    #[serde(rename = "mcp_list_tools.in_progress")]
+    McpListToolsInProgress { event_id: String, item_id: String },
+    #[serde(rename = "mcp_list_tools.completed")]
+    McpListToolsCompleted { event_id: String, item_id: String },
+    #[serde(rename = "mcp_list_tools.failed")]
+    McpListToolsFailed { event_id: String, item_id: String },
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
