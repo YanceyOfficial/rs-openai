@@ -50,7 +50,6 @@ rs_openai = { version = "0.8.0" }
 ### Not planned
 
 - [ ] Realtime API
-- [ ] Microsoft Azure Endpoints
 
 ## Usage
 
