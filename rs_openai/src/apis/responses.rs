@@ -1287,6 +1287,139 @@ mod tests {
     }
 
     #[test]
+    fn response_stream_event_reasoning_text_delta_and_done_deserialize() {
+        let delta_value = serde_json::json!({
+            "type": "response.reasoning_text.delta",
+            "content_index": 0,
+            "delta": "Let me think",
+            "item_id": "rs_1",
+            "output_index": 0,
+            "sequence_number": 17
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(delta_value).unwrap();
+        match event {
+            ResponseStreamEvent::ReasoningTextDelta { delta, .. } => {
+                assert_eq!(delta, "Let me think");
+            }
+            other => panic!("expected ReasoningTextDelta, got {other:?}"),
+        }
+
+        let done_value = serde_json::json!({
+            "type": "response.reasoning_text.done",
+            "content_index": 0,
+            "item_id": "rs_1",
+            "output_index": 0,
+            "sequence_number": 18,
+            "text": "Let me think about this."
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(done_value).unwrap();
+        match event {
+            ResponseStreamEvent::ReasoningTextDone { text, .. } => {
+                assert_eq!(text, "Let me think about this.");
+            }
+            other => panic!("expected ReasoningTextDone, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_stream_event_reasoning_summary_part_added_and_done_deserialize() {
+        let added_value = serde_json::json!({
+            "type": "response.reasoning_summary_part.added",
+            "item_id": "rs_1",
+            "output_index": 0,
+            "part": {"type": "summary_text", "text": ""},
+            "sequence_number": 19,
+            "summary_index": 0
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(added_value).unwrap();
+        match event {
+            ResponseStreamEvent::ReasoningSummaryPartAdded { part, .. } => match part {
+                crate::interfaces::responses::ReasoningSummaryPart::SummaryText { text } => {
+                    assert_eq!(text, "");
+                }
+            },
+            other => panic!("expected ReasoningSummaryPartAdded, got {other:?}"),
+        }
+
+        let done_value = serde_json::json!({
+            "type": "response.reasoning_summary_part.done",
+            "item_id": "rs_1",
+            "output_index": 0,
+            "part": {"type": "summary_text", "text": "Summary."},
+            "sequence_number": 20,
+            "summary_index": 0,
+            "status": "incomplete"
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(done_value).unwrap();
+        match event {
+            ResponseStreamEvent::ReasoningSummaryPartDone { status, .. } => {
+                assert_eq!(status.as_deref(), Some("incomplete"));
+            }
+            other => panic!("expected ReasoningSummaryPartDone, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_stream_event_reasoning_summary_text_delta_and_done_deserialize() {
+        let delta_value = serde_json::json!({
+            "type": "response.reasoning_summary_text.delta",
+            "delta": "Sum",
+            "item_id": "rs_1",
+            "output_index": 0,
+            "sequence_number": 21,
+            "summary_index": 0
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(delta_value).unwrap();
+        match event {
+            ResponseStreamEvent::ReasoningSummaryTextDelta { delta, .. } => {
+                assert_eq!(delta, "Sum");
+            }
+            other => panic!("expected ReasoningSummaryTextDelta, got {other:?}"),
+        }
+
+        let done_value = serde_json::json!({
+            "type": "response.reasoning_summary_text.done",
+            "item_id": "rs_1",
+            "output_index": 0,
+            "sequence_number": 22,
+            "summary_index": 0,
+            "text": "Summary."
+        });
+        let event: ResponseStreamEvent = serde_json::from_value(done_value).unwrap();
+        match event {
+            ResponseStreamEvent::ReasoningSummaryTextDone { text, .. } => {
+                assert_eq!(text, "Summary.");
+            }
+            other => panic!("expected ReasoningSummaryTextDone, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_stream_event_audio_events_deserialize() {
+        for (json_type, expected) in [
+            ("response.audio.delta", "AudioDelta"),
+            ("response.audio.done", "AudioDone"),
+            ("response.audio.transcript.delta", "AudioTranscriptDelta"),
+            ("response.audio.transcript.done", "AudioTranscriptDone"),
+        ] {
+            let mut value = serde_json::json!({
+                "type": json_type,
+                "sequence_number": 23
+            });
+            if json_type.ends_with("delta") {
+                value["delta"] = serde_json::json!("base64audiochunk");
+            }
+
+            let event: ResponseStreamEvent = serde_json::from_value(value).unwrap();
+            let debug = format!("{event:?}");
+            assert!(
+                debug.starts_with(expected),
+                "expected {expected}, got {debug}"
+            );
+        }
+    }
+
+    #[test]
     fn response_stream_event_error_deserializes() {
         let value = serde_json::json!({
             "type": "error",

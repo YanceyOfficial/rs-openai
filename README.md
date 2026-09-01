@@ -31,7 +31,7 @@ rs_openai = { version = "0.8.0" }
 - [x] Models
 - [x] Moderations
 - [x] Uploads
-- [x] Responses — OpenAI's now-recommended primary API (core CRUD/lifecycle, SSE streaming for every implemented tool type, function/file_search/web_search/image_generation/mcp/computer_use/code_interpreter tools, the `conversation` param, multimodal text/image/file input, the `include` param)
+- [x] Responses — OpenAI's now-recommended primary API (core CRUD/lifecycle, SSE streaming — including content_part, refusal, reasoning, and audio events — for every implemented tool type, function/file_search/web_search/image_generation/mcp/computer_use/code_interpreter tools, the `conversation` param, multimodal text/image/file input, the `include` param; shell/custom-tool streaming events not modeled, since this crate doesn't implement those tool types)
 - [x] Conversations (including the `items` sub-resource)
 - [x] Vector Stores (including File Batches and typed search filters)
 - [x] ChatKit (Beta)
@@ -46,10 +46,6 @@ rs_openai = { version = "0.8.0" }
 ### Deprecated (sunset 2026-08-26, per OpenAI)
 
 - [x] Assistants, Threads, Messages, Runs — still functional, but OpenAI recommends migrating to the Responses + Conversations APIs above
-
-### Known gaps
-
-- [ ] Responses: a handful of niche streaming event variants (reasoning text/summary, audio, and shell/custom-tool events for tool types this crate doesn't implement)
 
 ### Not planned
 

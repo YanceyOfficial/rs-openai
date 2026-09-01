@@ -1022,16 +1022,25 @@ pub struct ResponseLogprob {
     pub top_logprobs: Option<Vec<ResponseLogprobTopLogprob>>,
 }
 
+/// A reasoning summary part, carried by `ReasoningSummaryPartAdded`/`Done` stream events.
+/// An extensible tagged union (matching this crate's established pattern) with one
+/// confirmed variant.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ReasoningSummaryPart {
+    SummaryText { text: String },
+}
+
 /// A single Server-Sent Event from a streamed `Responses::create_with_stream` call. Covers
 /// lifecycle + text + function-calling events, the full streaming lifecycle for every tool
 /// type this crate implements (file_search, web_search, image_generation, mcp,
-/// code_interpreter), content_part and refusal events -- see
-/// docs/superpowers/specs/2026-08-11-responses-streaming-design.md and the later specs under
-/// docs/superpowers/specs/ prefixed `responses-streaming-`. The full union is 60 confirmed
-/// variants; the remaining ~16 (reasoning text/summary delta+done, audio, and events for
-/// shell/custom/computer_use tools -- this crate doesn't implement programmatic shell/custom
-/// tools, and computer_use has no per-item streaming events of its own) are deliberately
-/// deferred.
+/// code_interpreter), content_part, refusal, reasoning (text + summary), and audio events --
+/// see docs/superpowers/specs/2026-08-11-responses-streaming-design.md and the later specs
+/// under docs/superpowers/specs/ prefixed `responses-streaming-`. The full union is 60
+/// confirmed variants; the remaining ~6 (shell and custom-tool events) are deliberately
+/// deferred -- this crate doesn't implement programmatic shell/custom tools, so those events
+/// would be permanently unreachable. `computer_use` has no per-item streaming events of its
+/// own (confirmed absent from the union).
 #[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum ResponseStreamEvent {
@@ -1333,6 +1342,75 @@ pub enum ResponseStreamEvent {
         output_index: u32,
         sequence_number: u64,
     },
+    /// Emitted when a delta is added to a reasoning text.
+    #[serde(rename = "response.reasoning_text.delta")]
+    ReasoningTextDelta {
+        content_index: u32,
+        delta: String,
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+    },
+    /// Emitted when a reasoning text is completed.
+    #[serde(rename = "response.reasoning_text.done")]
+    ReasoningTextDone {
+        content_index: u32,
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+        text: String,
+    },
+    /// Emitted when a new reasoning summary part is added.
+    #[serde(rename = "response.reasoning_summary_part.added")]
+    ReasoningSummaryPartAdded {
+        item_id: String,
+        output_index: u32,
+        part: ReasoningSummaryPart,
+        sequence_number: u64,
+        summary_index: u32,
+    },
+    /// Emitted when a reasoning summary part is completed. `status` is `Some("incomplete")`
+    /// when generation was interrupted, omitted otherwise.
+    #[serde(rename = "response.reasoning_summary_part.done")]
+    ReasoningSummaryPartDone {
+        item_id: String,
+        output_index: u32,
+        part: ReasoningSummaryPart,
+        sequence_number: u64,
+        summary_index: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        status: Option<String>,
+    },
+    /// Emitted when a delta is added to a reasoning summary text.
+    #[serde(rename = "response.reasoning_summary_text.delta")]
+    ReasoningSummaryTextDelta {
+        delta: String,
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+        summary_index: u32,
+    },
+    /// Emitted when a reasoning summary text is completed.
+    #[serde(rename = "response.reasoning_summary_text.done")]
+    ReasoningSummaryTextDone {
+        item_id: String,
+        output_index: u32,
+        sequence_number: u64,
+        summary_index: u32,
+        text: String,
+    },
+    /// Emitted when there is a partial audio response. `delta` is base64-encoded audio bytes.
+    #[serde(rename = "response.audio.delta")]
+    AudioDelta { delta: String, sequence_number: u64 },
+    /// Emitted when the audio response is complete.
+    #[serde(rename = "response.audio.done")]
+    AudioDone { sequence_number: u64 },
+    /// Emitted when there is a partial transcript of audio.
+    #[serde(rename = "response.audio.transcript.delta")]
+    AudioTranscriptDelta { delta: String, sequence_number: u64 },
+    /// Emitted when the full audio transcript is completed.
+    #[serde(rename = "response.audio.transcript.done")]
+    AudioTranscriptDone { sequence_number: u64 },
     #[serde(rename = "error")]
     Error {
         message: String,
