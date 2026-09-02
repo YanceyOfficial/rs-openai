@@ -1,11 +1,12 @@
 //! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output; Phase C:
 //! function calling + MCP tools in-session; Phase D: SIP call management; Phase E: ephemeral
-//! client secrets) -- see
+//! client secrets; Phase F: transcription session type) -- see
 //! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md,
-//! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md, and
-//! docs/superpowers/specs/2026-09-02-realtime-phase-e-client-secrets-design.md.
+//! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md,
+//! docs/superpowers/specs/2026-09-02-realtime-phase-e-client-secrets-design.md, and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-f-transcription-design.md.
 
 pub mod calls;
 pub mod client_secrets;
@@ -70,11 +71,13 @@ mod tests {
     fn session_update_serializes_with_type_tag() {
         let event = RealtimeClientEvent::SessionUpdate {
             event_id: None,
-            session: RealtimeSessionConfig::builder()
-                .r#type("realtime")
-                .model("gpt-realtime-2.1")
-                .output_modalities(vec!["text".to_string()])
-                .build(),
+            session: Box::new(
+                RealtimeSessionConfig::builder()
+                    .r#type("realtime")
+                    .model("gpt-realtime-2.1")
+                    .output_modalities(vec!["text".to_string()])
+                    .build(),
+            ),
         };
         let json = serde_json::to_value(&event).unwrap();
         assert_eq!(
@@ -557,6 +560,57 @@ mod tests {
                 }),
                 "McpListToolsFailed",
             ),
+            (
+                serde_json::json!({
+                    "type": "conversation.item.input_audio_transcription.completed",
+                    "content_index": 0,
+                    "event_id": "evt_38",
+                    "item_id": "item_1",
+                    "transcript": "Hello there.",
+                    "usage": {"type": "duration", "seconds": 1.5},
+                    "languages": [{"code": "en"}],
+                    "logprobs": [{"token": "Hello", "bytes": [72, 101], "logprob": -0.01}]
+                }),
+                "ConversationItemInputAudioTranscriptionCompleted",
+            ),
+            (
+                serde_json::json!({
+                    "type": "conversation.item.input_audio_transcription.delta",
+                    "event_id": "evt_39",
+                    "item_id": "item_1",
+                    "content_index": 0,
+                    "delta": "Hel"
+                }),
+                "ConversationItemInputAudioTranscriptionDelta",
+            ),
+            (
+                serde_json::json!({
+                    "type": "conversation.item.input_audio_transcription.failed",
+                    "content_index": 0,
+                    "event_id": "evt_40",
+                    "item_id": "item_1",
+                    "error": {
+                        "code": "asr_failed",
+                        "message": "Transcription failed",
+                        "type": "transcription_error"
+                    }
+                }),
+                "ConversationItemInputAudioTranscriptionFailed",
+            ),
+            (
+                serde_json::json!({
+                    "type": "conversation.item.input_audio_transcription.segment",
+                    "id": "seg_1",
+                    "content_index": 0,
+                    "end": 2.5,
+                    "event_id": "evt_41",
+                    "item_id": "item_1",
+                    "speaker": "speaker_0",
+                    "start": 0.5,
+                    "text": "Hello there."
+                }),
+                "ConversationItemInputAudioTranscriptionSegment",
+            ),
         ];
 
         for (value, expected_variant) in cases {
@@ -567,6 +621,154 @@ mod tests {
                 "expected {expected_variant}, got {debug}"
             );
         }
+    }
+
+    #[test]
+    fn transcription_segment_and_failed_events_round_trip() {
+        use crate::interfaces::realtime::RealtimeTranscriptionError;
+
+        let segment = serde_json::json!({
+            "type": "conversation.item.input_audio_transcription.segment",
+            "id": "seg_1",
+            "content_index": 0,
+            "end": 2.5,
+            "event_id": "evt_1",
+            "item_id": "item_1",
+            "speaker": "speaker_0",
+            "start": 0.5,
+            "text": "Hello there."
+        });
+        let parsed: RealtimeServerEvent = serde_json::from_value(segment.clone()).unwrap();
+        match &parsed {
+            RealtimeServerEvent::ConversationItemInputAudioTranscriptionSegment {
+                id,
+                start,
+                end,
+                speaker,
+                text,
+                ..
+            } => {
+                assert_eq!(id, "seg_1");
+                assert_eq!(*start, 0.5);
+                assert_eq!(*end, 2.5);
+                assert_eq!(speaker, "speaker_0");
+                assert_eq!(text, "Hello there.");
+            }
+            other => panic!("expected Segment, got {other:?}"),
+        }
+        assert_eq!(serde_json::to_value(&parsed).unwrap(), segment);
+
+        let failed = serde_json::json!({
+            "type": "conversation.item.input_audio_transcription.failed",
+            "content_index": 1,
+            "event_id": "evt_2",
+            "item_id": "item_2",
+            "error": {
+                "code": "asr_failed",
+                "message": "Transcription failed",
+                "param": null,
+                "type": "transcription_error"
+            }
+        });
+        let parsed: RealtimeServerEvent = serde_json::from_value(failed).unwrap();
+        match parsed {
+            RealtimeServerEvent::ConversationItemInputAudioTranscriptionFailed {
+                content_index,
+                error: RealtimeTranscriptionError { code, message, .. },
+                ..
+            } => {
+                assert_eq!(content_index, 1);
+                assert_eq!(code.as_deref(), Some("asr_failed"));
+                assert_eq!(message.as_deref(), Some("Transcription failed"));
+            }
+            other => panic!("expected Failed, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn realtime_audio_transcription_round_trips() {
+        use crate::interfaces::realtime::RealtimeAudioTranscription;
+
+        let transcription = RealtimeAudioTranscription::builder()
+            .delay("low")
+            .keywords(vec!["OpenAI".to_string(), "Rust".to_string()])
+            .language("en")
+            .languages(vec!["en".to_string(), "es".to_string()])
+            .model("gpt-4o-transcribe")
+            .prompt("Expect technical vocabulary.")
+            .build();
+
+        let json = serde_json::to_value(&transcription).unwrap();
+        assert_eq!(json["delay"], "low");
+        assert_eq!(json["keywords"], serde_json::json!(["OpenAI", "Rust"]));
+        assert_eq!(json["model"], "gpt-4o-transcribe");
+
+        let parsed: RealtimeAudioTranscription = serde_json::from_value(json).unwrap();
+        assert_eq!(parsed.language.as_deref(), Some("en"));
+        assert_eq!(
+            parsed.languages.as_deref(),
+            Some(&["en".to_string(), "es".to_string()][..])
+        );
+    }
+
+    #[test]
+    fn session_config_serializes_transcription_session() {
+        use crate::interfaces::realtime::{
+            RealtimeAudioConfig, RealtimeAudioConfigInput, RealtimeAudioTranscription,
+        };
+
+        let session = RealtimeSessionConfig::builder()
+            .r#type("transcription")
+            .audio(
+                RealtimeAudioConfig::builder()
+                    .input(
+                        RealtimeAudioConfigInput::builder()
+                            .transcription(
+                                RealtimeAudioTranscription::builder()
+                                    .model("gpt-4o-transcribe")
+                                    .language("en")
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .include(vec!["item.input_audio_transcription.logprobs".to_string()])
+            .build();
+
+        let event = RealtimeClientEvent::SessionUpdate {
+            event_id: None,
+            session: Box::new(session),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "type": "session.update",
+                "session": {
+                    "type": "transcription",
+                    "audio": {
+                        "input": {
+                            "transcription": {"model": "gpt-4o-transcribe", "language": "en"}
+                        }
+                    },
+                    "include": ["item.input_audio_transcription.logprobs"]
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn session_config_include_round_trips() {
+        let session: RealtimeSessionConfig = serde_json::from_value(serde_json::json!({
+            "type": "realtime",
+            "include": ["item.input_audio_transcription.logprobs"]
+        }))
+        .unwrap();
+        assert_eq!(
+            session.include.as_deref(),
+            Some(&["item.input_audio_transcription.logprobs".to_string()][..])
+        );
     }
 
     #[test]

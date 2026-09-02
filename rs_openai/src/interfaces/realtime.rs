@@ -1,22 +1,24 @@
 //! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output; Phase C:
 //! function calling + MCP tools in-session; Phase D: SIP call management; Phase E: ephemeral
-//! client secrets) -- see
+//! client secrets; Phase F: transcription session type) -- see
 //! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md,
-//! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md, and
-//! docs/superpowers/specs/2026-09-02-realtime-phase-e-client-secrets-design.md. The WebSocket
-//! session (Phases A-C) is a persistent, stateful, full-duplex connection, unlike every other
-//! module in this crate (all plain HTTP request/response, even SSE streaming) -- covers
-//! connection setup, session config, conversation items, response lifecycle, audio
-//! input/output (including VAD turn detection), and function-calling/MCP tool configuration +
-//! tool-call items/events. Phase D's `calls` resource and Phase E's `client_secrets` resource,
+//! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md,
+//! docs/superpowers/specs/2026-09-02-realtime-phase-e-client-secrets-design.md, and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-f-transcription-design.md. The WebSocket
+//! session (Phases A-C, F) is a persistent, stateful, full-duplex connection, unlike every
+//! other module in this crate (all plain HTTP request/response, even SSE streaming) -- covers
+//! connection setup, session config (realtime and transcription session types), conversation
+//! items, response lifecycle, audio input/output (including VAD turn detection),
+//! function-calling/MCP tool configuration + tool-call items/events, and input-audio
+//! transcription events. Phase D's `calls` resource and Phase E's `client_secrets` resource,
 //! by contrast, are plain REST (SIP call accept/hangup/refer/reject plus WebRTC call
 //! bootstrapping; and minting `ek_...` tokens for browser/mobile/WebRTC clients) and fit this
-//! crate's ordinary `interfaces`/`apis` + `wiremock` pattern directly. Transcription session
-//! types and auto-reconnect are deliberately out of scope. `output_audio_buffer.*` events are
-//! WebRTC/SIP-only (confirmed via source) and are permanently out of scope for the WebSocket
-//! session, not merely deferred.
+//! crate's ordinary `interfaces`/`apis` + `wiremock` pattern directly. Auto-reconnect is
+//! deliberately out of scope. `output_audio_buffer.*` events are WebRTC/SIP-only (confirmed
+//! via source) and are permanently out of scope for the WebSocket session, not merely
+//! deferred.
 
 use bon::Builder;
 use serde::{Deserialize, Serialize};
@@ -109,8 +111,42 @@ pub struct RealtimeAudioOutputConfigWrapper {
     pub output: Option<RealtimeAudioOutputConfig>,
 }
 
-/// `transcription`'s full config (delay/keywords/language/languages/model/prompt) kept as
-/// raw JSON -- deliberately deferred richness, secondary to "does audio work."
+/// Config for input-audio transcription -- asynchronous speech-to-text run on the input
+/// audio buffer (through the `/audio/transcriptions` model), separate from the Realtime
+/// model's own native audio understanding. The request and response shapes are confirmed
+/// field-for-field identical, so this one type serves both. `delay`
+/// (`"minimal"|"low"|"medium"|"high"|"xhigh"`) and `model` (8 named values or a free
+/// string) kept as `Option<String>`.
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct RealtimeAudioTranscription {
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delay: Option<String>,
+
+    /// Words or phrases to bias transcription toward. Supported by `gpt-transcribe` /
+    /// `gpt-live-transcribe`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keywords: Option<Vec<String>>,
+
+    /// The input-audio language, ISO-639-1 (e.g. `en`). Improves accuracy and latency.
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+
+    /// Candidate input-audio languages, ISO-639-1. Supported by `gpt-transcribe` /
+    /// `gpt-live-transcribe`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub languages: Option<Vec<String>>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+}
+
 #[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
 pub struct RealtimeAudioConfigInput {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -120,7 +156,7 @@ pub struct RealtimeAudioConfigInput {
     pub noise_reduction: Option<RealtimeNoiseReduction>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub transcription: Option<serde_json::Value>,
+    pub transcription: Option<RealtimeAudioTranscription>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub turn_detection: Option<RealtimeTurnDetection>,
@@ -199,13 +235,19 @@ pub enum RealtimeToolChoice {
 }
 
 /// Deliberately trimmed from the real `RealtimeSessionCreateRequest`'s ~12 fields --
-/// `tracing`/`reasoning`/`prompt`/`truncation`/`include` deferred to a future phase.
+/// `tracing`/`reasoning`/`prompt`/`truncation` deferred to a future phase.
+///
+/// Serves **both** session types. A realtime session is `r#type = "realtime"` with
+/// `model`/`instructions`/`tools`/etc.; a transcription session (Phase F) is
+/// `r#type = "transcription"` with just `audio.input.transcription` + `include` set and the
+/// conversational fields left unset -- the real API models these as a union, but this crate
+/// treats `RealtimeSessionConfig` as a bag of optional fields keyed by the `r#type` string,
+/// matching how request-only and response-only fields are already conflated here.
 ///
 /// Also used, unchanged, for the `session` field of `session.created` / `session.updated`
 /// and of the client-secret response (`RealtimeClientSecret`), all of which are really the
-/// richer `RealtimeSessionCreateResponse` on the wire -- `id` / `object` / `expires_at`
-/// below are the response-only fields that let it round-trip losslessly. Phase F widens
-/// these three `session` sites to a `realtime | transcription` union.
+/// richer `*SessionCreateResponse` on the wire -- `id` / `object` / `expires_at` below are
+/// the response-only fields that let it round-trip losslessly.
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
 pub struct RealtimeSessionConfig {
     #[builder(into)]
@@ -249,6 +291,11 @@ pub struct RealtimeSessionConfig {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<RealtimeToolChoice>,
+
+    /// Extra fields to include in server outputs. The only documented value is
+    /// `"item.input_audio_transcription.logprobs"`. Valid on both session types.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<Vec<String>>,
 }
 
 /// A single content part of a conversation message. One flat, all-optional struct --
@@ -553,7 +600,10 @@ pub enum RealtimeClientEvent {
     SessionUpdate {
         #[serde(skip_serializing_if = "Option::is_none")]
         event_id: Option<String>,
-        session: RealtimeSessionConfig,
+        /// Boxed: `RealtimeSessionConfig` is by far the largest event payload, and boxing it
+        /// keeps `RealtimeClientEvent`'s variants size-balanced (same reason
+        /// `RealtimeTool::Mcp` is boxed).
+        session: Box<RealtimeSessionConfig>,
     },
     #[serde(rename = "conversation.item.create")]
     ConversationItemCreate {
@@ -619,12 +669,13 @@ pub enum RealtimeServerEvent {
     #[serde(rename = "session.created")]
     SessionCreated {
         event_id: String,
-        session: RealtimeSessionConfig,
+        /// Boxed for the same size-balancing reason as `RealtimeClientEvent::SessionUpdate`.
+        session: Box<RealtimeSessionConfig>,
     },
     #[serde(rename = "session.updated")]
     SessionUpdated {
         event_id: String,
-        session: RealtimeSessionConfig,
+        session: Box<RealtimeSessionConfig>,
     },
     #[serde(rename = "conversation.created")]
     ConversationCreated {
@@ -853,6 +904,84 @@ pub enum RealtimeServerEvent {
     McpListToolsCompleted { event_id: String, item_id: String },
     #[serde(rename = "mcp_list_tools.failed")]
     McpListToolsFailed { event_id: String, item_id: String },
+
+    /// Input-audio transcription finished for a user-audio item. Runs asynchronously with
+    /// response generation, so it may arrive before or after the response events.
+    #[serde(rename = "conversation.item.input_audio_transcription.completed")]
+    ConversationItemInputAudioTranscriptionCompleted {
+        content_index: u32,
+        event_id: String,
+        item_id: String,
+        transcript: String,
+        /// Billed per the ASR model's pricing. A token-billed vs. duration-billed union --
+        /// kept as raw JSON, matching `RealtimeResponse.usage`.
+        usage: serde_json::Value,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        languages: Option<Vec<RealtimeTranscriptionLanguage>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        logprobs: Option<Vec<RealtimeLogProb>>,
+    },
+    #[serde(rename = "conversation.item.input_audio_transcription.delta")]
+    ConversationItemInputAudioTranscriptionDelta {
+        event_id: String,
+        item_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        content_index: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        delta: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        logprobs: Option<Vec<RealtimeLogProb>>,
+    },
+    /// Transcription was configured but failed for a user message -- kept separate from
+    /// `error` events so the client can tie it to the item.
+    #[serde(rename = "conversation.item.input_audio_transcription.failed")]
+    ConversationItemInputAudioTranscriptionFailed {
+        content_index: u32,
+        event_id: String,
+        item_id: String,
+        error: RealtimeTranscriptionError,
+    },
+    /// A transcription segment (with speaker label and timing) was identified for an item.
+    #[serde(rename = "conversation.item.input_audio_transcription.segment")]
+    ConversationItemInputAudioTranscriptionSegment {
+        id: String,
+        content_index: u32,
+        end: f64,
+        event_id: String,
+        item_id: String,
+        speaker: String,
+        start: f64,
+        text: String,
+    },
+}
+
+/// A language detected in transcribed audio. Confirmed via source: an object with a single
+/// `code` field, not a bare string (unlike `RealtimeAudioTranscription.languages`).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RealtimeTranscriptionLanguage {
+    pub code: String,
+}
+
+/// A single log-probability entry. Enabled by setting the session's
+/// `include: ["item.input_audio_transcription.logprobs"]`.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RealtimeLogProb {
+    pub token: String,
+    pub bytes: Vec<u8>,
+    pub logprob: f64,
+}
+
+/// Details of a failed input-audio transcription (all fields optional, per source).
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct RealtimeTranscriptionError {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub param: Option<String>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
