@@ -1,12 +1,13 @@
 //! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output; Phase C:
 //! function calling + MCP tools in-session; Phase D: SIP call management; Phase E: ephemeral
-//! client secrets; Phase F: transcription session type) -- see
+//! client secrets; Phase F: transcription session type; Phase G: auto-reconnect) -- see
 //! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md,
-//! docs/superpowers/specs/2026-09-02-realtime-phase-e-client-secrets-design.md, and
-//! docs/superpowers/specs/2026-09-02-realtime-phase-f-transcription-design.md.
+//! docs/superpowers/specs/2026-09-02-realtime-phase-e-client-secrets-design.md,
+//! docs/superpowers/specs/2026-09-02-realtime-phase-f-transcription-design.md, and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-g-auto-reconnect-design.md.
 
 pub mod calls;
 pub mod client_secrets;
@@ -38,6 +39,7 @@ impl<'a> Realtime<'a> {
             self.openai.base_url(),
             self.openai.api_key(),
             req.model.as_deref(),
+            req.reconnect.clone(),
         )
         .await
     }

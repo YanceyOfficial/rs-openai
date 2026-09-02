@@ -1,24 +1,24 @@
 //! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output; Phase C:
 //! function calling + MCP tools in-session; Phase D: SIP call management; Phase E: ephemeral
-//! client secrets; Phase F: transcription session type) -- see
+//! client secrets; Phase F: transcription session type; Phase G: auto-reconnect) -- see
 //! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md,
-//! docs/superpowers/specs/2026-09-02-realtime-phase-e-client-secrets-design.md, and
-//! docs/superpowers/specs/2026-09-02-realtime-phase-f-transcription-design.md. The WebSocket
-//! session (Phases A-C, F) is a persistent, stateful, full-duplex connection, unlike every
+//! docs/superpowers/specs/2026-09-02-realtime-phase-e-client-secrets-design.md,
+//! docs/superpowers/specs/2026-09-02-realtime-phase-f-transcription-design.md, and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-g-auto-reconnect-design.md. The WebSocket
+//! session (Phases A-C, F, G) is a persistent, stateful, full-duplex connection, unlike every
 //! other module in this crate (all plain HTTP request/response, even SSE streaming) -- covers
 //! connection setup, session config (realtime and transcription session types), conversation
 //! items, response lifecycle, audio input/output (including VAD turn detection),
-//! function-calling/MCP tool configuration + tool-call items/events, and input-audio
-//! transcription events. Phase D's `calls` resource and Phase E's `client_secrets` resource,
-//! by contrast, are plain REST (SIP call accept/hangup/refer/reject plus WebRTC call
-//! bootstrapping; and minting `ek_...` tokens for browser/mobile/WebRTC clients) and fit this
-//! crate's ordinary `interfaces`/`apis` + `wiremock` pattern directly. Auto-reconnect is
-//! deliberately out of scope. `output_audio_buffer.*` events are WebRTC/SIP-only (confirmed
-//! via source) and are permanently out of scope for the WebSocket session, not merely
-//! deferred.
+//! function-calling/MCP tool configuration + tool-call items/events, input-audio transcription
+//! events, and opt-in transparent reconnection. Phase D's `calls` resource and Phase E's
+//! `client_secrets` resource, by contrast, are plain REST (SIP call accept/hangup/refer/reject
+//! plus WebRTC call bootstrapping; and minting `ek_...` tokens for browser/mobile/WebRTC
+//! clients) and fit this crate's ordinary `interfaces`/`apis` + `wiremock` pattern directly.
+//! `output_audio_buffer.*` events are WebRTC/SIP-only (confirmed via source) and are
+//! permanently out of scope for the WebSocket session, not merely deferred.
 
 use bon::Builder;
 use serde::{Deserialize, Serialize};
@@ -27,6 +27,34 @@ use std::collections::HashMap;
 #[derive(Builder, Debug, Clone, Default)]
 pub struct RealtimeConnectRequest {
     pub model: Option<String>,
+
+    /// Opt-in automatic reconnection. When set, a connection that drops with a recoverable
+    /// WebSocket close code is transparently re-established with exponential backoff, and the
+    /// `recv()` loop continues -- the server's fresh `session.created` event is the caller's
+    /// cue to re-apply any `session.update`. When `None` (the default), a dropped connection
+    /// ends the stream.
+    pub reconnect: Option<RealtimeReconnectConfig>,
+}
+
+/// Backoff policy for [`RealtimeConnectRequest::reconnect`]. Defaults mirror `openai-python`:
+/// 5 attempts, `500ms` initial delay, `8000ms` cap. Actual delays are
+/// `min(initial_delay_ms * 2^(attempt-1), max_delay_ms)` with a 0.75..1.0 jitter factor.
+#[derive(Builder, Debug, Clone)]
+pub struct RealtimeReconnectConfig {
+    #[builder(default = 5)]
+    pub max_retries: u32,
+
+    #[builder(default = 500)]
+    pub initial_delay_ms: u64,
+
+    #[builder(default = 8000)]
+    pub max_delay_ms: u64,
+}
+
+impl Default for RealtimeReconnectConfig {
+    fn default() -> Self {
+        Self::builder().build()
+    }
 }
 
 /// A single audio format -- `type`-tagged 3-variant union. Explicit per-variant
