@@ -13,4 +13,4 @@ actix-cors = "0.6.2"
 futures = { workspace = true }
 dotenvy = { workspace = true }
 actix-web-lab = "0.19.1"
-rs_openai = { path = "../../rs_openai", version = "0.8.0" }
+rs_openai = { path = "../../rs_openai", version = "0.9.0" }
