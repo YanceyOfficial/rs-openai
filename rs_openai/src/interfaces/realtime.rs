@@ -1,19 +1,22 @@
 //! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output; Phase C:
-//! function calling + MCP tools in-session; Phase D: SIP call management) -- see
+//! function calling + MCP tools in-session; Phase D: SIP call management; Phase E: ephemeral
+//! client secrets) -- see
 //! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md,
-//! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md, and
-//! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md. The WebSocket
+//! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md,
+//! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md, and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-e-client-secrets-design.md. The WebSocket
 //! session (Phases A-C) is a persistent, stateful, full-duplex connection, unlike every other
 //! module in this crate (all plain HTTP request/response, even SSE streaming) -- covers
 //! connection setup, session config, conversation items, response lifecycle, audio
 //! input/output (including VAD turn detection), and function-calling/MCP tool configuration +
-//! tool-call items/events. Phase D's `calls` resource, by contrast, is plain REST (SIP call
-//! accept/hangup/refer/reject, plus WebRTC call bootstrapping) and fits this crate's ordinary
-//! `interfaces`/`apis` + `wiremock` pattern directly. Ephemeral tokens, transcription/
-//! translation session types, and auto-reconnect are deliberately out of scope.
-//! `output_audio_buffer.*` events are WebRTC/SIP-only (confirmed via source) and are
-//! permanently out of scope for the WebSocket session, not merely deferred.
+//! tool-call items/events. Phase D's `calls` resource and Phase E's `client_secrets` resource,
+//! by contrast, are plain REST (SIP call accept/hangup/refer/reject plus WebRTC call
+//! bootstrapping; and minting `ek_...` tokens for browser/mobile/WebRTC clients) and fit this
+//! crate's ordinary `interfaces`/`apis` + `wiremock` pattern directly. Transcription session
+//! types and auto-reconnect are deliberately out of scope. `output_audio_buffer.*` events are
+//! WebRTC/SIP-only (confirmed via source) and are permanently out of scope for the WebSocket
+//! session, not merely deferred.
 
 use bon::Builder;
 use serde::{Deserialize, Serialize};
@@ -197,6 +200,12 @@ pub enum RealtimeToolChoice {
 
 /// Deliberately trimmed from the real `RealtimeSessionCreateRequest`'s ~12 fields --
 /// `tracing`/`reasoning`/`prompt`/`truncation`/`include` deferred to a future phase.
+///
+/// Also used, unchanged, for the `session` field of `session.created` / `session.updated`
+/// and of the client-secret response (`RealtimeClientSecret`), all of which are really the
+/// richer `RealtimeSessionCreateResponse` on the wire -- `id` / `object` / `expires_at`
+/// below are the response-only fields that let it round-trip losslessly. Phase F widens
+/// these three `session` sites to a `realtime | transcription` union.
 #[derive(Builder, Debug, Serialize, Deserialize, Clone)]
 pub struct RealtimeSessionConfig {
     #[builder(into)]
@@ -205,6 +214,20 @@ pub struct RealtimeSessionConfig {
     #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+
+    /// Response-only: the session id, looks like `sess_...`. Omitted when sent as a request.
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+
+    /// Response-only: `"realtime.session"` for realtime sessions.
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object: Option<String>,
+
+    /// Response-only: session expiration timestamp, in seconds since epoch.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<i64>,
 
     #[builder(into)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -879,4 +902,50 @@ pub struct RealtimeCallSipHeader {
 pub struct RealtimeCallIncomingEventData {
     pub call_id: String,
     pub sip_headers: Vec<RealtimeCallSipHeader>,
+}
+
+/// Configuration for a client secret's expiration -- the point after which the secret can
+/// no longer create new sessions (a session already started may continue past it). Both
+/// fields optional server-side.
+#[derive(Builder, Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ClientSecretExpiresAfter {
+    /// Only `"created_at"` is currently supported; `seconds` is added to the secret's
+    /// creation time to produce the expiration. `Option<String>` (not an enum) to stay
+    /// forward-compatible.
+    #[builder(into)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<String>,
+
+    /// Seconds from the anchor to expiration. Server default 600 (10 minutes); valid range
+    /// 10..7200 (2 hours). Not range-checked client-side.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seconds: Option<i64>,
+}
+
+/// Request body for `POST /realtime/client_secrets`. Both params optional -- an empty
+/// request serializes to `{}` and lets the server apply every default.
+#[derive(Builder, Debug, Serialize, Clone, Default)]
+pub struct CreateClientSecretRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_after: Option<ClientSecretExpiresAfter>,
+
+    /// Session configuration applied to sessions started with the minted secret (the client
+    /// connection can still override it). Phase E models the `realtime` session variant;
+    /// Phase F adds the `transcription` variant.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session: Option<RealtimeSessionConfig>,
+}
+
+/// Response from `POST /realtime/client_secrets` -- the minted ephemeral token plus the
+/// effective session configuration.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RealtimeClientSecret {
+    /// The generated client secret, a string that looks like `ek_...`. Pass it to a browser
+    /// / mobile / WebRTC client in place of the main API key.
+    pub value: String,
+
+    /// Expiration timestamp for the client secret, in seconds since epoch.
+    pub expires_at: i64,
+
+    pub session: RealtimeSessionConfig,
 }

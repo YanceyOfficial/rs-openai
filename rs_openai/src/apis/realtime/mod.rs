@@ -1,11 +1,14 @@
 //! Realtime API (Phase A: core text-only voice session; Phase B: audio input/output; Phase C:
-//! function calling + MCP tools in-session; Phase D: SIP call management) -- see
+//! function calling + MCP tools in-session; Phase D: SIP call management; Phase E: ephemeral
+//! client secrets) -- see
 //! docs/superpowers/specs/2026-09-01-realtime-phase-a-design.md,
 //! docs/superpowers/specs/2026-09-02-realtime-phase-b-audio-design.md,
-//! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md, and
-//! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md.
+//! docs/superpowers/specs/2026-09-02-realtime-phase-c-tools-design.md,
+//! docs/superpowers/specs/2026-09-02-realtime-phase-d-sip-calls-design.md, and
+//! docs/superpowers/specs/2026-09-02-realtime-phase-e-client-secrets-design.md.
 
 pub mod calls;
+pub mod client_secrets;
 pub mod connection;
 
 use crate::client::OpenAI;
@@ -13,6 +16,7 @@ use crate::interfaces::realtime;
 pub use crate::interfaces::realtime::*;
 use crate::shared::response_wrapper::OpenAIResponse;
 pub use calls::{RealtimeCall, RealtimeCalls};
+pub use client_secrets::RealtimeClientSecrets;
 pub use connection::RealtimeConnection;
 
 pub struct Realtime<'a> {
@@ -45,6 +49,12 @@ impl<'a> Realtime<'a> {
     /// Scoped accessor for managing an existing Realtime call (SIP accept/hangup/refer/reject).
     pub fn call(&self, call_id: impl Into<String>) -> RealtimeCall<'a> {
         RealtimeCall::new(self.openai, call_id.into())
+    }
+
+    /// Scoped accessor for minting ephemeral client secrets (`ek_...` tokens for browser /
+    /// mobile / WebRTC clients).
+    pub fn client_secrets(&self) -> RealtimeClientSecrets<'a> {
+        RealtimeClientSecrets::new(self.openai)
     }
 }
 
